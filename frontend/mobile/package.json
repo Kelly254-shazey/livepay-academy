@@ -1,0 +1,39 @@
+{
+  "name": "@livegate/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
+    "@hookform/resolvers": "^5.0.0",
+    "@livegate/shared": "file:../shared",
+    "@tanstack/react-query": "^5.0.0",
+    "expo": "~55.0.8",
+    "expo-constants": "~55.0.9",
+    "expo-file-system": "~55.0.11",
+    "expo-font": "~55.0.4",
+    "expo-router": "~55.0.7",
+    "expo-splash-screen": "~55.0.12",
+    "expo-status-bar": "~55.0.4",
+    "react": "19.2.0",
+    "react-hook-form": "^7.0.0",
+    "react-native": "0.83.2",
+    "react-native-reanimated": "^4.2.1",
+    "react-native-safe-area-context": "^5.6.2",
+    "react-native-screens": "^4.23.0",
+    "zod": "^3.25.76",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.14",
+    "babel-preset-expo": "~55.0.12",
+    "typescript": "~5.9.3"
+  }
+}

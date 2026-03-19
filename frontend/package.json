@@ -1,0 +1,15 @@
+{
+  "name": "livegate-frontend-workspace",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "web",
+    "mobile"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace ./web run dev",
+    "dev:mobile": "npm --workspace ./mobile run start",
+    "typecheck:web": "npm --workspace ./web run typecheck",
+    "typecheck:mobile": "npm --workspace ./mobile run typecheck"
+  }
+}

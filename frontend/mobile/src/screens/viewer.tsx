@@ -1,0 +1,666 @@
+import { categories, formatCurrency } from '@livegate/shared';
+import { useQuery } from '@tanstack/react-query';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
+import { Text, View } from 'react-native';
+import { mobileApi } from '@/api/client';
+import {
+  CategoryChip,
+  ClassCard,
+  ContentCard,
+  CreatorCard,
+  LiveCard,
+  NotificationRow,
+  TransactionRow,
+} from '@/components/cards';
+import { Button, EmptyState, Heading, LoadingState, Screen, Surface, TextField } from '@/components/ui';
+
+const sectionTitleStyle = { fontSize: 20, fontWeight: '700' as const, color: '#171512' };
+const metaLabelStyle = { fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' as const, color: '#6E675C' };
+const metaValueStyle = { fontSize: 16, fontWeight: '600' as const, color: '#171512' };
+const searchFilters = [
+  { title: 'All', value: 'all' },
+  { title: 'Creators', value: 'creator' },
+  { title: 'Lives', value: 'live' },
+  { title: 'Content', value: 'content' },
+  { title: 'Classes', value: 'class' },
+] as const;
+
+function getCategoryTitle(slug: string) {
+  return categories.find((item) => item.slug === slug)?.title ?? slug.replace(/-/g, ' ');
+}
+
+export function HomeScreen() {
+  const query = useQuery({
+    queryKey: ['mobile-home'],
+    queryFn: mobileApi.getHomeFeed,
+  });
+  const homeCategories = query.data?.categories?.length ? query.data.categories.slice(0, 6) : categories.slice(0, 6);
+
+  return (
+    <Screen>
+      <Heading
+        body="A calm home feed for premium discovery across paid live sessions, premium content, and structured classes."
+        eyebrow="LiveGate"
+        title="Discover premium access"
+      />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {homeCategories.map((category) => (
+          <CategoryChip
+            key={category.slug}
+            onPress={() => router.push(`/(viewer)/category/${category.slug}`)}
+            title={category.title}
+          />
+        ))}
+      </View>
+      {query.isLoading ? <LoadingState label="Loading home feed..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Home feed unavailable" /> : null}
+      {query.data ? (
+        <>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Trending lives</Text>
+            {query.data.trendingLives.length ? (
+              query.data.trendingLives.map((item) => (
+                <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
+              ))
+            ) : (
+              <EmptyState body="No live sessions returned yet from the API." title="No lives yet" />
+            )}
+          </View>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Featured creators</Text>
+            {query.data.featuredCreators.length ? (
+              query.data.featuredCreators.map((item) => (
+                <CreatorCard key={item.id} creator={item} onPress={() => router.push(`/(viewer)/creator/${item.id}`)} />
+              ))
+            ) : (
+              <EmptyState body="No creator feed returned yet from the API." title="No creators yet" />
+            )}
+          </View>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Premium content</Text>
+            {query.data.premiumContent.length ? (
+              query.data.premiumContent.map((item) => (
+                <ContentCard content={item} key={item.id} onPress={() => router.push(`/(viewer)/content/${item.id}`)} />
+              ))
+            ) : (
+              <EmptyState body="Locked content highlights will appear here after the API is connected." title="No content yet" />
+            )}
+          </View>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Recommended classes</Text>
+            {query.data.recommendedClasses.length ? (
+              query.data.recommendedClasses.map((item) => (
+                <ClassCard classItem={item} key={item.id} onPress={() => router.push(`/(viewer)/class/${item.id}`)} />
+              ))
+            ) : (
+              <EmptyState body="Class recommendations will appear here once the backend returns results." title="No classes yet" />
+            )}
+          </View>
+        </>
+      ) : null}
+    </Screen>
+  );
+}
+
+export function CategoriesScreen() {
+  return (
+    <Screen>
+      <Heading
+        body="Each category has a dedicated browsing context for creators, lives, locked content, and classes."
+        eyebrow="Categories"
+        title="Browse with intent"
+      />
+      {categories.map((category) => (
+        <Surface key={category.slug}>
+          <Text style={{ fontSize: 18, fontWeight: '600', color: '#171512' }}>{category.title}</Text>
+          <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{category.shortDescription}</Text>
+          <Button onPress={() => router.push(`/(viewer)/category/${category.slug}`)} title="Open category" />
+        </Surface>
+      ))}
+    </Screen>
+  );
+}
+
+export function SearchScreen() {
+  const [query, setQuery] = useState('');
+  const [type, setType] = useState<(typeof searchFilters)[number]['value']>('all');
+  const searchQuery = useQuery({
+    queryKey: ['mobile-search', query, type],
+    queryFn: () => mobileApi.search({ query, type }),
+    enabled: query.trim().length > 1,
+  });
+
+  return (
+    <Screen>
+      <Heading body="Search creators, lives, premium content, and classes." eyebrow="Search" title="Find what matters" />
+      <TextField label="Search" onChangeText={setQuery} placeholder="Search LiveGate" value={query} />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {searchFilters.map((filter) => (
+          <CategoryChip active={type === filter.value} key={filter.value} onPress={() => setType(filter.value)} title={filter.title} />
+        ))}
+      </View>
+      {query.trim().length <= 1 ? <EmptyState body="Start typing to search across the platform." title="Search is idle" /> : null}
+      {searchQuery.isLoading ? <LoadingState label="Searching..." /> : null}
+      {searchQuery.isError ? <EmptyState body={(searchQuery.error as Error).message} title="Search unavailable" /> : null}
+      {searchQuery.data ? (
+        <View style={{ gap: 12 }}>
+          {searchQuery.data.creators.map((item) => (
+            <CreatorCard key={item.id} creator={item} onPress={() => router.push(`/(viewer)/creator/${item.id}`)} />
+          ))}
+          {searchQuery.data.lives.map((item) => (
+            <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
+          ))}
+          {searchQuery.data.content.map((item) => (
+            <ContentCard content={item} key={item.id} onPress={() => router.push(`/(viewer)/content/${item.id}`)} />
+          ))}
+          {searchQuery.data.classes.map((item) => (
+            <ClassCard classItem={item} key={item.id} onPress={() => router.push(`/(viewer)/class/${item.id}`)} />
+          ))}
+          {!searchQuery.data.creators.length &&
+          !searchQuery.data.lives.length &&
+          !searchQuery.data.content.length &&
+          !searchQuery.data.classes.length ? (
+            <EmptyState body="Try a different keyword or switch the active filter." title="No results" />
+          ) : null}
+        </View>
+      ) : null}
+    </Screen>
+  );
+}
+
+export function ViewerLibraryScreen() {
+  const query = useQuery({
+    queryKey: ['viewer-dashboard-mobile'],
+    queryFn: mobileApi.getViewerDashboard,
+  });
+
+  return (
+    <Screen>
+      <Heading
+        body="Purchases, joined lives, saved content, followed creators, notifications, and transaction history converge here."
+        eyebrow="Viewer dashboard"
+        title="Your library"
+      />
+      {query.isLoading ? <LoadingState label="Loading dashboard..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Viewer dashboard unavailable" /> : null}
+      {query.data ? (
+        <>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Purchased lives</Text>
+            {query.data.purchasedLives.items.length ? (
+              query.data.purchasedLives.items.map((item) => (
+                <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
+              ))
+            ) : (
+              <EmptyState body="Paid live sessions will appear here after checkout." title="No purchased lives" />
+            )}
+          </View>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Saved premium content</Text>
+            {query.data.purchasedContent.items.length ? (
+              query.data.purchasedContent.items.map((item) => (
+                <ContentCard content={item} key={item.id} onPress={() => router.push(`/(viewer)/content/${item.id}`)} />
+              ))
+            ) : (
+              <EmptyState body="Unlocked premium content will appear here." title="No saved content" />
+            )}
+          </View>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Enrolled classes</Text>
+            {query.data.enrolledClasses.items.length ? (
+              query.data.enrolledClasses.items.map((item) => (
+                <ClassCard classItem={item} key={item.id} onPress={() => router.push(`/(viewer)/class/${item.id}`)} />
+              ))
+            ) : (
+              <EmptyState body="Classes you enroll in will stay visible here." title="No enrolled classes" />
+            )}
+          </View>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Followed creators</Text>
+            {query.data.followedCreators.items.length ? (
+              query.data.followedCreators.items.map((item) => (
+                <CreatorCard creator={item} key={item.id} onPress={() => router.push(`/(viewer)/creator/${item.id}`)} />
+              ))
+            ) : (
+              <EmptyState body="Creators you follow will appear here for quick access." title="No followed creators" />
+            )}
+          </View>
+        </>
+      ) : null}
+    </Screen>
+  );
+}
+
+export function ViewerProfileScreen() {
+  return (
+    <Screen>
+      <Heading
+        body="Profile, notifications, wallet, and settings stay close without crowding the main discovery experience."
+        eyebrow="Profile"
+        title="Account"
+      />
+      <Surface>
+        <Button onPress={() => router.push('/(viewer)/notifications')} title="Notifications" />
+        <Button onPress={() => router.push('/(viewer)/wallet')} title="Wallet" variant="secondary" />
+        <Button onPress={() => router.push('/(viewer)/settings')} title="Settings" variant="ghost" />
+      </Surface>
+    </Screen>
+  );
+}
+
+export function CategoryDetailScreen() {
+  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const query = useQuery({
+    queryKey: ['mobile-category', slug],
+    queryFn: () => mobileApi.getCategoryDetail(slug),
+    enabled: Boolean(slug),
+  });
+
+  return (
+    <Screen>
+      <Heading body="Creators, lives, premium content, and classes are grouped within this category." eyebrow="Category" title={slug?.replace(/-/g, ' ') ?? 'Category'} />
+      {query.isLoading ? <LoadingState label="Loading category..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Category unavailable" /> : null}
+      {query.data ? (
+        <>
+          {query.data.creators.items.map((item) => (
+            <CreatorCard creator={item} key={item.id} onPress={() => router.push(`/(viewer)/creator/${item.id}`)} />
+          ))}
+          {query.data.lives.items.map((item) => (
+            <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
+          ))}
+          {query.data.premiumContent.items.map((item) => (
+            <ContentCard content={item} key={item.id} onPress={() => router.push(`/(viewer)/content/${item.id}`)} />
+          ))}
+          {query.data.classes.items.map((item) => (
+            <ClassCard classItem={item} key={item.id} onPress={() => router.push(`/(viewer)/class/${item.id}`)} />
+          ))}
+        </>
+      ) : null}
+    </Screen>
+  );
+}
+
+export function CreatorProfileScreen() {
+  const { creatorId } = useLocalSearchParams<{ creatorId: string }>();
+  const query = useQuery({
+    queryKey: ['mobile-creator', creatorId],
+    queryFn: () => mobileApi.getCreatorProfile(creatorId),
+    enabled: Boolean(creatorId),
+  });
+
+  return (
+    <Screen>
+      {query.isLoading ? <LoadingState label="Loading creator..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Creator unavailable" /> : null}
+      {query.data ? (
+        <>
+          <Heading body={query.data.creator.bio ?? query.data.creator.headline} eyebrow="Creator" title={query.data.creator.displayName} />
+          <Surface>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <View style={{ gap: 4 }}>
+                <Text style={{ fontSize: 14, color: '#6E675C' }}>@{query.data.creator.handle}</Text>
+                <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{query.data.creator.headline}</Text>
+              </View>
+              <Button title="Follow creator" />
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {query.data.creator.categories.map((category) => (
+                <CategoryChip key={category} title={getCategoryTitle(category)} />
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Followers</Text>
+                <Text style={metaValueStyle}>{query.data.creator.followerCount}</Text>
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Reviews</Text>
+                <Text style={metaValueStyle}>{query.data.creator.reviewCount}</Text>
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Status</Text>
+                <Text style={metaValueStyle}>{query.data.creator.verificationStatus}</Text>
+              </View>
+            </View>
+          </Surface>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Reviews</Text>
+            {query.data.reviews.items.length ? (
+              query.data.reviews.items.map((review) => (
+                <Surface key={review.id}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>{review.authorName}</Text>
+                    <Text style={{ fontSize: 13, color: '#6E675C' }}>{review.rating}/5</Text>
+                  </View>
+                  <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{review.comment}</Text>
+                </Surface>
+              ))
+            ) : (
+              <EmptyState body="Creator reviews will appear here when returned by the backend." title="No reviews yet" />
+            )}
+          </View>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Upcoming lives</Text>
+            {query.data.upcomingLives.items.length ? (
+              query.data.upcomingLives.items.map((item) => (
+                <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
+              ))
+            ) : (
+              <EmptyState body="Upcoming sessions from this creator will appear here." title="No lives scheduled" />
+            )}
+          </View>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Premium content</Text>
+            {query.data.premiumContent.items.length ? (
+              query.data.premiumContent.items.map((item) => (
+                <ContentCard content={item} key={item.id} onPress={() => router.push(`/(viewer)/content/${item.id}`)} />
+              ))
+            ) : (
+              <EmptyState body="Locked content from this creator will appear here." title="No premium content" />
+            )}
+          </View>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Classes</Text>
+            {query.data.classes.items.length ? (
+              query.data.classes.items.map((item) => (
+                <ClassCard classItem={item} key={item.id} onPress={() => router.push(`/(viewer)/class/${item.id}`)} />
+              ))
+            ) : (
+              <EmptyState body="Classes and workshops from this creator will appear here." title="No classes yet" />
+            )}
+          </View>
+        </>
+      ) : null}
+    </Screen>
+  );
+}
+
+export function LiveDetailsScreen() {
+  const { liveId } = useLocalSearchParams<{ liveId: string }>();
+  const query = useQuery({
+    queryKey: ['mobile-live', liveId],
+    queryFn: () => mobileApi.getLiveDetail(liveId),
+    enabled: Boolean(liveId),
+  });
+
+  return (
+    <Screen>
+      {query.isLoading ? <LoadingState label="Loading live session..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Live unavailable" /> : null}
+      {query.data ? (
+        <>
+          <Heading body={query.data.live.description} eyebrow="Paid live" title={query.data.live.title} />
+          <Surface>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Host</Text>
+                <Text style={metaValueStyle}>{query.data.live.creator.displayName}</Text>
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Category</Text>
+                <Text style={metaValueStyle}>{getCategoryTitle(query.data.live.category)}</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Starts</Text>
+                <Text style={metaValueStyle}>{query.data.live.startTime}</Text>
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Price</Text>
+                <Text style={metaValueStyle}>{formatCurrency(query.data.live.price)}</Text>
+              </View>
+            </View>
+          </Surface>
+          <Surface>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+              {query.data.live.accessGranted
+                ? 'Access granted. You can join the live room immediately.'
+                : 'Payment is required before this live can be joined. Connect your payment backend to unlock this flow.'}
+            </Text>
+            {query.data.live.accessGranted ? (
+              <Button onPress={() => router.push(`/(viewer)/live/${liveId}/room`)} title="Join live room" />
+            ) : (
+              <Button title="Payment placeholder" variant="secondary" />
+            )}
+          </Surface>
+        </>
+      ) : null}
+    </Screen>
+  );
+}
+
+export function LiveRoomScreen() {
+  const { liveId } = useLocalSearchParams<{ liveId: string }>();
+  const query = useQuery({
+    queryKey: ['mobile-live-room', liveId],
+    queryFn: () => mobileApi.getLiveRoom(liveId),
+    enabled: Boolean(liveId),
+  });
+
+  return (
+    <Screen>
+      {query.isLoading ? <LoadingState label="Connecting to live room..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Live room unavailable" /> : null}
+      {query.data ? (
+        <>
+          <Heading body={query.data.live.description} eyebrow="Live room" title={query.data.live.title} />
+          <Surface>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Host</Text>
+                <Text style={metaValueStyle}>{query.data.live.creator.displayName}</Text>
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Viewers</Text>
+                <Text style={metaValueStyle}>{query.data.live.viewerCount}</Text>
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Chat</Text>
+                <Text style={metaValueStyle}>{query.data.chatEnabled ? 'Enabled' : 'Unavailable'}</Text>
+              </View>
+            </View>
+          </Surface>
+          <Surface>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+              Streaming and chat can mount here once your realtime and media providers are connected.
+            </Text>
+            <Text style={sectionTitleStyle}>Chat area</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+              This reserved panel is where live chat messages and composer controls will render after realtime integration.
+            </Text>
+            {query.data.hostNotes?.length ? (
+              <View style={{ gap: 10 }}>
+                <Text style={sectionTitleStyle}>Host notes</Text>
+                {query.data.hostNotes.map((note, index) => (
+                  <Surface key={`${note}-${index}`}>
+                    <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{note}</Text>
+                  </Surface>
+                ))}
+              </View>
+            ) : null}
+          </Surface>
+        </>
+      ) : null}
+    </Screen>
+  );
+}
+
+export function ContentDetailsScreen() {
+  const { contentId } = useLocalSearchParams<{ contentId: string }>();
+  const query = useQuery({
+    queryKey: ['mobile-content', contentId],
+    queryFn: () => mobileApi.getPremiumContentDetail(contentId),
+    enabled: Boolean(contentId),
+  });
+
+  return (
+    <Screen>
+      {query.isLoading ? <LoadingState label="Loading content..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Content unavailable" /> : null}
+      {query.data ? (
+        <>
+          <Heading body={query.data.content.description} eyebrow="Premium content" title={query.data.content.title} />
+          <Surface>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Creator</Text>
+                <Text style={metaValueStyle}>{query.data.content.creator.displayName}</Text>
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Category</Text>
+                <Text style={metaValueStyle}>{getCategoryTitle(query.data.content.category)}</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Price</Text>
+                <Text style={metaValueStyle}>{formatCurrency(query.data.content.price)}</Text>
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Attachments</Text>
+                <Text style={metaValueStyle}>{query.data.content.attachmentCount}</Text>
+              </View>
+            </View>
+          </Surface>
+          <Surface>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+              {query.data.content.accessGranted
+                ? 'Unlocked state active. Attachments or replay access can render here.'
+                : 'Payment is required before this content becomes accessible.'}
+            </Text>
+            <Button title={query.data.content.accessGranted ? 'Open content' : 'Unlock placeholder'} />
+          </Surface>
+        </>
+      ) : null}
+    </Screen>
+  );
+}
+
+export function ClassDetailsScreen() {
+  const { classId } = useLocalSearchParams<{ classId: string }>();
+  const query = useQuery({
+    queryKey: ['mobile-class', classId],
+    queryFn: () => mobileApi.getClassDetail(classId),
+    enabled: Boolean(classId),
+  });
+
+  return (
+    <Screen>
+      {query.isLoading ? <LoadingState label="Loading class..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Class unavailable" /> : null}
+      {query.data ? (
+        <>
+          <Heading body={query.data.classItem.description} eyebrow="Class" title={query.data.classItem.title} />
+          <Surface>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Teacher</Text>
+                <Text style={metaValueStyle}>{query.data.classItem.creator.displayName}</Text>
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Category</Text>
+                <Text style={metaValueStyle}>{getCategoryTitle(query.data.classItem.category)}</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Schedule</Text>
+                <Text style={metaValueStyle}>{query.data.classItem.scheduleLabel}</Text>
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Price</Text>
+                <Text style={metaValueStyle}>{formatCurrency(query.data.classItem.price)}</Text>
+              </View>
+            </View>
+          </Surface>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Lessons</Text>
+            {query.data.classItem.lessons.length ? (
+              query.data.classItem.lessons.map((lesson) => (
+                <Surface key={lesson.id}>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>{lesson.title}</Text>
+                  <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{lesson.durationLabel}</Text>
+                </Surface>
+              ))
+            ) : (
+              <EmptyState body="Lessons will appear here when returned by the backend." title="No lessons yet" />
+            )}
+          </View>
+          <View style={{ gap: 12 }}>
+            <Text style={sectionTitleStyle}>Materials</Text>
+            {query.data.classItem.materials.length ? (
+              query.data.classItem.materials.map((material, index) => (
+                <Surface key={`${material}-${index}`}>
+                  <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{material}</Text>
+                </Surface>
+              ))
+            ) : (
+              <EmptyState body="Class materials will appear here after enrollment-ready data is returned." title="No materials yet" />
+            )}
+          </View>
+          <Button title={query.data.classItem.accessGranted ? 'Continue class' : 'Enroll placeholder'} />
+        </>
+      ) : null}
+    </Screen>
+  );
+}
+
+export function NotificationsScreen() {
+  const query = useQuery({
+    queryKey: ['mobile-notifications'],
+    queryFn: mobileApi.getNotifications,
+  });
+
+  return (
+    <Screen>
+      <Heading body="Live reminders, purchases, announcements, and payout updates." eyebrow="Notifications" title="Updates" />
+      {query.isLoading ? <LoadingState label="Loading notifications..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Notifications unavailable" /> : null}
+      {query.data ? (
+        query.data.items.length ? (
+          query.data.items.map((item) => <NotificationRow item={item} key={item.id} />)
+        ) : (
+          <EmptyState body="Notification records will appear here from the backend." title="No notifications yet" />
+        )
+      ) : null}
+    </Screen>
+  );
+}
+
+export function ViewerWalletScreen() {
+  const query = useQuery({
+    queryKey: ['mobile-viewer-transactions'],
+    queryFn: mobileApi.getViewerDashboard,
+  });
+
+  return (
+    <Screen>
+      <Heading body="Purchases and transaction history remain visible without clutter." eyebrow="Wallet" title="Transactions" />
+      {query.isLoading ? <LoadingState label="Loading transactions..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Wallet unavailable" /> : null}
+      {query.data ? (
+        query.data.transactions.items.length ? (
+          query.data.transactions.items.map((item) => <TransactionRow item={item} key={item.id} />)
+        ) : (
+          <EmptyState body="Transactions appear here after purchases are completed." title="No transactions yet" />
+        )
+      ) : null}
+    </Screen>
+  );
+}
+
+export function SettingsScreen() {
+  return (
+    <Screen>
+      <Heading body="Quiet account controls without a cluttered settings maze." eyebrow="Settings" title="Preferences" />
+      <Surface>
+        <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+          Notification preferences, security controls, payout settings, and account actions can mount here when those APIs are ready.
+        </Text>
+      </Surface>
+    </Screen>
+  );
+}
