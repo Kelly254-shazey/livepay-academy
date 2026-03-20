@@ -1,0 +1,11 @@
+{
+  "css.lint.unknownAtRules": "ignore",
+  "cSpell.words": [
+    "enabledelayedexpansion",
+    "errorlevel",
+    "mysqladmin",
+    "pressable",
+    "pyproject",
+    "setlocal"
+  ]
+}

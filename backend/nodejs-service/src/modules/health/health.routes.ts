@@ -1,0 +1,46 @@
+import { Router } from "express";
+import type { PrismaClient } from "@prisma/client";
+
+import type { AppRedisClient } from "../../infrastructure/cache/redis";
+
+type DependencyPinger = {
+  ping: () => Promise<unknown>;
+};
+
+export function createHealthRouter(
+  db: PrismaClient,
+  redis: AppRedisClient,
+  dependencies?: {
+    javaFinance?: DependencyPinger;
+    pythonIntelligence?: DependencyPinger;
+  }
+) {
+  const router = Router();
+
+  router.get("/", async (_req, res) => {
+    const [database, cache, javaFinance, pythonIntelligence] = await Promise.all([
+      db.$queryRawUnsafe("SELECT 1").then(() => "up").catch(() => "down"),
+      redis.ping().then(() => "up").catch(() => "down"),
+      dependencies?.javaFinance?.ping().then(() => "up").catch(() => "down") ?? Promise.resolve("unknown"),
+      dependencies?.pythonIntelligence?.ping().then(() => "up").catch(() => "down") ?? Promise.resolve("unknown")
+    ]);
+
+    res.json({
+      status:
+        database === "up" &&
+        cache === "up" &&
+        (javaFinance === "up" || javaFinance === "unknown") &&
+        (pythonIntelligence === "up" || pythonIntelligence === "unknown")
+          ? "ok"
+          : "degraded",
+      services: {
+        database,
+        cache,
+        javaFinance,
+        pythonIntelligence
+      }
+    });
+  });
+
+  return router;
+}

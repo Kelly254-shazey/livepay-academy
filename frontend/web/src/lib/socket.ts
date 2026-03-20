@@ -4,10 +4,13 @@ import { env } from './env';
 let socket: Socket | null = null;
 
 export function getLiveGateSocket() {
-  if (!env.socketUrl) return null;
+  const target =
+    env.socketUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+
+  if (!target) return null;
 
   if (!socket) {
-    socket = io(env.socketUrl, {
+    socket = io(target, {
       autoConnect: false,
       transports: ['websocket'],
     });

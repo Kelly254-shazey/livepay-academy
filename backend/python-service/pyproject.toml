@@ -1,0 +1,21 @@
+[project]
+name = "livegate-python-service"
+version = "1.0.0"
+description = "LiveGate intelligence, analytics, ranking, moderation, and fraud service"
+requires-python = ">=3.11"
+dependencies = [
+  "aiomysql>=0.2.0",
+  "apscheduler>=3.10.4",
+  "fastapi>=0.115.11",
+  "pydantic-settings>=2.8.1",
+  "redis>=5.2.1",
+  "sqlalchemy>=2.0.38",
+  "uvicorn[standard]>=0.34.0"
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]

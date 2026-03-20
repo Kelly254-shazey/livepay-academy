@@ -1,0 +1,33 @@
+{
+  "product": "LiveGate",
+  "commission": {
+    "platformRate": "0.20",
+    "creatorRate": "0.80"
+  },
+  "roles": ["viewer", "creator", "moderator", "admin"],
+  "categories": [
+    "Education",
+    "Trading Education",
+    "Business & Entrepreneurship",
+    "Career Coaching",
+    "Mentorship",
+    "Fitness & Wellness",
+    "Creative Skills",
+    "Events & Workshops",
+    "Premium Tutorials",
+    "Entertainment Live"
+  ],
+  "guardrails": [
+    "Users must pay before joining a paid live session.",
+    "Creators define live and premium content prices, but the backend validates all price references.",
+    "Users must pay before unlocking premium content or restricted class lessons.",
+    "Platform commission is always 20% of successful transactions.",
+    "Creator share is always 80% of successful transactions.",
+    "Frontend pricing and payment success claims are never trusted.",
+    "Sensitive actions and all financial state changes must be auditable."
+  ],
+  "internalAuth": {
+    "header": "x-internal-api-key"
+  }
+}
+

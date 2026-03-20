@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import type {
   AdminDashboardPayload,
   ApiListResponse,
@@ -18,7 +19,25 @@ import type {
 import { apiRoutes } from '@livegate/shared';
 import { useSessionStore } from '@/store/session-store';
 
-const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ?? '';
+function resolveExpoHost() {
+  const hostUri = Constants.expoConfig?.hostUri;
+
+  if (!hostUri) {
+    return '';
+  }
+
+  return hostUri
+    .replace(/^[a-z]+:\/\//i, '')
+    .split(':')[0]
+    ?.trim();
+}
+
+const apiBaseUrl =
+  process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ||
+  (() => {
+    const host = resolveExpoHost();
+    return host ? `http://${host}:3000/api` : '';
+  })();
 
 export class MobileApiError extends Error {}
 

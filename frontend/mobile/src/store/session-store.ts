@@ -36,26 +36,26 @@ const createStore = () => {
 
     return create<SessionState>()(
       persist(
-        (set) => ({
+        (set: any) => ({
           hydrated: false,
           hasSeenOnboarding: false,
           preferredRole: 'viewer',
           session: null,
-          setHydrated: (hydrated) => set({ hydrated }),
+          setHydrated: (hydrated: boolean) => set({ hydrated }),
           completeOnboarding: () => set({ hasSeenOnboarding: true }),
-          setPreferredRole: (preferredRole) => set({ preferredRole }),
-          setSession: (session) => set({ session }),
+          setPreferredRole: (preferredRole: UserRole) => set({ preferredRole }),
+          setSession: (session: AuthSession | null) => set({ session }),
           signOut: () => set({ session: null }),
         }),
         {
           name: 'livegate-mobile-session',
           storage: createJSONStorage(() => fileStorage),
-          partialize: (state) => ({
+          partialize: (state: SessionState) => ({
             hasSeenOnboarding: state.hasSeenOnboarding,
             preferredRole: state.preferredRole,
             session: state.session,
           }),
-          onRehydrateStorage: () => (state) => {
+          onRehydrateStorage: () => (state?: SessionState) => {
             state?.setHydrated(true);
           },
         },

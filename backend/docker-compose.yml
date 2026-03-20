@@ -1,0 +1,82 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: livegate-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_USER: ${MYSQL_USER:-livegate}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-livegate}
+    ports:
+      - "3306:3306"
+    volumes:
+      - livegate_mysql:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -p${MYSQL_ROOT_PASSWORD:-root} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: livegate-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - livegate_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  nodejs-service:
+    build:
+      context: ./nodejs-service
+    container_name: livegate-nodejs-service
+    restart: unless-stopped
+    env_file:
+      - ./nodejs-service/.env.example
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+  python-service:
+    build:
+      context: ./python-service
+    container_name: livegate-python-service
+    restart: unless-stopped
+    env_file:
+      - ./python-service/.env.example
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  java-service:
+    build:
+      context: ./java-service
+    container_name: livegate-java-service
+    restart: unless-stopped
+    env_file:
+      - ./java-service/.env.example
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+volumes:
+  livegate_mysql:
+  livegate_redis:

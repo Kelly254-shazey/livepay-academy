@@ -41,11 +41,19 @@ export async function http<T>(path: string, options: RequestOptions = {}) {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${env.apiBaseUrl}${path}`, {
-    ...options,
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${env.apiBaseUrl}${path}`, {
+      ...options,
+      headers,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
+  } catch {
+    throw new ApiRequestError(
+      'LiveGate backend is unavailable. Start the backend services and try again.',
+    );
+  }
 
   const json = await response.json().catch(() => null);
 
