@@ -14,10 +14,10 @@ export function Card({
   return (
     <div
       className={`
-        bg-surface border border-stroke rounded-xl
-        transition-all duration-200
-        ${interactive ? 'hover:shadow-soft hover:border-accent/30 cursor-pointer hover:-translate-y-0.5' : ''}
-        ${noPadding ? '' : 'p-6'}
+        glass-card rounded-[28px]
+        transition-all duration-300
+        ${interactive ? 'cursor-pointer hover:-translate-y-1 hover:shadow-glass-lg hover:border-white/60' : ''}
+        ${noPadding ? '' : 'p-6 sm:p-7'}
         ${className || ''}
       `}
     >

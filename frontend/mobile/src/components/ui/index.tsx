@@ -165,7 +165,7 @@ export const styles = StyleSheet.create({
   scrollContent: {
     padding: theme.spacing.xl,
     gap: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxxl,
+    paddingBottom: 120,
   },
   surface: {
     backgroundColor: theme.colors.elevatedSurface,

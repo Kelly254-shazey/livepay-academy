@@ -8,53 +8,162 @@
   color-scheme: light;
   --font-body: 'Manrope', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
-  --canvas: #f5f1e8;
-  --surface: #fffaf3;
-  --surface-muted: #eee6d9;
-  --stroke: #ded5c7;
-  --text: #171512;
-  --muted: #6e675c;
+  
+  /* Primary Canvas & Surface */
+  --canvas: #f8faf9;
+  --surface: #ffffff;
+  --surface-muted: #f0f3f1;
+  --surface-secondary: #f5f8f6;
+  
+  /* Borders & Dividers */
+  --stroke: #d8dcd9;
+  --stroke-subtle: #e8ebe7;
+  
+  /* Text Colors */
+  --text: #0d1d1b;
+  --text-secondary: #4a5a57;
+  --muted: #717d7a;
+  
+  /* Primary Brand Color - Teal */
   --accent: #0f766e;
-  --accent-muted: #dcede9;
-  --success: #205c47;
-  --warning: #9a6a2a;
-  --danger: #a34734;
+  --accent-light: #14b8a6;
+  --accent-dark: #0a5650;
+  --accent-muted: #ccede6;
+  
+  /* Status Colors */
+  --success: #15803d;
+  --success-light: #22c55e;
+  --success-dark: #166534;
+  
+  --warning: #a16207;
+  --warning-light: #eab308;
+  --warning-dark: #713f12;
+  
+  --danger: #b91c1c;
+  --danger-light: #ef4444;
+  --danger-dark: #7f1d1d;
+  
+  --info: #0369a1;
+  --info-light: #0ea5e9;
+  --info-dark: #0c4a6e;
+  
+  /* Role-Based Colors */
+  --role-creator: #8b5cf6;      /* Purple */
+  --role-viewer: #3b82f6;       /* Blue */
+  --role-admin: #dc2626;        /* Red */
+  --role-moderator: #f59e0b;    /* Amber */
+  
+  /* Structural Backgrounds */
+  --bg-overlay: rgba(13, 29, 27, 0.04);
+  --bg-hover: rgba(15, 118, 110, 0.04);
+  --bg-active: rgba(15, 118, 110, 0.08);
 }
 
 .dark {
   color-scheme: dark;
-  --canvas: #11110f;
-  --surface: #171613;
-  --surface-muted: #1f1d19;
-  --stroke: #2b2925;
-  --text: #f7f2ea;
-  --muted: #b7aea2;
-  --accent: #75b7ae;
-  --accent-muted: rgba(117, 183, 174, 0.14);
-  --success: #4f9d80;
-  --warning: #d6a35f;
-  --danger: #db8d7c;
+  
+  /* Primary Canvas & Surface */
+  --canvas: #0f1513;
+  --surface: #1a2220;
+  --surface-muted: #232d2a;
+  --surface-secondary: #1f2925;
+  
+  /* Borders & Dividers */
+  --stroke: #394440;
+  --stroke-subtle: #2a3330;
+  
+  /* Text Colors */
+  --text: #f0f4f3;
+  --text-secondary: #b8c4bf;
+  --muted: #7a8a85;
+  
+  /* Primary Brand Color - Teal */
+  --accent: #06b6d4;
+  --accent-light: #67e8f9;
+  --accent-dark: #0891b2;
+  --accent-muted: rgba(6, 182, 212, 0.14);
+  
+  /* Status Colors */
+  --success: #4ade80;
+  --success-light: #86efac;
+  --success-dark: #22863a;
+  
+  --warning: #fbbf24;
+  --warning-light: #fcd34d;
+  --warning-dark: #b45309;
+  
+  --danger: #f87171;
+  --danger-light: #fca5a5;
+  --danger-dark: #991b1b;
+  
+  --info: #38bdf8;
+  --info-light: #7dd3fc;
+  --info-dark: #075985;
+  
+  /* Role-Based Colors */
+  --role-creator: #a78bfa;      /* Light Purple */
+  --role-viewer: #60a5fa;       /* Light Blue */
+  --role-admin: #f87171;        /* Light Red */
+  --role-moderator: #fbbf24;    /* Light Amber */
+  
+  /* Structural Backgrounds */
+  --bg-overlay: rgba(240, 244, 243, 0.06);
+  --bg-hover: rgba(6, 182, 212, 0.08);
+  --bg-active: rgba(6, 182, 212, 0.12);
 }
 
 html {
   scroll-behavior: smooth;
+  background: var(--canvas);
 }
 
 body {
-  @apply bg-canvas text-text antialiased;
+  @apply text-text antialiased;
+  position: relative;
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
   font-family: var(--font-body);
+  background-color: var(--canvas);
   background-image:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 24%),
-    radial-gradient(circle at 85% 0%, rgba(154, 106, 42, 0.08), transparent 26%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.34), transparent 30%),
-    linear-gradient(180deg, #f8f4ec 0%, #f5f1e8 100%);
+    radial-gradient(circle at 10% 0%, rgba(13, 124, 116, 0.18), transparent 28%),
+    radial-gradient(circle at 100% 6%, rgba(67, 97, 238, 0.12), transparent 24%),
+    radial-gradient(circle at 82% 100%, rgba(182, 120, 50, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 28%),
+    linear-gradient(180deg, #f7fffb 0%, #eaf4f1 44%, #e2efea 100%);
+}
+
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  border-radius: 9999px;
+  filter: blur(90px);
+  pointer-events: none;
+  opacity: 0.9;
+  z-index: 0;
+}
+
+body::before {
+  top: -140px;
+  left: -40px;
+  width: 320px;
+  height: 320px;
+  background: rgba(13, 124, 116, 0.16);
+}
+
+body::after {
+  right: -80px;
+  bottom: -120px;
+  width: 360px;
+  height: 360px;
+  background: rgba(182, 120, 50, 0.12);
 }
 
 #root {
+  position: relative;
   min-height: 100vh;
+  isolation: isolate;
 }
 
 h1,
@@ -79,7 +188,7 @@ select {
 }
 
 ::selection {
-  background: rgba(15, 118, 110, 0.18);
+  background: rgba(13, 124, 116, 0.18);
 }
 
 .text-balance {
@@ -88,73 +197,113 @@ select {
 }
 
 .glass {
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  background: color-mix(in srgb, var(--surface) 86%, transparent);
-  border: 1px solid color-mix(in srgb, var(--stroke) 40%, transparent);
+  backdrop-filter: blur(24px) saturate(185%);
+  -webkit-backdrop-filter: blur(24px) saturate(185%);
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  border: 1px solid color-mix(in srgb, white 38%, var(--stroke));
+  box-shadow:
+    0 18px 48px rgba(10, 31, 28, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
 }
 
 .glass-sm {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
-  border: 1px solid color-mix(in srgb, var(--stroke) 30%, transparent);
+  backdrop-filter: blur(18px) saturate(175%);
+  -webkit-backdrop-filter: blur(18px) saturate(175%);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid color-mix(in srgb, white 34%, var(--stroke));
 }
 
 .glass-lg {
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
-  border: 1px solid color-mix(in srgb, var(--stroke) 50%, transparent);
+  backdrop-filter: blur(30px) saturate(195%);
+  -webkit-backdrop-filter: blur(30px) saturate(195%);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border: 1px solid color-mix(in srgb, white 42%, var(--stroke));
+  box-shadow:
+    0 26px 80px rgba(10, 31, 28, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
 }
 
 .glass-full {
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
-  border: 1.5px solid color-mix(in srgb, var(--stroke) 60%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(34px) saturate(205%);
+  -webkit-backdrop-filter: blur(34px) saturate(205%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.08)),
+    color-mix(in srgb, var(--surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, white 46%, var(--stroke));
+  box-shadow:
+    0 30px 100px rgba(10, 31, 28, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38);
 }
 
 .glass-border {
-  border: 2px solid color-mix(in srgb, var(--stroke) 35%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid color-mix(in srgb, white 30%, var(--stroke));
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
 }
 
 .glass-hover {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  background: color-mix(in srgb, var(--surface) 85%, transparent);
-  border: 1px solid color-mix(in srgb, var(--stroke) 40%, transparent);
-  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  backdrop-filter: blur(22px) saturate(188%);
+  -webkit-backdrop-filter: blur(22px) saturate(188%);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid color-mix(in srgb, white 36%, var(--stroke));
+  transition: all 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .glass-hover:hover {
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  background: color-mix(in srgb, var(--surface) 80%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-  box-shadow: 0 8px 32px rgba(15, 118, 110, 0.1);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 26%, white);
+  box-shadow: 0 18px 48px rgba(13, 124, 116, 0.14);
   transform: translateY(-2px);
 }
 
 .glass-interactive {
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  background: color-mix(in srgb, var(--surface) 84%, transparent);
-  border: 1.5px solid color-mix(in srgb, var(--stroke) 45%, transparent);
-  transition: all 200ms ease-out;
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  border: 1px solid color-mix(in srgb, white 38%, var(--stroke));
+  transition: all 220ms ease-out;
   cursor: pointer;
 }
 
 .glass-interactive:hover {
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-  box-shadow: 0 8px 32px rgba(15, 118, 110, 0.12);
+  border-color: color-mix(in srgb, var(--accent) 30%, white);
+  box-shadow: 0 16px 44px rgba(13, 124, 116, 0.14);
 }
 
 .glass-interactive:active {
-  transform: scale(0.98);
+  transform: scale(0.985);
+}
+
+.glass-card {
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(30px) saturate(200%);
+  -webkit-backdrop-filter: blur(30px) saturate(200%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.44), rgba(255, 255, 255, 0.12)),
+    color-mix(in srgb, var(--surface) 74%, transparent);
+  border: 1px solid color-mix(in srgb, white 42%, var(--stroke));
+  box-shadow:
+    0 22px 64px rgba(10, 31, 28, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.36);
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.48), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 62%);
+  opacity: 0.9;
+}
+
+.glass-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 .dark .glass,
@@ -163,30 +312,37 @@ select {
 .dark .glass-full,
 .dark .glass-border,
 .dark .glass-hover,
-.dark .glass-interactive {
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
-  border-color: color-mix(in srgb, var(--stroke) 50%, transparent);
+.dark .glass-interactive,
+.dark .glass-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    color-mix(in srgb, var(--surface) 76%, transparent);
+  border-color: color-mix(in srgb, white 12%, var(--stroke));
 }
 
-.dark .glass-full {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+.dark .glass-full,
+.dark .glass-card {
+  box-shadow:
+    0 26px 80px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .dark .glass-hover:hover,
 .dark .glass-interactive:hover {
-  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  box-shadow: 0 8px 32px rgba(117, 183, 174, 0.12);
+  border-color: color-mix(in srgb, var(--accent) 30%, white);
+  box-shadow: 0 18px 52px rgba(93, 207, 194, 0.16);
 }
 
 .surface-panel {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.24)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.18)),
     var(--surface);
 }
 
 .hero-glow {
   background:
-    radial-gradient(circle at 0% 0%, rgba(15, 118, 110, 0.18), transparent 34%),
-    radial-gradient(circle at 100% 0%, rgba(154, 106, 42, 0.1), transparent 26%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.4), transparent 36%);
+    radial-gradient(circle at 0% 0%, rgba(13, 124, 116, 0.2), transparent 34%),
+    radial-gradient(circle at 100% 0%, rgba(67, 97, 238, 0.1), transparent 28%),
+    radial-gradient(circle at 100% 100%, rgba(182, 120, 50, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.46), transparent 38%);
 }

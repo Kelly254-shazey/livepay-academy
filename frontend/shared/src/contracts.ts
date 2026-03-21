@@ -1,6 +1,7 @@
 import type { CategorySlug } from './catalog';
 
 export type UserRole = 'viewer' | 'creator' | 'moderator' | 'admin';
+export type DemoAudience = 'public' | 'staff';
 export type VerificationStatus = 'unverified' | 'pending' | 'verified';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 export type TransactionType = 'purchase' | 'earning' | 'payout' | 'commission';
@@ -39,6 +40,7 @@ export interface UserAccount {
   fullName: string;
   email: string;
   role: UserRole;
+  roles?: UserRole[];
   avatarUrl?: string | null;
 }
 
@@ -51,6 +53,21 @@ export interface AuthTokens {
 export interface AuthSession {
   user: UserAccount;
   tokens: AuthTokens;
+  activeRole?: UserRole;
+  isDemo?: boolean;
+}
+
+export interface DemoParticipant {
+  id: string;
+  audience: DemoAudience;
+  fullName: string;
+  email: string;
+  password: string;
+  title: string;
+  roleLabel: string;
+  roles: UserRole[];
+  defaultRole: UserRole;
+  summary: string;
 }
 
 export interface CreatorSummary {
@@ -132,8 +149,44 @@ export interface CheckoutSummary {
   title: string;
   amount: number;
   currency: string;
+  productType?: 'live' | 'content' | 'class';
   category?: CategorySlug;
   creatorName?: string;
+  platformCommissionAmount?: number;
+  creatorEarningsAmount?: number;
+  totalAmount?: number;
+  sessionStatus?: 'draft' | 'ready';
+  accessPolicy?: string;
+}
+
+export interface ProfileSettingsPayload {
+  fullName: string;
+  email: string;
+  roles: UserRole[];
+  defaultRole: UserRole;
+  notificationPreferences: {
+    liveReminders: boolean;
+    purchaseUpdates: boolean;
+    creatorAnnouncements: boolean;
+    systemAlerts: boolean;
+  };
+  appearancePreferences: {
+    theme: 'system' | 'light' | 'dark';
+    compactMode: boolean;
+  };
+  privacyPreferences: {
+    publicCreatorProfile: boolean;
+    communityVisibility: boolean;
+  };
+  payoutPreferences?: {
+    method: string;
+    note?: string;
+  };
+}
+
+export interface SaveProfileSettingsResponse {
+  message: string;
+  settings: ProfileSettingsPayload;
 }
 
 export interface TransactionRecord {

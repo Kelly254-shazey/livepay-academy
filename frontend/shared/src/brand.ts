@@ -6,22 +6,22 @@ export const brand = {
 } as const;
 
 export const palette = {
-  canvas: '#F5F1E8',
-  surface: '#FFFCF7',
-  surfaceMuted: '#F0EADF',
-  stroke: '#E2DACD',
-  text: '#171512',
-  textMuted: '#6E675C',
-  accent: '#0F766E',
-  accentMuted: '#DDEEEB',
-  success: '#205C47',
-  warning: '#9A6A2A',
-  danger: '#A34734',
-  darkCanvas: '#11110F',
-  darkSurface: '#171613',
-  darkStroke: '#2B2925',
-  darkText: '#F7F2EA',
-  darkTextMuted: '#B7AEA2',
+  canvas: '#E7F2EF',
+  surface: '#F8FFFB',
+  surfaceMuted: '#DCEAE4',
+  stroke: '#BFD1C9',
+  text: '#10211D',
+  textMuted: '#60726C',
+  accent: '#0D7C74',
+  accentMuted: '#D9F0EB',
+  success: '#196B59',
+  warning: '#B67832',
+  danger: '#A64B40',
+  darkCanvas: '#0A1110',
+  darkSurface: '#111B19',
+  darkStroke: '#263834',
+  darkText: '#EEF8F4',
+  darkTextMuted: '#9FB8B0',
 } as const;
 
 export const radii = {

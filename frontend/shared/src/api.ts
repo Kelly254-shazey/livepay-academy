@@ -21,6 +21,7 @@ export const apiRoutes = {
   notifications: '/notifications',
   search: '/search',
   checkout: '/checkout',
+  profileSettings: '/users/settings',
   transactions: '/transactions',
   viewerDashboard: '/viewer/dashboard',
   creatorDashboard: '/creator/dashboard',

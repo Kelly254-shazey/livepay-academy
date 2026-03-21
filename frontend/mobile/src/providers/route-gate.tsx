@@ -1,5 +1,5 @@
 import { useRouter, useSegments } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '@/store/session-store';
 
 export function RouteGate() {
@@ -9,6 +9,7 @@ export function RouteGate() {
   const hydrated = useSessionStore((state) => state.hydrated);
   const hasSeenOnboarding = useSessionStore((state) => state.hasSeenOnboarding);
   const session = useSessionStore((state) => state.session);
+  const lastRouteRef = useRef<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setBootReady(true), 700);
@@ -19,28 +20,32 @@ export function RouteGate() {
     if (!hydrated || !bootReady) return;
 
     const root = segments[0];
+    let nextRoute: string | null = null;
 
     if (!hasSeenOnboarding && root !== '(public)') {
-      router.replace('/(public)/onboarding');
-      return;
-    }
-
-    if (!session) {
+      nextRoute = '/(public)/onboarding';
+    } else if (!session) {
       if (root !== '(public)') {
-        router.replace('/(public)/sign-in');
+        nextRoute = '/(public)/sign-in';
       }
-      return;
-    }
-
-    if (session.user.role === 'creator') {
+    } else if (session.user.role === 'creator') {
       if (root !== '(creator)') {
-        router.replace('/(creator)/(tabs)/dashboard');
+        nextRoute = '/(creator)/(tabs)/dashboard';
       }
-      return;
+    } else if (session.user.role === 'admin' || session.user.role === 'moderator') {
+      if (root !== '(staff)') {
+        nextRoute = '/(staff)/dashboard';
+      }
+    } else {
+      if (root !== '(viewer)') {
+        nextRoute = '/(viewer)/(tabs)/home';
+      }
     }
 
-    if (root !== '(viewer)') {
-      router.replace('/(viewer)/(tabs)/home');
+    // Only navigate if the route has changed from last time
+    if (nextRoute && lastRouteRef.current !== nextRoute) {
+      lastRouteRef.current = nextRoute;
+      router.replace(nextRoute as never);
     }
   }, [bootReady, hasSeenOnboarding, hydrated, router, segments, session]);
 

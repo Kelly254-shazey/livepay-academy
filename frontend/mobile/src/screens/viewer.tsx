@@ -1,7 +1,8 @@
-import { categories, formatCurrency } from '@livegate/shared';
-import { useQuery } from '@tanstack/react-query';
+import type { ProfileSettingsPayload } from '@livegate/shared';
+import { categories, formatCurrency, getSessionRoles } from '@livegate/shared';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { mobileApi } from '@/api/client';
 import {
@@ -14,6 +15,7 @@ import {
   TransactionRow,
 } from '@/components/cards';
 import { Button, EmptyState, Heading, LoadingState, Screen, Surface, TextField } from '@/components/ui';
+import { useSessionStore } from '@/store/session-store';
 
 const sectionTitleStyle = { fontSize: 20, fontWeight: '700' as const, color: '#171512' };
 const metaLabelStyle = { fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' as const, color: '#6E675C' };
@@ -25,24 +27,113 @@ const searchFilters = [
   { title: 'Content', value: 'content' },
   { title: 'Classes', value: 'class' },
 ] as const;
+const heroCardStyle = {
+  borderRadius: 28,
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.35)',
+  backgroundColor: 'rgba(255,255,255,0.34)',
+  padding: 16,
+  gap: 8,
+} as const;
+
+function SettingsToggle({
+  title,
+  body,
+  value,
+  onChange,
+}: {
+  title: string;
+  body: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <View style={[heroCardStyle, { flexBasis: '47%', flexGrow: 1 }]}>
+      <Text style={{ fontSize: 15, fontWeight: '700', color: '#10211D' }}>{title}</Text>
+      <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>{body}</Text>
+      <Button onPress={() => onChange(!value)} title={value ? 'Enabled' : 'Disabled'} variant={value ? 'primary' : 'secondary'} />
+    </View>
+  );
+}
 
 function getCategoryTitle(slug: string) {
   return categories.find((item) => item.slug === slug)?.title ?? slug.replace(/-/g, ' ');
 }
 
 export function HomeScreen() {
+  const session = useSessionStore((state) => state.session);
+  const setActiveRole = useSessionStore((state) => state.setActiveRole);
   const query = useQuery({
     queryKey: ['mobile-home'],
     queryFn: mobileApi.getHomeFeed,
   });
   const homeCategories = query.data?.categories?.length ? query.data.categories.slice(0, 6) : categories.slice(0, 6);
+  const sessionRoles = getSessionRoles(session);
+  const featuredCreators = query.data?.featuredCreators.length ?? 0;
+  const featuredLives = query.data?.trendingLives.length ?? 0;
+  const featuredClasses = query.data?.recommendedClasses.length ?? 0;
 
   return (
     <Screen>
+      <Surface>
+        <Text style={{ fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase', color: '#60726C' }}>
+          LiveGate home
+        </Text>
+        <Text style={{ fontSize: 32, lineHeight: 38, fontWeight: '700', color: '#10211D', letterSpacing: -0.8 }}>
+          Discover premium lives, classes, and locked expertise.
+        </Text>
+        <Text style={{ fontSize: 15, lineHeight: 24, color: '#60726C' }}>
+          The mobile home is designed to keep discovery, access state, and monetized learning clear at a glance.
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          <View style={[heroCardStyle, { flexBasis: '31%', flexGrow: 1 }]}>
+            <Text style={metaLabelStyle}>Creators</Text>
+            <Text style={{ fontSize: 24, fontWeight: '700', color: '#10211D' }}>{featuredCreators}</Text>
+            <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>Featured in the feed</Text>
+          </View>
+          <View style={[heroCardStyle, { flexBasis: '31%', flexGrow: 1 }]}>
+            <Text style={metaLabelStyle}>Lives</Text>
+            <Text style={{ fontSize: 24, fontWeight: '700', color: '#10211D' }}>{featuredLives}</Text>
+            <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>Paid or upcoming sessions</Text>
+          </View>
+          <View style={[heroCardStyle, { flexBasis: '31%', flexGrow: 1 }]}>
+            <Text style={metaLabelStyle}>Classes</Text>
+            <Text style={{ fontSize: 24, fontWeight: '700', color: '#10211D' }}>{featuredClasses}</Text>
+            <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>Structured learning paths</Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          <Button onPress={() => router.push('/(viewer)/(tabs)/assistant')} title="Ask AI concierge" />
+          <Button onPress={() => router.push('/(viewer)/(tabs)/library')} title="Open library" variant="secondary" />
+          {sessionRoles.includes('creator') ? (
+            <Button
+              onPress={() => {
+                setActiveRole('creator');
+                router.replace('/(creator)/(tabs)/dashboard');
+              }}
+              title="Switch to creator"
+              variant="ghost"
+            />
+          ) : null}
+        </View>
+      </Surface>
+      {session?.isDemo ? (
+        <Surface>
+          <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
+            Demo mode
+          </Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>
+            You are previewing LiveGate with a demo participant.
+          </Text>
+          <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+            Use the dashboards, AI assistant, and role switcher to review the full navigation flow before connecting live data.
+          </Text>
+        </Surface>
+      ) : null}
       <Heading
-        body="A calm home feed for premium discovery across paid live sessions, premium content, and structured classes."
-        eyebrow="LiveGate"
-        title="Discover premium access"
+        body="Browse by category, then move into the live, creator, content, and class details that matter."
+        eyebrow="Explore"
+        title="Choose a lane quickly"
       />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {homeCategories.map((category) => (
@@ -233,17 +324,51 @@ export function ViewerLibraryScreen() {
 }
 
 export function ViewerProfileScreen() {
+  const session = useSessionStore((state) => state.session);
+  const setActiveRole = useSessionStore((state) => state.setActiveRole);
+  const signOut = useSessionStore((state) => state.signOut);
+  const roles = getSessionRoles(session);
+
   return (
     <Screen>
       <Heading
-        body="Profile, notifications, wallet, and settings stay close without crowding the main discovery experience."
+        body="Profile, navigation shortcuts, hybrid role switching, and account actions stay available without turning the app into a maze."
         eyebrow="Profile"
         title="Account"
       />
       <Surface>
+        <Text style={{ fontSize: 20, fontWeight: '700', color: '#10211D' }}>
+          {session?.user.fullName ?? 'LiveGate viewer'}
+        </Text>
+        <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+          {session?.user.email ?? 'No email loaded'}
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {roles.map((role) => (
+            <CategoryChip active={session?.user.role === role} key={role} title={role} />
+          ))}
+        </View>
+        {roles.includes('creator') ? (
+          <Button
+            onPress={() => {
+              setActiveRole('creator');
+              router.replace('/(creator)/(tabs)/dashboard');
+            }}
+            title="Switch to creator workspace"
+            variant="secondary"
+          />
+        ) : null}
         <Button onPress={() => router.push('/(viewer)/notifications')} title="Notifications" />
         <Button onPress={() => router.push('/(viewer)/wallet')} title="Wallet" variant="secondary" />
         <Button onPress={() => router.push('/(viewer)/settings')} title="Settings" variant="ghost" />
+        <Button
+          onPress={() => {
+            signOut();
+            router.replace('/(public)/sign-in');
+          }}
+          title="Sign out"
+          variant="ghost"
+        />
       </Surface>
     </Screen>
   );
@@ -423,7 +548,16 @@ export function LiveDetailsScreen() {
             {query.data.live.accessGranted ? (
               <Button onPress={() => router.push(`/(viewer)/live/${liveId}/room`)} title="Join live room" />
             ) : (
-              <Button title="Payment placeholder" variant="secondary" />
+              <Button
+                onPress={() =>
+                  router.push({
+                    pathname: '/(viewer)/checkout',
+                    params: { productId: liveId, productType: 'live' },
+                  })
+                }
+                title="Continue to checkout"
+                variant="secondary"
+              />
             )}
           </Surface>
         </>
@@ -531,7 +665,17 @@ export function ContentDetailsScreen() {
                 ? 'Unlocked state active. Attachments or replay access can render here.'
                 : 'Payment is required before this content becomes accessible.'}
             </Text>
-            <Button title={query.data.content.accessGranted ? 'Open content' : 'Unlock placeholder'} />
+            <Button
+              onPress={() =>
+                query.data.content.accessGranted
+                  ? undefined
+                  : router.push({
+                      pathname: '/(viewer)/checkout',
+                      params: { productId: contentId, productType: 'content' },
+                    })
+              }
+              title={query.data.content.accessGranted ? 'Open content' : 'Continue to checkout'}
+            />
           </Surface>
         </>
       ) : null}
@@ -601,7 +745,17 @@ export function ClassDetailsScreen() {
               <EmptyState body="Class materials will appear here after enrollment-ready data is returned." title="No materials yet" />
             )}
           </View>
-          <Button title={query.data.classItem.accessGranted ? 'Continue class' : 'Enroll placeholder'} />
+          <Button
+            onPress={() =>
+              query.data.classItem.accessGranted
+                ? undefined
+                : router.push({
+                    pathname: '/(viewer)/checkout',
+                    params: { productId: classId, productType: 'class' },
+                  })
+            }
+            title={query.data.classItem.accessGranted ? 'Continue class' : 'Continue to checkout'}
+          />
         </>
       ) : null}
     </Screen>
@@ -652,15 +806,264 @@ export function ViewerWalletScreen() {
   );
 }
 
+export function CheckoutScreen() {
+  const { productId, productType } = useLocalSearchParams<{
+    productId: string;
+    productType: 'live' | 'content' | 'class';
+  }>();
+  const mutation = useQuery({
+    queryKey: ['mobile-checkout', productId, productType],
+    queryFn: () =>
+      mobileApi.createCheckout({
+        productId,
+        productType,
+      }),
+    enabled: Boolean(productId && productType),
+  });
+
+  return (
+    <Screen>
+      <Heading
+        body="Review the purchase summary, commission split, and access rule before payment is completed."
+        eyebrow="Checkout"
+        title="Secure checkout session"
+      />
+      {!productId || !productType ? (
+        <EmptyState
+          body="Open checkout from a live, premium content item, or class details screen."
+          title="No product selected"
+        />
+      ) : null}
+      {mutation.isLoading ? <LoadingState label="Creating checkout session..." /> : null}
+      {mutation.isError ? <EmptyState body={(mutation.error as Error).message} title="Checkout unavailable" /> : null}
+      {mutation.data ? (
+        <>
+          <Surface>
+            <Text style={metaLabelStyle}>Session id</Text>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: '#10211D' }}>{mutation.data.id}</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{mutation.data.accessPolicy}</Text>
+          </Surface>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <View style={[heroCardStyle, { flexBasis: '47%', flexGrow: 1 }]}>
+              <Text style={metaLabelStyle}>Total</Text>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: '#10211D' }}>
+                {formatCurrency(mutation.data.totalAmount ?? mutation.data.amount, mutation.data.currency)}
+              </Text>
+            </View>
+            <View style={[heroCardStyle, { flexBasis: '47%', flexGrow: 1 }]}>
+              <Text style={metaLabelStyle}>Platform commission</Text>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: '#10211D' }}>
+                {formatCurrency(mutation.data.platformCommissionAmount ?? 0, mutation.data.currency)}
+              </Text>
+            </View>
+            <View style={[heroCardStyle, { flexBasis: '47%', flexGrow: 1 }]}>
+              <Text style={metaLabelStyle}>Creator earnings</Text>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: '#10211D' }}>
+                {formatCurrency(mutation.data.creatorEarningsAmount ?? 0, mutation.data.currency)}
+              </Text>
+            </View>
+            <View style={[heroCardStyle, { flexBasis: '47%', flexGrow: 1 }]}>
+              <Text style={metaLabelStyle}>Category</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>
+                {mutation.data.category ? getCategoryTitle(mutation.data.category) : 'General'}
+              </Text>
+            </View>
+          </View>
+          <Surface>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>{mutation.data.title}</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+              Creator: {mutation.data.creatorName ?? 'LiveGate creator'}
+            </Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+              Product type: {productType}
+            </Text>
+            <Button onPress={() => router.replace('/(viewer)/(tabs)/library')} title="Return to library" />
+            <Button onPress={() => router.back()} title="Back" variant="ghost" />
+          </Surface>
+        </>
+      ) : null}
+    </Screen>
+  );
+}
+
 export function SettingsScreen() {
+  const session = useSessionStore((state) => state.session);
+  const setSession = useSessionStore((state) => state.setSession);
+  const setPreferredRoles = useSessionStore((state) => state.setPreferredRoles);
+  const query = useQuery({
+    queryKey: ['mobile-profile-settings', session?.user.id, 'viewer'],
+    queryFn: mobileApi.getProfileSettings,
+    enabled: Boolean(session),
+  });
+  const saveMutation = useMutation({
+    mutationFn: mobileApi.saveProfileSettings,
+    onSuccess: (result) => {
+      if (!session) return;
+
+      setPreferredRoles(result.settings.roles, result.settings.defaultRole);
+      setSession({
+        ...session,
+        activeRole: result.settings.defaultRole,
+        user: {
+          ...session.user,
+          fullName: result.settings.fullName,
+          email: result.settings.email,
+          role: result.settings.defaultRole,
+          roles: result.settings.roles,
+        },
+      });
+    },
+  });
+  const [settings, setSettings] = useState<ProfileSettingsPayload | null>(null);
+
+  useEffect(() => {
+    if (query.data) {
+      setSettings(query.data);
+    }
+  }, [query.data]);
+
   return (
     <Screen>
       <Heading body="Quiet account controls without a cluttered settings maze." eyebrow="Settings" title="Preferences" />
-      <Surface>
-        <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-          Notification preferences, security controls, payout settings, and account actions can mount here when those APIs are ready.
-        </Text>
-      </Surface>
+      {query.isLoading ? <LoadingState label="Loading settings..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Settings unavailable" /> : null}
+      {settings ? (
+        <>
+          <Surface>
+            <TextField
+              label="Full name"
+              onChangeText={(value) => setSettings((current) => (current ? { ...current, fullName: value } : current))}
+              value={settings.fullName}
+            />
+            <TextField
+              label="Email"
+              onChangeText={(value) => setSettings((current) => (current ? { ...current, email: value } : current))}
+              value={settings.email}
+            />
+            <Text style={{ fontSize: 13, color: '#60726C' }}>Default role</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {settings.roles.map((role) => (
+                <CategoryChip
+                  active={settings.defaultRole === role}
+                  key={role}
+                  onPress={() =>
+                    setSettings((current) => (current ? { ...current, defaultRole: role } : current))
+                  }
+                  title={role}
+                />
+              ))}
+            </View>
+          </Surface>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SettingsToggle
+              body="Remind me before scheduled live sessions begin."
+              onChange={(value) =>
+                setSettings((current) =>
+                  current
+                    ? {
+                        ...current,
+                        notificationPreferences: { ...current.notificationPreferences, liveReminders: value },
+                      }
+                    : current,
+                )
+              }
+              title="Live reminders"
+              value={settings.notificationPreferences.liveReminders}
+            />
+            <SettingsToggle
+              body="Show purchases, unlock confirmations, and billing updates."
+              onChange={(value) =>
+                setSettings((current) =>
+                  current
+                    ? {
+                        ...current,
+                        notificationPreferences: { ...current.notificationPreferences, purchaseUpdates: value },
+                      }
+                    : current,
+                )
+              }
+              title="Purchase updates"
+              value={settings.notificationPreferences.purchaseUpdates}
+            />
+            <SettingsToggle
+              body="Receive creator class, live, and content announcements."
+              onChange={(value) =>
+                setSettings((current) =>
+                  current
+                    ? {
+                        ...current,
+                        notificationPreferences: { ...current.notificationPreferences, creatorAnnouncements: value },
+                      }
+                    : current,
+                )
+              }
+              title="Creator announcements"
+              value={settings.notificationPreferences.creatorAnnouncements}
+            />
+            <SettingsToggle
+              body="Keep security and system notices turned on."
+              onChange={(value) =>
+                setSettings((current) =>
+                  current
+                    ? {
+                        ...current,
+                        notificationPreferences: { ...current.notificationPreferences, systemAlerts: value },
+                      }
+                    : current,
+                )
+              }
+              title="System alerts"
+              value={settings.notificationPreferences.systemAlerts}
+            />
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SettingsToggle
+              body="Use tighter spacing in dashboard-heavy screens."
+              onChange={(value) =>
+                setSettings((current) =>
+                  current
+                    ? {
+                        ...current,
+                        appearancePreferences: { ...current.appearancePreferences, compactMode: value },
+                      }
+                    : current,
+                )
+              }
+              title="Compact mode"
+              value={settings.appearancePreferences.compactMode}
+            />
+            <SettingsToggle
+              body="Keep your profile visible to the wider learning community."
+              onChange={(value) =>
+                setSettings((current) =>
+                  current
+                    ? {
+                        ...current,
+                        privacyPreferences: { ...current.privacyPreferences, communityVisibility: value },
+                      }
+                    : current,
+                )
+              }
+              title="Community visibility"
+              value={settings.privacyPreferences.communityVisibility}
+            />
+          </View>
+          {saveMutation.isSuccess ? (
+            <Surface>
+              <Text style={{ fontSize: 14, color: '#196B59' }}>{saveMutation.data.message}</Text>
+            </Surface>
+          ) : null}
+          {saveMutation.isError ? (
+            <Surface>
+              <Text style={{ fontSize: 14, color: '#A64B40' }}>{(saveMutation.error as Error).message}</Text>
+            </Surface>
+          ) : null}
+          <Button
+            onPress={() => settings && saveMutation.mutate(settings)}
+            title={saveMutation.isPending ? 'Saving settings...' : 'Save settings'}
+          />
+        </>
+      ) : null}
     </Screen>
   );
 }

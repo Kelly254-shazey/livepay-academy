@@ -1,4 +1,10 @@
-import { categories, productRules } from '@livegate/shared';
+import {
+  brand,
+  categories,
+  demoParticipants,
+  productRules,
+  type DemoParticipant,
+} from '@livegate/shared';
 import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -11,7 +17,49 @@ import {
   LiveCard,
 } from '@/components/domain';
 import { webApi } from '@/lib/api';
-import { Button, Card, EmptyState, LoadingBlock, SectionTitle } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, LoadingBlock, SectionTitle, StatCard } from '@/components/ui';
+
+const publicModes = [
+  {
+    id: 'viewer',
+    title: 'Viewer mode',
+    body: 'Pay for premium lives, unlock content, and build a polished learning library without clutter.',
+    href: '/auth/role-selection',
+    cta: 'Explore as viewer',
+    badge: 'Audience',
+  },
+  {
+    id: 'creator',
+    title: 'Creator mode',
+    body: 'Host paid live sessions, publish premium content, and manage serious earnings from one studio.',
+    href: '/auth/role-selection',
+    cta: 'Start as creator',
+    badge: 'Monetization',
+  },
+  {
+    id: 'hybrid',
+    title: 'Hybrid mode',
+    body: 'Operate as both viewer and creator from one account, then switch context without signing out.',
+    href: '/auth/role-selection',
+    cta: 'Use both roles',
+    badge: 'Flexible identity',
+  },
+] as const;
+
+const launchFlow = [
+  {
+    title: 'Discover with intention',
+    body: 'Browse by category, creator, or recommendation with pricing and access state visible early.',
+  },
+  {
+    title: 'Pay before access',
+    body: 'Lives, premium content, and classes stay locked until server-side access is verified.',
+  },
+  {
+    title: 'Switch roles cleanly',
+    body: 'One account can act as viewer and creator, while staff access stays off the public path.',
+  },
+] as const;
 
 function QuerySection<T>({
   title,
@@ -44,10 +92,34 @@ function QuerySection<T>({
       ) : (
         <EmptyState
           title={`No ${title.toLowerCase()} yet`}
-          body="This section is connected to the production API contract and will fill as soon as your backend begins returning results."
+          body="This section is ready for production responses and will populate as soon as the backend returns results."
         />
       )}
     </section>
+  );
+}
+
+function DemoAccountCard({ participant }: { participant: DemoParticipant }) {
+  return (
+    <Card className="space-y-4 transition duration-200 hover:-translate-y-1 hover:shadow-panel">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-lg font-semibold tracking-[-0.03em]">{participant.fullName}</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-muted">{participant.roleLabel}</p>
+        </div>
+        <Badge tone="accent">Demo</Badge>
+      </div>
+      <p className="text-sm leading-6 text-muted">{participant.summary}</p>
+      <div className="flex flex-wrap gap-2">
+        {participant.roles.map((role) => (
+          <Badge key={role}>{role}</Badge>
+        ))}
+      </div>
+      <p className="text-sm text-muted">{participant.email}</p>
+      <Link to={`/auth/sign-in?demo=${participant.id}`}>
+        <Button className="w-full">Open this demo account</Button>
+      </Link>
+    </Card>
   );
 }
 
@@ -56,31 +128,141 @@ export function LandingPage() {
     queryKey: ['home-feed'],
     queryFn: webApi.getHomeFeed,
   });
+  const publicDemoAccounts = demoParticipants.filter((participant) => participant.audience === 'public');
 
   return (
     <PageFrame>
-      <div className="mx-auto max-w-7xl space-y-12 px-6 py-10">
-        <HeroPanel
-          action={
-            <div className="flex flex-wrap gap-3">
-              <Link to="/auth/role-selection">
-                <Button>Start earning</Button>
-              </Link>
-              <Link to="/categories/education">
-                <Button variant="secondary">Browse LiveGate</Button>
-              </Link>
+      <div className="mx-auto max-w-7xl space-y-12 px-6 py-10 sm:space-y-14">
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.18fr)_380px]">
+          <HeroPanel
+            action={
+              <div className="flex flex-wrap gap-3">
+                <Link to="/auth/role-selection">
+                  <Button size="lg">Choose your role</Button>
+                </Link>
+                <Link to="/auth/sign-in?demo=demo-hybrid">
+                  <Button size="lg" variant="secondary">
+                    Open demo workspace
+                  </Button>
+                </Link>
+              </div>
+            }
+            body="LiveGate is a premium product for paid live sessions, locked content, structured classes, and serious creator monetization across education, business, trading, mentorship, wellness, and entertainment."
+            eyebrow="Premium live learning"
+            title="A calmer way to sell expertise, join live sessions, and unlock paid knowledge."
+          />
+
+          <Card className="space-y-5">
+            <div className="space-y-2">
+              <Badge tone="accent">At a glance</Badge>
+              <h2 className="text-2xl font-semibold tracking-[-0.04em]">Simple outside, disciplined underneath.</h2>
+              <p className="text-sm leading-7 text-muted">{brand.description}</p>
             </div>
-          }
-          body="LiveGate is a premium platform for paid live sessions, locked content, and structured classes across education, trading, business, wellness, mentorship, and more."
-          eyebrow="Creator economy, refined"
-          title="A calm, premium monetization layer for live expertise."
-        />
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="rounded-[24px] border border-white/35 bg-white/22 p-4 backdrop-blur-xl">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted">Commission split</p>
+                <p className="mt-2 text-3xl font-semibold tracking-[-0.04em]">80 / 20</p>
+                <p className="mt-1 text-sm text-muted">Creators keep 80%, platform retains 20%.</p>
+              </div>
+              <div className="rounded-[24px] border border-white/35 bg-white/22 p-4 backdrop-blur-xl">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted">Role model</p>
+                <p className="mt-2 text-3xl font-semibold tracking-[-0.04em]">Hybrid</p>
+                <p className="mt-1 text-sm text-muted">One account can switch between viewer and creator context.</p>
+              </div>
+              <div className="rounded-[24px] border border-white/35 bg-white/22 p-4 backdrop-blur-xl sm:col-span-2 xl:col-span-1">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted">Staff access</p>
+                <p className="mt-2 text-3xl font-semibold tracking-[-0.04em]">Hidden</p>
+                <p className="mt-1 text-sm text-muted">Admins and moderators use a separate restricted portal.</p>
+              </div>
+            </div>
+          </Card>
+        </section>
 
         <section className="space-y-6">
           <SectionTitle
-            eyebrow="Taxonomy"
-            body="Each category has its own browsing context, filtering flow, and dedicated discovery surface."
-            title="Built for clear category discovery"
+            eyebrow="Roles"
+            body="Public onboarding stays deliberately narrow: viewer, creator, or both. Staff access is intentionally separate."
+            title="Choose a mode that matches how you use the platform"
+          />
+          <div className="grid gap-4 lg:grid-cols-3">
+            {publicModes.map((mode) => (
+              <Card className="space-y-5 transition duration-200 hover:-translate-y-1 hover:shadow-panel" key={mode.id}>
+                <div className="flex items-center justify-between gap-3">
+                  <Badge tone="accent">{mode.badge}</Badge>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted">{mode.id}</p>
+                </div>
+                <div className="space-y-3">
+                  <h3 className="text-2xl font-semibold tracking-[-0.04em]">{mode.title}</h3>
+                  <p className="text-sm leading-7 text-muted">{mode.body}</p>
+                </div>
+                <Link to={mode.href}>
+                  <Button className="w-full" variant={mode.id === 'creator' ? 'primary' : 'secondary'}>
+                    {mode.cta}
+                  </Button>
+                </Link>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+          <Card className="space-y-5">
+            <div className="space-y-3">
+              <Badge tone="success">AI concierge</Badge>
+              <h2 className="text-3xl font-semibold tracking-[-0.05em]">A built-in assistant for orientation, dashboards, and monetization flow.</h2>
+              <p className="max-w-3xl text-sm leading-7 text-muted">
+                Both web and mobile now include an AI concierge surface that helps users navigate
+                roles, understand payouts, find dashboards, and orient themselves without adding
+                noisy UI chrome.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {launchFlow.map((step) => (
+                <div className="rounded-[24px] border border-white/35 bg-white/22 p-4 backdrop-blur-xl" key={step.title}>
+                  <p className="font-semibold tracking-[-0.02em]">{step.title}</p>
+                  <p className="mt-2 text-sm leading-6 text-muted">{step.body}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+            <StatCard
+              detail="Supported categories with distinct discovery surfaces."
+              label="Categories"
+              value={String(categories.length)}
+            />
+            <StatCard
+              detail="Preview accounts for audience, creator, and hybrid workflows."
+              label="Demo participants"
+              value={String(publicDemoAccounts.length)}
+            />
+            <StatCard
+              detail="Access remains verified server-side before paid joins and unlocks."
+              label="Trust model"
+              value="Strict"
+            />
+          </div>
+        </section>
+
+        <section className="space-y-6">
+          <SectionTitle
+            eyebrow="Demo access"
+            body="Use these public demo participants to inspect the dashboards, navigation paths, and AI-assisted flows without waiting for live backend data."
+            title="Preview the product with real role-based demo identities"
+          />
+          <div className="grid gap-4 lg:grid-cols-3">
+            {publicDemoAccounts.map((participant) => (
+              <DemoAccountCard key={participant.id} participant={participant} />
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-6">
+          <SectionTitle
+            eyebrow="Browse"
+            body="Every category stays explicit, so discovery remains legible even as the product grows."
+            title="Built around clear category navigation"
           />
           <div className="flex flex-wrap gap-3">
             {categories.map((category) => (
@@ -90,7 +272,7 @@ export function LandingPage() {
         </section>
 
         <QuerySection
-          body="Featured creator modules are API-driven and will populate once creator data is available."
+          body="These creator cards show who is currently worth following, teaching, or paying attention to."
           error={homeQuery.error as Error | null}
           isLoading={homeQuery.isLoading}
           items={homeQuery.data?.featuredCreators}
@@ -99,7 +281,7 @@ export function LandingPage() {
         />
 
         <QuerySection
-          body="Trending paid lives appear here with pricing, audience state, and direct entry into checkout or live details."
+          body="Paid live sessions surface price, timing, host identity, and access state without visual noise."
           error={homeQuery.error as Error | null}
           isLoading={homeQuery.isLoading}
           items={homeQuery.data?.trendingLives}
@@ -108,7 +290,7 @@ export function LandingPage() {
         />
 
         <QuerySection
-          body="Premium tutorials, replays, downloadable materials, and locked lessons sit behind these API-powered cards."
+          body="Premium tutorials, replay packs, and downloadable learning products stay clearly separated from live inventory."
           error={homeQuery.error as Error | null}
           isLoading={homeQuery.isLoading}
           items={homeQuery.data?.premiumContent}
@@ -117,7 +299,7 @@ export function LandingPage() {
         />
 
         <QuerySection
-          body="Classes and workshops remain structured, price-aware, and teacher-led, ready for real schedules and lesson payloads."
+          body="Structured classes and workshops stay teacher-led, schedule-aware, and payment-gated."
           error={homeQuery.error as Error | null}
           isLoading={homeQuery.isLoading}
           items={homeQuery.data?.recommendedClasses}
@@ -125,38 +307,41 @@ export function LandingPage() {
           title="Recommended classes"
         />
 
-        <section className="grid gap-4 lg:grid-cols-3">
-          {productRules.map((rule) => (
-            <Card className="space-y-3" key={rule}>
-              <div className="h-10 w-10 rounded-2xl bg-accent-muted" />
-              <p className="text-sm leading-7 text-muted">{rule}</p>
-            </Card>
-          ))}
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-2">
-          <Card className="space-y-4">
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+          <Card className="space-y-5">
             <SectionTitle
-              eyebrow="How it works"
-              body="Creators price their own live sessions, content, and classes while the platform automatically enforces purchase-before-access."
-              title="Monetization without noisy UX"
+              eyebrow="Rules"
+              body="The product surface stays elegant because the underlying rules are unambiguous."
+              title="Business logic that remains visible where it matters"
             />
-            <ol className="space-y-3 text-sm leading-7 text-muted">
-              <li>1. Creators publish paid lives, premium content, and structured classes.</li>
-              <li>2. Users discover by category, creator, or direct recommendations.</li>
-              <li>3. Checkout unlocks access, while LiveGate retains the 20% platform commission.</li>
-            </ol>
+            <div className="grid gap-3">
+              {productRules.map((rule) => (
+                <div className="rounded-[24px] border border-white/35 bg-white/22 px-4 py-3 text-sm leading-6 text-muted backdrop-blur-xl" key={rule}>
+                  {rule}
+                </div>
+              ))}
+            </div>
           </Card>
-          <Card className="space-y-4">
+
+          <Card className="space-y-5">
             <SectionTitle
-              eyebrow="Trust"
-              body="The frontend is prepared for verification, moderation, admin oversight, suspicious payment review, and role-based routing."
-              title="Serious enough for investors and premium creators"
+              eyebrow="Product posture"
+              body="LiveGate is designed to feel premium and quiet while still exposing the right control surfaces for creators, viewers, and staff."
+              title="The experience stays polished because the boundaries stay clean"
             />
             <p className="text-sm leading-7 text-muted">
-              The product surface stays calm while the architecture underneath anticipates audit trails,
-              flagged content, payout reviews, verification states, and transaction-level controls.
+              Public users see only the paths they need. Hybrid users can switch contexts. Staff use
+              a separate hidden portal. Payments, access grants, commissions, and payouts stay
+              backend-owned and auditable.
             </p>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/auth/sign-up">
+                <Button>Open an account</Button>
+              </Link>
+              <Link to="/auth/sign-in?demo=demo-viewer">
+                <Button variant="secondary">Preview viewer flow</Button>
+              </Link>
+            </div>
           </Card>
         </section>
       </div>

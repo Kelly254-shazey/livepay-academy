@@ -1,7 +1,7 @@
 import { Redirect, Stack } from 'expo-router';
 import { useSessionStore } from '@/store/session-store';
 
-export default function CreatorLayout() {
+export default function StaffLayout() {
   const hydrated = useSessionStore((state) => state.hydrated);
   const session = useSessionStore((state) => state.session);
 
@@ -10,15 +10,15 @@ export default function CreatorLayout() {
   }
 
   if (!session) {
-    return <Redirect href="/(public)/sign-in" />;
+    return <Redirect href="/(public)/staff-access" />;
+  }
+
+  if (session.user.role === 'creator') {
+    return <Redirect href="/(creator)/(tabs)/dashboard" />;
   }
 
   if (session.user.role === 'viewer') {
     return <Redirect href="/(viewer)/(tabs)/home" />;
-  }
-
-  if (session.user.role === 'admin' || session.user.role === 'moderator') {
-    return <Redirect href="/(staff)/dashboard" />;
   }
 
   return <Stack screenOptions={{ headerShown: false }} />;

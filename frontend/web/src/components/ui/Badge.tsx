@@ -6,16 +6,16 @@ interface BadgeProps {
 }
 
 const variantStyles = {
-  default: 'bg-surface-muted text-text',
-  success: 'bg-success/10 text-success',
-  warning: 'bg-warning/10 text-warning',
-  danger: 'bg-danger/10 text-danger',
-  accent: 'bg-accent-muted text-accent',
+  default: 'border-white/35 bg-white/20 text-text',
+  success: 'border-success/20 bg-success/12 text-success',
+  warning: 'border-warning/20 bg-warning/12 text-warning',
+  danger: 'border-danger/20 bg-danger/12 text-danger',
+  accent: 'border-accent/20 bg-accent/12 text-accent',
 };
 
 const sizeStyles = {
-  sm: 'px-2.5 py-1 text-xs font-medium',
-  md: 'px-3 py-1.5 text-sm font-medium',
+  sm: 'px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]',
+  md: 'px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em]',
 };
 
 export function Badge({
@@ -27,7 +27,9 @@ export function Badge({
   return (
     <span
       className={`
-        inline-block rounded-full
+        inline-flex items-center rounded-full border
+        shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]
+        backdrop-blur-xl
         ${variantStyles[variant]}
         ${sizeStyles[size]}
         ${className || ''}

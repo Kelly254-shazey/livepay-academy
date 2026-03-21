@@ -13,26 +13,39 @@ export function cx(...parts: Array<string | false | null | undefined>) {
 export function Button({
   className,
   variant = 'primary',
+  size = 'md',
+  fullWidth = false,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
+  size?: 'sm' | 'md' | 'lg';
+  fullWidth?: boolean;
 }) {
   const variants = {
     primary:
-      'border border-text bg-text text-canvas shadow-lift hover:-translate-y-0.5 hover:opacity-95 focus-visible:ring-2 focus-visible:ring-text/20',
+      'border border-accent/60 bg-accent text-surface shadow-glass hover:-translate-y-0.5 hover:bg-accent/90 hover:shadow-glass-lg focus-visible:ring-2 focus-visible:ring-accent/20',
     secondary:
-      'border border-stroke bg-surface/90 text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] hover:-translate-y-0.5 hover:bg-surface-muted/90 focus-visible:ring-2 focus-visible:ring-text/10',
+      'border border-white/40 bg-white/25 text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] backdrop-blur-xl hover:-translate-y-0.5 hover:bg-white/35 hover:border-white/55 focus-visible:ring-2 focus-visible:ring-text/10',
     ghost:
-      'border border-transparent bg-transparent text-muted hover:bg-surface-muted/70 hover:text-text focus-visible:ring-2 focus-visible:ring-text/10',
+      'border border-transparent bg-transparent text-muted hover:bg-white/20 hover:text-text focus-visible:ring-2 focus-visible:ring-text/10',
     danger:
-      'border border-danger bg-danger text-white shadow-lift hover:-translate-y-0.5 hover:opacity-95 focus-visible:ring-2 focus-visible:ring-danger/20',
+      'border border-danger/60 bg-danger text-white shadow-[0_14px_36px_rgba(166,75,64,0.2)] hover:-translate-y-0.5 hover:bg-danger/90 focus-visible:ring-2 focus-visible:ring-danger/20',
+    success:
+      'border border-success/60 bg-success text-white shadow-[0_14px_36px_rgba(25,107,89,0.18)] hover:-translate-y-0.5 hover:bg-success/90 focus-visible:ring-2 focus-visible:ring-success/20',
+  };
+  const sizes = {
+    sm: 'rounded-full px-3.5 py-2 text-sm',
+    md: 'rounded-full px-4.5 py-2.5 text-sm',
+    lg: 'rounded-full px-6 py-3.5 text-base',
   };
 
   return (
     <button
       className={cx(
-        'inline-flex items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold tracking-[-0.01em] transition duration-200 disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-55',
+        'inline-flex items-center justify-center font-semibold tracking-[-0.01em] transition duration-200 disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-55',
         variants[variant],
+        sizes[size],
+        fullWidth && 'w-full',
         className,
       )}
       {...props}
@@ -42,7 +55,7 @@ export function Button({
 
 export function Card({ className, children }: PropsWithChildren<{ className?: string }>) {
   return (
-    <div className={cx('surface-panel rounded-[30px] border border-stroke/90 p-6 shadow-soft', className)}>
+    <div className={cx('glass-card rounded-[28px] p-6 shadow-glass sm:p-7', className)}>
       {children}
     </div>
   );
@@ -51,7 +64,7 @@ export function Card({ className, children }: PropsWithChildren<{ className?: st
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className="w-full rounded-[22px] border border-stroke bg-white/40 px-4 py-3.5 text-sm outline-none transition placeholder:text-muted/80 focus:border-text focus:bg-white/70 focus:shadow-[0_0_0_4px_rgba(23,21,18,0.05)]"
+      className="w-full rounded-[22px] border border-white/40 bg-white/28 px-4 py-3.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] outline-none backdrop-blur-xl transition placeholder:text-muted/80 focus:border-white/60 focus:bg-white/40 focus:shadow-[0_0_0_4px_rgba(16,33,29,0.08)]"
       {...props}
     />
   );
@@ -60,7 +73,7 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
-      className="min-h-28 w-full rounded-[22px] border border-stroke bg-white/40 px-4 py-3.5 text-sm outline-none transition placeholder:text-muted/80 focus:border-text focus:bg-white/70 focus:shadow-[0_0_0_4px_rgba(23,21,18,0.05)]"
+      className="min-h-28 w-full rounded-[22px] border border-white/40 bg-white/28 px-4 py-3.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] outline-none backdrop-blur-xl transition placeholder:text-muted/80 focus:border-white/60 focus:bg-white/40 focus:shadow-[0_0_0_4px_rgba(16,33,29,0.08)]"
       {...props}
     />
   );
@@ -69,15 +82,20 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 export function Badge({
   children,
   tone = 'default',
-}: PropsWithChildren<{ tone?: 'default' | 'accent' | 'success' | 'warning' }>) {
+}: PropsWithChildren<{ tone?: 'default' | 'accent' | 'success' | 'warning' | 'danger' }>) {
   const tones = {
-    default: 'bg-surface-muted text-muted',
-    accent: 'bg-accent-muted text-accent',
-    success: 'bg-green-100/80 text-success dark:bg-green-950/40',
-    warning: 'bg-amber-100/90 text-warning dark:bg-amber-950/40',
+    default: 'border-white/35 bg-white/20 text-text',
+    accent: 'border-accent/20 bg-accent/12 text-accent',
+    success: 'border-success/20 bg-success/12 text-success',
+    warning: 'border-warning/20 bg-warning/12 text-warning',
+    danger: 'border-danger/20 bg-danger/12 text-danger',
   };
 
-  return <span className={cx('rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]', tones[tone])}>{children}</span>;
+  return (
+    <span className={cx('inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] backdrop-blur-xl', tones[tone])}>
+      {children}
+    </span>
+  );
 }
 
 export function StatCard({
@@ -147,10 +165,10 @@ export function InlineNotice({
   return (
     <div
       className={cx(
-        'rounded-[26px] border px-4 py-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]',
+        'rounded-[26px] border px-4 py-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] backdrop-blur-xl',
         tone === 'danger'
-          ? 'border-danger/30 bg-danger/10 text-danger'
-          : 'border-stroke bg-surface-muted text-muted',
+          ? 'border-danger/25 bg-danger/12 text-danger'
+          : 'border-white/35 bg-white/20 text-muted',
       )}
     >
       <p className="font-medium">{title}</p>
@@ -173,7 +191,7 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
-      <div className="glass w-full max-w-lg rounded-[34px] border border-white/20 bg-surface p-6 shadow-panel">
+      <div className="glass-full w-full max-w-lg rounded-[34px] p-6 shadow-panel">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-xl font-semibold tracking-[-0.02em]">{title}</h3>
           <Button variant="ghost" onClick={onClose}>
@@ -196,13 +214,13 @@ export function Tabs({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="inline-flex rounded-full border border-stroke bg-surface-muted/90 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+    <div className="inline-flex rounded-full border border-white/35 bg-white/22 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] backdrop-blur-xl">
       {items.map((item) => (
         <button
           key={item.value}
           className={cx(
             'rounded-full px-4 py-2 text-sm font-medium transition',
-            value === item.value ? 'bg-surface text-text shadow-lift' : 'text-muted hover:text-text',
+            value === item.value ? 'bg-white/55 text-text shadow-glass' : 'text-muted hover:text-text',
           )}
           onClick={() => onChange(item.value)}
           type="button"

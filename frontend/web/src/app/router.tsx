@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { useSessionStore } from '@/store/session-store';
 import { AdminDashboardPage, CheckoutPage, CreatorDashboardPage, NotificationsCenterPage, PaymentFailedPage, PaymentSuccessPage, UserDashboardPage } from '@/pages/app';
-import { ForgotPasswordPage, ResetPasswordPage, RoleSelectionPage, SignInPage, SignUpPage } from '@/pages/auth';
+import { ForgotPasswordPage, ResetPasswordPage, RoleSelectionPage, SignInPage, SignUpPage, StaffAccessPage } from '@/pages/auth';
 import { CategoryPage, ClassDetailsPage, CreatorProfilePage, LiveDetailsPage, LiveRoomPage, PremiumContentPage } from '@/pages/discovery';
 import { LandingPage } from '@/pages/public';
 
@@ -38,6 +38,7 @@ export const router = createBrowserRouter([
   { path: '/auth/role-selection', element: <RoleSelectionPage /> },
   { path: '/auth/sign-in', element: <SignInPage /> },
   { path: '/auth/sign-up', element: <SignUpPage /> },
+  { path: '/staff/portal', element: <StaffAccessPage /> },
   { path: '/auth/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/auth/reset-password', element: <ResetPasswordPage /> },
   { path: '/categories/:slug', element: <CategoryPage /> },

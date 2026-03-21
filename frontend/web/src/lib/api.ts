@@ -11,53 +11,126 @@ import type {
   LiveRoomPayload,
   LiveSessionDetailPayload,
   NotificationRecord,
+  ProfileSettingsPayload,
   PremiumContentDetailPayload,
+  SaveProfileSettingsResponse,
   SearchFilters,
   SearchResultsPayload,
   TransactionRecord,
   ViewerDashboardPayload,
 } from '@livegate/shared';
-import { apiRoutes } from '@livegate/shared';
+import {
+  apiRoutes,
+  createDemoCheckout,
+  forgotPasswordDemo,
+  getDemoAdminDashboard,
+  getDemoCategoryDetail,
+  getDemoClassDetail,
+  getDemoCreatorDashboard,
+  getDemoCreatorProfile,
+  getDemoHomeFeed,
+  getDemoLiveDetail,
+  getDemoLiveRoom,
+  getDemoNotifications,
+  getDemoProfileSettings,
+  getDemoPremiumContentDetail,
+  getDemoViewerDashboard,
+  requestDemoPayout,
+  resetPasswordDemo,
+  saveDemoProfileSettings,
+  searchDemo,
+  signInWithDemo,
+  signUpWithDemo,
+  type UserRole,
+} from '@livegate/shared';
 import { http } from './http';
+import { useSessionStore } from '@/store/session-store';
+
+async function withDemoFallback<T>(run: () => Promise<T>, fallback: () => T | Promise<T>) {
+  try {
+    return await run();
+  } catch {
+    return fallback();
+  }
+}
 
 export const webApi = {
-  signIn: (body: { email: string; password: string; role: string }) =>
-    http<AuthSession>(apiRoutes.auth.signIn, { method: 'POST', body, authenticated: false }),
-  signUp: (body: { fullName: string; email: string; password: string; role: string }) =>
-    http<AuthSession>(apiRoutes.auth.signUp, { method: 'POST', body, authenticated: false }),
+  signIn: (body: { email: string; password: string; role: string; roles?: UserRole[] }) =>
+    withDemoFallback(
+      () => http<AuthSession>(apiRoutes.auth.signIn, { method: 'POST', body, authenticated: false }),
+      () => signInWithDemo({ ...body, activeRole: body.role as UserRole }),
+    ),
+  signUp: (body: {
+    fullName: string;
+    email: string;
+    password: string;
+    role: string;
+    roles?: UserRole[];
+  }) =>
+    withDemoFallback(
+      () => http<AuthSession>(apiRoutes.auth.signUp, { method: 'POST', body, authenticated: false }),
+      () => signUpWithDemo({ ...body, activeRole: body.role as UserRole }),
+    ),
   forgotPassword: (body: { email: string }) =>
-    http<{ message: string }>(apiRoutes.auth.forgotPassword, {
+    withDemoFallback(() => http<{ message: string }>(apiRoutes.auth.forgotPassword, {
       method: 'POST',
       body,
       authenticated: false,
-    }),
+    }), forgotPasswordDemo),
   resetPassword: (body: { email: string; token: string; password: string }) =>
-    http<{ message: string }>(apiRoutes.auth.resetPassword, {
+    withDemoFallback(() => http<{ message: string }>(apiRoutes.auth.resetPassword, {
       method: 'POST',
       body,
       authenticated: false,
-    }),
-  getHomeFeed: () => http<HomeFeedPayload>(apiRoutes.home, { authenticated: false }),
+    }), resetPasswordDemo),
+  getHomeFeed: () =>
+    withDemoFallback(() => http<HomeFeedPayload>(apiRoutes.home, { authenticated: false }), getDemoHomeFeed),
   getCategoryDetail: (slug: string) =>
-    http<CategoryDetailPayload>(apiRoutes.categoryDetail(slug), { authenticated: false }),
+    withDemoFallback(
+      () => http<CategoryDetailPayload>(apiRoutes.categoryDetail(slug), { authenticated: false }),
+      () => getDemoCategoryDetail(slug as never),
+    ),
   getCreatorProfile: (id: string) =>
-    http<CreatorProfilePayload>(apiRoutes.creatorDetail(id), { authenticated: false }),
+    withDemoFallback(
+      () => http<CreatorProfilePayload>(apiRoutes.creatorDetail(id), { authenticated: false }),
+      () => getDemoCreatorProfile(id),
+    ),
   getLiveDetail: (id: string) =>
-    http<LiveSessionDetailPayload>(apiRoutes.liveDetail(id), { authenticated: false }),
-  getLiveRoom: (id: string) => http<LiveRoomPayload>(apiRoutes.liveRoom(id)),
+    withDemoFallback(
+      () => http<LiveSessionDetailPayload>(apiRoutes.liveDetail(id), { authenticated: false }),
+      () => getDemoLiveDetail(id),
+    ),
+  getLiveRoom: (id: string) =>
+    withDemoFallback(() => http<LiveRoomPayload>(apiRoutes.liveRoom(id)), () => getDemoLiveRoom(id)),
   getPremiumContentDetail: (id: string) =>
-    http<PremiumContentDetailPayload>(apiRoutes.premiumContentDetail(id), {
-      authenticated: false,
-    }),
+    withDemoFallback(
+      () =>
+        http<PremiumContentDetailPayload>(apiRoutes.premiumContentDetail(id), {
+          authenticated: false,
+        }),
+      () => getDemoPremiumContentDetail(id),
+    ),
   getClassDetail: (id: string) =>
-    http<ClassDetailPayload>(apiRoutes.classDetail(id), { authenticated: false }),
-  getViewerDashboard: () => http<ViewerDashboardPayload>(apiRoutes.viewerDashboard),
-  getCreatorDashboard: () => http<CreatorDashboardPayload>(apiRoutes.creatorDashboard),
-  getAdminDashboard: () => http<AdminDashboardPayload>(apiRoutes.adminDashboard),
+    withDemoFallback(
+      () => http<ClassDetailPayload>(apiRoutes.classDetail(id), { authenticated: false }),
+      () => getDemoClassDetail(id),
+    ),
+  getViewerDashboard: () =>
+    withDemoFallback(() => http<ViewerDashboardPayload>(apiRoutes.viewerDashboard), getDemoViewerDashboard),
+  getCreatorDashboard: () =>
+    withDemoFallback(() => http<CreatorDashboardPayload>(apiRoutes.creatorDashboard), getDemoCreatorDashboard),
+  getAdminDashboard: () =>
+    withDemoFallback(() => http<AdminDashboardPayload>(apiRoutes.adminDashboard), getDemoAdminDashboard),
   getNotifications: () =>
-    http<ApiListResponse<NotificationRecord>>(apiRoutes.notifications),
+    withDemoFallback(
+      () => http<ApiListResponse<NotificationRecord>>(apiRoutes.notifications),
+      getDemoNotifications,
+    ),
   getTransactions: () =>
-    http<ApiListResponse<TransactionRecord>>(apiRoutes.transactions),
+    withDemoFallback(
+      () => http<ApiListResponse<TransactionRecord>>(apiRoutes.transactions),
+      () => getDemoViewerDashboard().transactions,
+    ),
   search: (filters: SearchFilters) => {
     const search = new URLSearchParams();
 
@@ -65,12 +138,44 @@ export const webApi = {
     if (filters.category) search.set('category', filters.category);
     if (filters.type) search.set('type', filters.type);
 
-    return http<SearchResultsPayload>(`${apiRoutes.search}?${search.toString()}`, {
-      authenticated: false,
-    });
+    return withDemoFallback(
+      () =>
+        http<SearchResultsPayload>(`${apiRoutes.search}?${search.toString()}`, {
+          authenticated: false,
+        }),
+      () => searchDemo(filters),
+    );
   },
   createCheckout: (body: { productId: string; productType: 'live' | 'content' | 'class' }) =>
-    http<CheckoutSummary>(apiRoutes.checkout, { method: 'POST', body }),
+    withDemoFallback(
+      () => http<CheckoutSummary>(apiRoutes.checkout, { method: 'POST', body }),
+      () => createDemoCheckout(body),
+    ),
   requestPayout: (body: { amount: number; method: string; note?: string }) =>
-    http<{ message: string }>(apiRoutes.creatorPayouts, { method: 'POST', body }),
+    withDemoFallback(
+      () => http<{ message: string }>(apiRoutes.creatorPayouts, { method: 'POST', body }),
+      () => requestDemoPayout(body),
+    ),
+  getProfileSettings: () =>
+    withDemoFallback(
+      () => http<ProfileSettingsPayload>(apiRoutes.profileSettings),
+      () => {
+        const session = useSessionStore.getState().session;
+        return getDemoProfileSettings({
+          fullName: session?.user.fullName,
+          email: session?.user.email,
+          roles: session?.user.roles,
+          activeRole: session?.user.role,
+        });
+      },
+    ),
+  saveProfileSettings: (body: ProfileSettingsPayload) =>
+    withDemoFallback(
+      () =>
+        http<SaveProfileSettingsResponse>(apiRoutes.profileSettings, {
+          method: 'PUT',
+          body,
+        }),
+      () => saveDemoProfileSettings(body),
+    ),
 };
