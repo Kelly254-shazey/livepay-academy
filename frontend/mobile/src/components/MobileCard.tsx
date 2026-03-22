@@ -19,10 +19,11 @@ interface MobileCardProps {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: theme.radius.xl,
-    borderWidth: 2,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
+    ...theme.shadow.sm,
   },
 });
 
@@ -30,7 +31,7 @@ export function MobileCard({
   children,
   onPress,
   interactive = false,
-  padding = 16,
+  padding = theme.spacing.lg,
   style,
   testID,
 }: MobileCardProps) {

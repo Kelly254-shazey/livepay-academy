@@ -1,5 +1,5 @@
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   fullWidth?: boolean;
@@ -8,22 +8,16 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles = {
-  primary:
-    'border border-accent/60 bg-accent text-surface shadow-glass hover:-translate-y-0.5 hover:bg-accent/90 hover:shadow-glass-lg active:translate-y-0 active:bg-accent/80 disabled:border-white/25 disabled:bg-surface-muted disabled:text-muted',
-  secondary:
-    'border border-white/40 bg-white/25 text-text backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] hover:-translate-y-0.5 hover:border-white/55 hover:bg-white/35 active:translate-y-0 active:bg-white/30 disabled:border-white/20 disabled:bg-surface-muted disabled:text-muted',
-  ghost:
-    'border border-transparent bg-transparent text-text hover:bg-white/20 hover:text-text active:bg-white/25 disabled:text-muted',
-  danger:
-    'border border-danger/60 bg-danger text-surface shadow-[0_14px_36px_rgba(164,75,64,0.2)] hover:-translate-y-0.5 hover:bg-danger/90 active:translate-y-0 active:bg-danger/80 disabled:border-white/25 disabled:bg-surface-muted',
-  success:
-    'border border-success/60 bg-success text-surface shadow-[0_14px_36px_rgba(25,107,89,0.18)] hover:-translate-y-0.5 hover:bg-success/90 active:translate-y-0 active:bg-success/80 disabled:border-white/25 disabled:bg-surface-muted',
+  primary: 'bg-accent text-white border-accent hover:bg-accent-hover focus:ring-accent/20',
+  secondary: 'bg-surface text-text border-border hover:bg-surface-muted focus:ring-accent/20',
+  ghost: 'bg-transparent text-text border-transparent hover:bg-hover focus:ring-accent/20',
+  danger: 'bg-danger text-white border-danger hover:bg-red-600 focus:ring-danger/20',
 };
 
 const sizeStyles = {
-  sm: 'px-3.5 py-2 text-sm font-medium rounded-full gap-2',
-  md: 'px-4.5 py-2.5 text-sm font-semibold rounded-full gap-2',
-  lg: 'px-6 py-3.5 text-base font-semibold rounded-full gap-3',
+  sm: 'px-3 py-1.5 text-sm font-medium rounded-lg',
+  md: 'px-4 py-2 text-sm font-semibold rounded-lg',
+  lg: 'px-6 py-2.5 text-base font-semibold rounded-lg',
 };
 
 export function Button({
@@ -42,10 +36,10 @@ export function Button({
     <button
       disabled={isLoading || disabled}
       className={`
-        inline-flex items-center justify-center
-        tracking-tight transition-all duration-200 ease-out
-        focus:outline-none focus:ring-2 focus:ring-accent/50 focus:ring-offset-2 focus:ring-offset-canvas
-        disabled:cursor-not-allowed disabled:opacity-60
+        inline-flex items-center justify-center gap-2
+        border transition-all duration-200
+        focus:outline-none focus:ring-2 focus:ring-offset-2
+        disabled:opacity-50 disabled:cursor-not-allowed
         ${variantStyles[variant]}
         ${sizeStyles[size]}
         ${fullWidth ? 'w-full' : ''}

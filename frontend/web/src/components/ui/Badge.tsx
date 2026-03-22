@@ -1,21 +1,21 @@
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'default' | 'success' | 'warning' | 'danger' | 'accent';
+  variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger';
   size?: 'sm' | 'md';
   className?: string;
 }
 
 const variantStyles = {
-  default: 'border-white/35 bg-white/20 text-text',
-  success: 'border-success/20 bg-success/12 text-success',
-  warning: 'border-warning/20 bg-warning/12 text-warning',
-  danger: 'border-danger/20 bg-danger/12 text-danger',
-  accent: 'border-accent/20 bg-accent/12 text-accent',
+  default: 'bg-surface-muted text-text border-border',
+  primary: 'bg-accent-muted text-accent border-accent/20',
+  success: 'bg-green-50 text-green-700 border-green-200',
+  warning: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  danger: 'bg-red-50 text-red-700 border-red-200',
 };
 
 const sizeStyles = {
-  sm: 'px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]',
-  md: 'px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em]',
+  sm: 'px-2 py-0.5 text-xs',
+  md: 'px-2.5 py-1 text-sm',
 };
 
 export function Badge({
@@ -27,9 +27,7 @@ export function Badge({
   return (
     <span
       className={`
-        inline-flex items-center rounded-full border
-        shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]
-        backdrop-blur-xl
+        inline-flex items-center font-medium rounded-full border
         ${variantStyles[variant]}
         ${sizeStyles[size]}
         ${className || ''}

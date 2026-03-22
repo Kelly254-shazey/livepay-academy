@@ -151,19 +151,42 @@ export function LandingPage() {
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.18fr)_380px]">
           <HeroPanel
             action={
-              <div className="flex flex-wrap gap-3">
-                <Link to="/auth/role-selection">
-                  <Button size="lg">Choose your role</Button>
-                </Link>
-                <Link to="/auth/sign-in?demo=demo-hybrid">
-                  <Button size="lg" variant="secondary">
-                    Open demo workspace
-                  </Button>
-                </Link>
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-3">
+                  <Link to="/auth/role-selection">
+                    <Button size="lg">Choose your role</Button>
+                  </Link>
+                  <Link to="/auth/sign-in?demo=demo-hybrid">
+                    <Button size="lg" variant="secondary">
+                      Open demo workspace
+                    </Button>
+                  </Link>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.12em] text-muted">📱 Also available on mobile</p>
+                  <div className="flex flex-wrap gap-2">
+                    <a href="https://apps.apple.com/app/livegate" target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="secondary" className="gap-2">
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M17.05 13.5c-.02-2.22 1.82-3.28 1.84-3.3-1-1.46-2.54-1.66-3.09-1.68-1.31-.14-2.56.78-3.22.78-.64 0-1.63-.76-2.68-.73-1.38.03-2.65.8-3.36 2.03-.143.247-.267.505-.37.77-.752 2.289-.204 5.258 1.4 6.982.94 1.37 2.07 2.85 3.56 2.8 1.44-.05 1.99-.94 3.74-.94 1.74 0 2.26.94 3.76.91 1.55-.03 2.53-1.39 3.46-2.76.966-1.436 1.41-2.94 1.44-3.02-.03-.02-3.03-1.17-3.06-4.63z"/>
+                        </svg>
+                        App Store
+                      </Button>
+                    </a>
+                    <a href="https://play.google.com/store/apps/details?id=com.livegate" target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="secondary" className="gap-2">
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M3 13.5v8.5c0 1.1.9 2 2 2h4v-6h3v6h4c1.1 0 2-.9 2-2v-8.5M6.5 1.5h11c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2h-11c-1.1 0-2-.9-2-2v-4c0-1.1.9-2 2-2z"/>
+                        </svg>
+                        Play Store
+                      </Button>
+                    </a>
+                  </div>
+                </div>
               </div>
             }
-            body="LiveGate is a premium product for paid live sessions, locked content, structured classes, and serious creator monetization across education, business, trading, mentorship, wellness, and entertainment."
-            eyebrow="Premium live learning"
+            body="LiveGate is a premium product for paid live sessions, locked content, structured classes, and serious creator monetization across education, business, trading, mentorship, wellness, and entertainment. Available on web and mobile for seamless access anywhere."
+            eyebrow="Premium live learning • Web & Mobile"
             title="A calmer way to sell expertise, join live sessions, and unlock paid knowledge."
           />
 

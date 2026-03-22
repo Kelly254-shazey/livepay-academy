@@ -1,265 +1,334 @@
-import { type PropsWithChildren } from 'react';
+import React from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
+  View,
   Text,
   TextInput,
-  View,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  StyleSheet,
+  type ViewStyle,
+  type TextStyle,
+  type StyleProp,
 } from 'react-native';
 import { theme } from '@/theme';
+import { MobileButton } from '@/components/MobileButton';
 
-export function Screen({
-  children,
-  scroll = true,
-}: PropsWithChildren<{ scroll?: boolean }>) {
-  const content = scroll ? (
-    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.backgroundOrbPrimary} />
-      <View style={styles.backgroundOrbSecondary} />
+// Screen Container
+interface ScreenProps {
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}
+
+export function Screen({ children, style }: ScreenProps) {
+  return (
+    <ScrollView
+      style={[styles.screen, style]}
+      contentContainerStyle={styles.screenContent}
+      showsVerticalScrollIndicator={false}
+    >
       {children}
     </ScrollView>
-  ) : (
-    <View style={styles.scrollContent}>
-      <View style={styles.backgroundOrbPrimary} />
-      <View style={styles.backgroundOrbSecondary} />
+  );
+}
+
+// Surface (Card-like container)
+interface SurfaceProps {
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+  padding?: number;
+}
+
+export function Surface({ children, style, padding = theme.spacing.lg }: SurfaceProps) {
+  return (
+    <View style={[styles.surface, { padding }, style]}>
       {children}
     </View>
   );
-
-  return <SafeAreaView style={styles.screen}>{content}</SafeAreaView>;
 }
 
-export function Surface({ children, style }: PropsWithChildren<{ style?: object }>) {
-  return <View style={[styles.surface, style]}>{children}</View>;
-}
-
-export function Heading({
-  eyebrow,
-  title,
-  body,
-}: {
-  eyebrow?: string;
+// Typography Components
+interface HeadingProps {
   title: string;
+  eyebrow?: string;
   body?: string;
-}) {
+  style?: StyleProp<TextStyle>;
+}
+
+export function Heading({ title, eyebrow, body, style }: HeadingProps) {
   return (
-    <View style={{ gap: 8 }}>
-      {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-      <Text style={styles.title}>{title}</Text>
-      {body ? <Text style={styles.body}>{body}</Text> : null}
+    <View style={styles.headingContainer}>
+      {eyebrow && (
+        <Text style={[styles.eyebrow, style]}>{eyebrow}</Text>
+      )}
+      <Text style={[styles.title, style]}>{title}</Text>
+      {body && (
+        <Text style={[styles.body, style]}>{body}</Text>
+      )}
     </View>
   );
 }
 
-export function Button({
-  title,
-  variant = 'primary',
-  onPress,
-  disabled,
-}: {
-  title: string;
-  variant?: 'primary' | 'secondary' | 'ghost';
-  onPress?: () => void;
-  disabled?: boolean;
-}) {
-  const variants = {
-    primary: { backgroundColor: theme.colors.text, borderColor: theme.colors.text, color: theme.colors.background },
-    secondary: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text },
-    ghost: { backgroundColor: 'transparent', borderColor: 'transparent', color: theme.colors.mutedText },
-  };
-
-  return (
-    <Pressable
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.button,
-        { opacity: disabled ? 0.55 : pressed ? 0.9 : 1, transform: [{ translateY: pressed ? 1 : 0 }] },
-        {
-          backgroundColor: variants[variant].backgroundColor,
-          borderColor: variants[variant].borderColor,
-        },
-      ]}
-    >
-      <Text style={[styles.buttonText, { color: variants[variant].color }]}>{title}</Text>
-    </Pressable>
-  );
+// Text Field
+interface TextFieldProps {
+  label?: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+  error?: string;
+  multiline?: boolean;
+  secureTextEntry?: boolean;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function TextField({
   label,
-  placeholder,
-  secureTextEntry,
   value,
   onChangeText,
-}: {
-  label: string;
-  placeholder?: string;
-  secureTextEntry?: boolean;
-  value?: string;
-  onChangeText?: (value: string) => void;
-}) {
+  placeholder,
+  error,
+  multiline = false,
+  secureTextEntry = false,
+  style,
+}: TextFieldProps) {
   return (
-    <View style={{ gap: 8 }}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+    <View style={[styles.textFieldContainer, style]}>
+      {label && <Text style={styles.label}>{label}</Text>}
       <TextInput
+        style={[
+          styles.textInput,
+          multiline && styles.textInputMultiline,
+          error && styles.textInputError,
+        ]}
+        value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={theme.colors.mutedText}
+        placeholderTextColor={theme.colors.textMuted}
+        multiline={multiline}
+        numberOfLines={multiline ? 4 : 1}
         secureTextEntry={secureTextEntry}
-        style={styles.input}
-        value={value}
       />
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 }
 
-export function EmptyState({
-  title,
-  body,
-}: {
+// Button (using the updated MobileButton)
+export { MobileButton as Button };
+
+// Loading State
+interface LoadingStateProps {
+  label?: string;
+}
+
+export function LoadingState({ label = 'Loading...' }: LoadingStateProps) {
+  return (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color={theme.colors.accent} />
+      <Text style={styles.loadingText}>{label}</Text>
+    </View>
+  );
+}
+
+// Empty State
+interface EmptyStateProps {
   title: string;
-  body: string;
-}) {
+  body?: string;
+  action?: React.ReactNode;
+}
+
+export function EmptyState({ title, body, action }: EmptyStateProps) {
   return (
-    <Surface>
-      <View style={styles.emptyBadge} />
+    <View style={styles.emptyContainer}>
       <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.body}>{body}</Text>
-    </Surface>
-  );
-}
-
-export function LoadingState({ label = 'Loading...' }: { label?: string }) {
-  return (
-    <Surface style={{ alignItems: 'center', gap: 12, paddingVertical: 32 }}>
-      <ActivityIndicator color={theme.colors.accent} />
-      <Text style={styles.body}>{label}</Text>
-    </Surface>
-  );
-}
-
-export function MetaRow({
-  left,
-  right,
-}: {
-  left: string;
-  right: string;
-}) {
-  return (
-    <View style={styles.metaRow}>
-      <Text style={styles.metaText}>{left}</Text>
-      <Text style={styles.metaText}>{right}</Text>
+      {body && <Text style={styles.emptyBody}>{body}</Text>}
+      {action && <View style={styles.emptyAction}>{action}</View>}
     </View>
   );
 }
 
-export const styles = StyleSheet.create({
+// Badge
+interface BadgeProps {
+  children: React.ReactNode;
+  variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger';
+  style?: StyleProp<ViewStyle>;
+}
+
+export function Badge({ children, variant = 'default', style }: BadgeProps) {
+  const badgeStyle = badgeVariants[variant];
+  
+  return (
+    <View style={[styles.badge, badgeStyle.container, style]}>
+      <Text style={[styles.badgeText, badgeStyle.text]}>{children}</Text>
+    </View>
+  );
+}
+
+// Avatar
+interface AvatarProps {
+  name?: string;
+  size?: 'sm' | 'md' | 'lg';
+  style?: StyleProp<ViewStyle>;
+}
+
+export function Avatar({ name, size = 'md', style }: AvatarProps) {
+  const avatarSize = avatarSizes[size];
+  const initials = name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
+  
+  return (
+    <View style={[styles.avatar, avatarSize, style]}>
+      <Text style={[styles.avatarText, { fontSize: avatarSize.width * 0.4 }]}>
+        {initials}
+      </Text>
+    </View>
+  );
+}
+
+// Styles
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  scrollContent: {
-    padding: theme.spacing.xl,
+  screenContent: {
+    padding: theme.spacing.lg,
     gap: theme.spacing.lg,
-    paddingBottom: 120,
   },
   surface: {
-    backgroundColor: theme.colors.elevatedSurface,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    gap: theme.spacing.md,
-    overflow: 'hidden',
-    ...theme.shadow.soft,
+    borderColor: theme.colors.borderSubtle,
+    ...theme.shadow.sm,
+  },
+  headingContainer: {
+    gap: theme.spacing.xs,
   },
   eyebrow: {
-    fontSize: 11,
-    letterSpacing: 2.2,
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.textMuted,
     textTransform: 'uppercase',
-    color: theme.colors.mutedText,
-    fontWeight: '700',
+    letterSpacing: 1,
   },
   title: {
-    fontSize: 32,
-    lineHeight: 38,
-    fontWeight: '700',
+    fontSize: theme.typography.sizes['3xl'],
+    fontWeight: theme.typography.weights.bold,
     color: theme.colors.text,
-    letterSpacing: -0.8,
+    lineHeight: theme.typography.sizes['3xl'] * 1.2,
   },
   body: {
-    fontSize: 15,
-    lineHeight: 24,
-    color: theme.colors.mutedText,
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.textSecondary,
+    lineHeight: theme.typography.sizes.base * 1.5,
   },
-  button: {
-    borderRadius: theme.radius.pill,
-    paddingHorizontal: 18,
-    paddingVertical: 15,
+  textFieldContainer: {
+    gap: theme.spacing.xs,
+  },
+  label: {
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text,
+  },
+  textInput: {
     borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    padding: theme.spacing.md,
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.surface,
+    fontFamily: theme.typography.fontFamily,
+  },
+  textInputMultiline: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  textInputError: {
+    borderColor: theme.colors.danger,
+  },
+  errorText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.danger,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.xxl,
+    gap: theme.spacing.md,
+  },
+  loadingText: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.textMuted,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.xxl,
+    gap: theme.spacing.md,
+  },
+  emptyTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: theme.typography.sizes.base * 1.5,
+  },
+  emptyAction: {
+    marginTop: theme.spacing.md,
+  },
+  badge: {
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.pill,
+    alignSelf: 'flex-start',
+  },
+  badgeText: {
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: theme.typography.weights.medium,
+  },
+  avatar: {
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: -0.15,
-  },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    color: theme.colors.text,
-    backgroundColor: 'rgba(255,255,255,0.72)',
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.colors.text,
-    letterSpacing: -0.3,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: theme.spacing.md,
-  },
-  metaText: {
-    fontSize: 13,
-    color: theme.colors.mutedText,
-  },
-  backgroundOrbPrimary: {
-    position: 'absolute',
-    top: -40,
-    right: -20,
-    width: 160,
-    height: 160,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15, 118, 110, 0.08)',
-  },
-  backgroundOrbSecondary: {
-    position: 'absolute',
-    top: 120,
-    left: -34,
-    width: 120,
-    height: 120,
-    borderRadius: 999,
-    backgroundColor: 'rgba(154, 106, 42, 0.08)',
-  },
-  emptyBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.colors.accentMuted,
+  avatarText: {
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.textSecondary,
   },
 });
+
+const badgeVariants = {
+  default: {
+    container: { backgroundColor: theme.colors.surfaceMuted },
+    text: { color: theme.colors.text },
+  },
+  primary: {
+    container: { backgroundColor: theme.colors.accentMuted },
+    text: { color: theme.colors.accent },
+  },
+  success: {
+    container: { backgroundColor: '#dcfce7' },
+    text: { color: theme.colors.success },
+  },
+  warning: {
+    container: { backgroundColor: '#fef3c7' },
+    text: { color: theme.colors.warning },
+  },
+  danger: {
+    container: { backgroundColor: '#fee2e2' },
+    text: { color: theme.colors.danger },
+  },
+};
+
+const avatarSizes = {
+  sm: { width: 32, height: 32 },
+  md: { width: 40, height: 40 },
+  lg: { width: 48, height: 48 },
+};

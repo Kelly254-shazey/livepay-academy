@@ -1,4 +1,3 @@
-import { palette } from '@livegate/shared';
 import { Platform } from 'react-native';
 
 function createShadow({
@@ -17,13 +16,8 @@ function createShadow({
   elevation: number;
 }) {
   if (Platform.OS === 'web') {
-    const rgba =
-      color === '#171512'
-        ? `rgba(23,21,18,${opacity})`
-        : `rgba(16,33,29,${opacity})`;
-
     return {
-      boxShadow: `${x}px ${y}px ${blur}px ${rgba}`,
+      boxShadow: `${x}px ${y}px ${blur}px rgba(0,0,0,${opacity})`,
     };
   }
 
@@ -38,51 +32,67 @@ function createShadow({
 
 export const theme = {
   colors: {
-    background: palette.canvas,
-    surface: palette.surface,
-    mutedSurface: palette.surfaceMuted,
-    elevatedSurface: '#FCFFFD',
-    border: palette.stroke,
-    stroke: palette.stroke,
-    text: palette.text,
-    mutedText: palette.textMuted,
-    muted: palette.textMuted,
-    accent: palette.accent,
-    primary: palette.accent,
-    accentMuted: palette.accentMuted,
-    success: palette.success,
-    successLight: '#4ade80',
-    warning: palette.warning,
-    warningLight: '#fbbf24',
-    danger: palette.danger,
-    dangerLight: '#f87171',
-    error: palette.danger,
-    info: '#0ea5e9',
-    infoLight: '#38bdf8',
-    roleCreator: '#a78bfa',      /* Purple */
-    roleViewer: '#60a5fa',       /* Blue */
-    roleAdmin: '#f87171',        /* Red */
-    roleModerator: '#fbbf24',    /* Amber */
+    background: '#fafafa',
+    surface: '#ffffff',
+    surfaceMuted: '#f5f5f5',
+    surfaceElevated: '#ffffff',
+    border: '#e5e5e5',
+    borderSubtle: '#f0f0f0',
+    text: '#171717',
+    textSecondary: '#525252',
+    textMuted: '#737373',
+    accent: '#0ea5e9',
+    accentHover: '#0284c7',
+    accentMuted: '#e0f2fe',
+    primary: '#0ea5e9',
+    success: '#10b981',
+    warning: '#f59e0b',
+    danger: '#ef4444',
+    error: '#ef4444',
+    info: '#3b82f6',
   },
   spacing: {
     xs: 4,
     sm: 8,
     md: 12,
     lg: 16,
-    xl: 24,
-    xxl: 32,
-    xxxl: 40,
+    xl: 20,
+    xxl: 24,
+    xxxl: 32,
   },
   radius: {
-    sm: 14,
-    md: 18,
-    lg: 24,
-    xl: 30,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 20,
     pill: 999,
   },
   shadow: {
-    soft: createShadow({ color: '#171512', x: 0, y: 14, blur: 28, opacity: 0.08, elevation: 6 }),
-    panel: createShadow({ color: '#171512', x: 0, y: 16, blur: 32, opacity: 0.1, elevation: 8 }),
-    lift: createShadow({ color: '#171512', x: 0, y: 12, blur: 24, opacity: 0.08, elevation: 6 }),
+    sm: createShadow({ color: '#000000', x: 0, y: 1, blur: 3, opacity: 0.1, elevation: 2 }),
+    md: createShadow({ color: '#000000', x: 0, y: 4, blur: 12, opacity: 0.15, elevation: 4 }),
+    lg: createShadow({ color: '#000000', x: 0, y: 8, blur: 25, opacity: 0.15, elevation: 8 }),
+  },
+  typography: {
+    fontFamily: Platform.select({
+      ios: '-apple-system',
+      android: 'Roboto',
+      default: 'Inter',
+    }),
+    sizes: {
+      xs: 12,
+      sm: 14,
+      base: 16,
+      lg: 18,
+      xl: 20,
+      '2xl': 24,
+      '3xl': 30,
+      '4xl': 36,
+    },
+    weights: {
+      normal: '400' as const,
+      medium: '500' as const,
+      semibold: '600' as const,
+      bold: '700' as const,
+    },
   },
 };

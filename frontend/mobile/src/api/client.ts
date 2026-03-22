@@ -1,3 +1,12 @@
+/**
+ * Mobile API Client
+ * 
+ * Security Features:
+ * - SSRF protection with URL validation and IP range blocking
+ * - Input sanitization for search parameters
+ * - Path validation to prevent injection attacks
+ * - Safe URL construction with proper validation
+ */
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import type {
@@ -59,6 +68,94 @@ function resolveExpoHost() {
     ?.trim();
 }
 
+// Security: Allowed domains for API requests (allowlist approach)
+const ALLOWED_DOMAINS = [
+  'localhost', // Development only
+  '127.0.0.1', // Development only
+  // Add your production API domains here
+  // 'api.livegate.com',
+  // 'staging-api.livegate.com'
+];
+
+// Security: Validate and sanitize URLs to prevent SSRF attacks
+function validateApiUrl(baseUrl: string): boolean {
+  try {
+    const url = new URL(baseUrl);
+    
+    // Only allow HTTP/HTTPS protocols
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return false;
+    }
+    
+    const hostname = url.hostname.toLowerCase();
+    
+    // In development, allow localhost
+    if (__DEV__ || process.env.NODE_ENV === 'development') {
+      if (['localhost', '127.0.0.1', '::1'].includes(hostname)) {
+        return true;
+      }
+    }
+    
+    // Check against allowlist
+    if (!ALLOWED_DOMAINS.includes(hostname)) {
+      return false;
+    }
+    
+    // Block private IP ranges (RFC 1918) even if somehow in allowlist
+    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const ipMatch = hostname.match(ipv4Regex);
+    if (ipMatch) {
+      const [, a, b, c, d] = ipMatch.map(Number);
+      // Block private ranges: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+      if (
+        (a === 10) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        (a === 169 && b === 254) // Block AWS metadata service
+      ) {
+        return false;
+      }
+    }
+    
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function sanitizePath(path: string): string {
+  // Remove any protocol or hostname from path
+  if (path.includes('://')) {
+    throw new MobileApiError('Invalid path: protocol not allowed in API paths');
+  }
+  
+  // Ensure path starts with /
+  if (!path.startsWith('/')) {
+    path = '/' + path;
+  }
+  
+  // Remove any double slashes and normalize
+  path = path.replace(/\/+/g, '/');
+  
+  return path;
+}
+
+// Security: Validate ID parameters to prevent injection
+function validateId(id: string, paramName: string): string {
+  if (!id || typeof id !== 'string') {
+    throw new MobileApiError(`Invalid ${paramName}: must be a non-empty string`);
+  }
+  
+  // Remove any potentially dangerous characters
+  const sanitized = id.replace(/[^a-zA-Z0-9-_]/g, '').slice(0, 100);
+  
+  if (!sanitized || sanitized.length < 1) {
+    throw new MobileApiError(`Invalid ${paramName}: contains invalid characters`);
+  }
+  
+  return sanitized;
+}
+
 const explicitApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ?? '';
 const inferredApiBaseUrl = (() => {
   const host = resolveExpoHost();
@@ -79,6 +176,81 @@ async function withDemoFallback<T>(run: () => Promise<T>, fallback: () => T | Pr
   }
 }
 
+// Security: Safe fetch wrapper with comprehensive SSRF protection
+async function safeFetch(url: string, options: RequestInit): Promise<Response> {
+  // Parse and validate the URL thoroughly
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    throw new MobileApiError('Request blocked: Malformed URL');
+  }
+  
+  // Protocol validation
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    throw new MobileApiError('Request blocked: Invalid protocol');
+  }
+  
+  // Hostname validation against allowlist
+  const hostname = parsedUrl.hostname.toLowerCase();
+  const isDevelopment = __DEV__ || process.env.NODE_ENV === 'development';
+  
+  if (isDevelopment && ['localhost', '127.0.0.1', '::1'].includes(hostname)) {
+    // Allow localhost in development
+  } else if (!ALLOWED_DOMAINS.includes(hostname)) {
+    throw new MobileApiError('Request blocked: Domain not in allowlist');
+  }
+  
+  // IP range validation (additional security layer)
+  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  const ipMatch = hostname.match(ipv4Regex);
+  if (ipMatch) {
+    const [, a, b, c, d] = ipMatch.map(Number);
+    // Block private ranges and metadata services
+    if (
+      (a === 10) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254) ||
+      (a === 127) // Additional localhost block
+    ) {
+      if (!isDevelopment || !['127.0.0.1'].includes(hostname)) {
+        throw new MobileApiError('Request blocked: Private IP range');
+      }
+    }
+  }
+  
+  // Port validation (block common internal service ports)
+  const dangerousPorts = [22, 23, 25, 53, 110, 143, 993, 995, 1433, 3306, 5432, 6379, 27017];
+  if (parsedUrl.port && dangerousPorts.includes(parseInt(parsedUrl.port))) {
+    throw new MobileApiError('Request blocked: Dangerous port');
+  }
+  
+  // Path validation
+  if (parsedUrl.pathname.includes('..') || parsedUrl.pathname.includes('//')) {
+    throw new MobileApiError('Request blocked: Invalid path');
+  }
+  
+  // Additional security headers and options
+  const secureOptions: RequestInit = {
+    ...options,
+    headers: {
+      ...options.headers,
+      'X-Requested-With': 'XMLHttpRequest',
+      'User-Agent': 'LiveGate-Mobile/1.0',
+    },
+    redirect: 'error', // Prevent redirect-based SSRF
+    timeout: 30000, // 30 second timeout
+  };
+  
+  // Make the actual request with all validations passed
+  try {
+    return await fetch(parsedUrl.toString(), secureOptions);
+  } catch (error) {
+    throw new MobileApiError('Network request failed');
+  }
+}
+
 async function request<T>(
   path: string,
   options: Omit<RequestInit, 'body'> & { body?: unknown; authenticated?: boolean } = {},
@@ -86,6 +258,14 @@ async function request<T>(
   if (!apiBaseUrl) {
     throw new MobileApiError('Set EXPO_PUBLIC_API_BASE_URL before using the mobile app data layer.');
   }
+
+  // Security: Validate the base URL to prevent SSRF
+  if (!validateApiUrl(apiBaseUrl)) {
+    throw new MobileApiError('Invalid API base URL: blocked for security reasons');
+  }
+
+  // Security: Sanitize the path to prevent injection
+  const sanitizedPath = sanitizePath(path);
 
   const token = useSessionStore.getState().session?.tokens.accessToken;
   const headers = new Headers(options.headers);
@@ -98,7 +278,18 @@ async function request<T>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+  // Security: Construct URL safely
+  const fullUrl = `${apiBaseUrl}${sanitizedPath}`;
+  
+  // Additional validation of the final URL
+  try {
+    new URL(fullUrl); // This will throw if URL is malformed
+  } catch {
+    throw new MobileApiError('Malformed request URL');
+  }
+
+  // Use secure fetch wrapper instead of direct fetch
+  const response = await safeFetch(fullUrl, {
     ...options,
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
@@ -154,32 +345,52 @@ export const mobileApi = {
     withDemoFallback(() => request<HomeFeedPayload>(apiRoutes.home, { authenticated: false }), getDemoHomeFeed),
   getCategoryDetail: (slug: string) =>
     withDemoFallback(
-      () => request<CategoryDetailPayload>(apiRoutes.categoryDetail(slug), { authenticated: false }),
+      () => {
+        const validatedSlug = validateId(slug, 'category slug');
+        return request<CategoryDetailPayload>(apiRoutes.categoryDetail(validatedSlug), { authenticated: false });
+      },
       () => getDemoCategoryDetail(slug as never),
     ),
   getCreatorProfile: (id: string) =>
     withDemoFallback(
-      () => request<CreatorProfilePayload>(apiRoutes.creatorDetail(id), { authenticated: false }),
+      () => {
+        const validatedId = validateId(id, 'creator ID');
+        return request<CreatorProfilePayload>(apiRoutes.creatorDetail(validatedId), { authenticated: false });
+      },
       () => getDemoCreatorProfile(id),
     ),
   getLiveDetail: (id: string) =>
     withDemoFallback(
-      () => request<LiveSessionDetailPayload>(apiRoutes.liveDetail(id), { authenticated: false }),
+      () => {
+        const validatedId = validateId(id, 'live session ID');
+        return request<LiveSessionDetailPayload>(apiRoutes.liveDetail(validatedId), { authenticated: false });
+      },
       () => getDemoLiveDetail(id),
     ),
   getLiveRoom: (id: string) =>
-    withDemoFallback(() => request<LiveRoomPayload>(apiRoutes.liveRoom(id)), () => getDemoLiveRoom(id)),
+    withDemoFallback(
+      () => {
+        const validatedId = validateId(id, 'live room ID');
+        return request<LiveRoomPayload>(apiRoutes.liveRoom(validatedId));
+      },
+      () => getDemoLiveRoom(id)
+    ),
   getPremiumContentDetail: (id: string) =>
     withDemoFallback(
-      () =>
-        request<PremiumContentDetailPayload>(apiRoutes.premiumContentDetail(id), {
+      () => {
+        const validatedId = validateId(id, 'content ID');
+        return request<PremiumContentDetailPayload>(apiRoutes.premiumContentDetail(validatedId), {
           authenticated: false,
-        }),
+        });
+      },
       () => getDemoPremiumContentDetail(id),
     ),
   getClassDetail: (id: string) =>
     withDemoFallback(
-      () => request<ClassDetailPayload>(apiRoutes.classDetail(id), { authenticated: false }),
+      () => {
+        const validatedId = validateId(id, 'class ID');
+        return request<ClassDetailPayload>(apiRoutes.classDetail(validatedId), { authenticated: false });
+      },
       () => getDemoClassDetail(id),
     ),
   getViewerDashboard: () =>
@@ -192,9 +403,23 @@ export const mobileApi = {
     withDemoFallback(() => request<ApiListResponse<NotificationRecord>>(apiRoutes.notifications), getDemoNotifications),
   search: (filters: SearchFilters) => {
     const params = new URLSearchParams();
-    if (filters.query) params.set('query', filters.query);
-    if (filters.category) params.set('category', filters.category);
-    if (filters.type) params.set('type', filters.type);
+    // Security: Sanitize search parameters to prevent injection
+    if (filters.query) {
+      const sanitizedQuery = filters.query.trim().slice(0, 200); // Limit length
+      if (sanitizedQuery) params.set('query', sanitizedQuery);
+    }
+    if (filters.category) {
+      // Validate category against known values
+      const sanitizedCategory = filters.category.replace(/[^a-zA-Z0-9-_]/g, '').slice(0, 50);
+      if (sanitizedCategory) params.set('category', sanitizedCategory);
+    }
+    if (filters.type) {
+      // Validate type against known values
+      const allowedTypes = ['all', 'creator', 'live', 'content', 'class'];
+      if (allowedTypes.includes(filters.type)) {
+        params.set('type', filters.type);
+      }
+    }
     return withDemoFallback(
       () =>
         request<SearchResultsPayload>(`${apiRoutes.search}?${params.toString()}`, {
@@ -205,12 +430,41 @@ export const mobileApi = {
   },
   createCheckout: (body: { productId: string; productType: 'live' | 'content' | 'class' }) =>
     withDemoFallback(
-      () => request<CheckoutSummary>(apiRoutes.checkout, { method: 'POST', body }),
+      () => {
+        const validatedProductId = validateId(body.productId, 'product ID');
+        const allowedTypes = ['live', 'content', 'class'] as const;
+        if (!allowedTypes.includes(body.productType)) {
+          throw new MobileApiError('Invalid product type');
+        }
+        return request<CheckoutSummary>(apiRoutes.checkout, { 
+          method: 'POST', 
+          body: { ...body, productId: validatedProductId } 
+        });
+      },
       () => createDemoCheckout(body),
     ),
   requestPayout: (body: { amount: number; method: string; note?: string }) =>
     withDemoFallback(
-      () => request<{ message: string }>(apiRoutes.creatorPayouts, { method: 'POST', body }),
+      () => {
+        // Validate payout request data
+        if (!body.amount || typeof body.amount !== 'number' || body.amount <= 0 || body.amount > 1000000) {
+          throw new MobileApiError('Invalid payout amount: must be a positive number under 1,000,000');
+        }
+        if (!body.method || typeof body.method !== 'string' || body.method.length > 100) {
+          throw new MobileApiError('Invalid payout method: must be a non-empty string under 100 characters');
+        }
+        const sanitizedMethod = body.method.replace(/[<>"'&]/g, '').trim();
+        const sanitizedNote = body.note ? body.note.replace(/[<>"'&]/g, '').trim().slice(0, 500) : undefined;
+        
+        return request<{ message: string }>(apiRoutes.creatorPayouts, { 
+          method: 'POST', 
+          body: {
+            amount: body.amount,
+            method: sanitizedMethod,
+            note: sanitizedNote
+          }
+        });
+      },
       () => requestDemoPayout(body),
     ),
   getProfileSettings: () =>

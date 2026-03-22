@@ -14,12 +14,41 @@ import {
   NotificationRow,
   TransactionRow,
 } from '@/components/cards';
-import { Button, EmptyState, Heading, LoadingState, Screen, Surface, TextField } from '@/components/ui';
+import { 
+  Button, 
+  EmptyState, 
+  Heading, 
+  LoadingState, 
+  Screen, 
+  Surface, 
+  TextField,
+  Badge,
+  Avatar
+} from '@/components/ui';
 import { useSessionStore } from '@/store/session-store';
+import { theme } from '@/theme';
 
-const sectionTitleStyle = { fontSize: 20, fontWeight: '700' as const, color: '#171512' };
-const metaLabelStyle = { fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' as const, color: '#6E675C' };
-const metaValueStyle = { fontSize: 16, fontWeight: '600' as const, color: '#171512' };
+const sectionTitleStyle = { 
+  fontSize: theme.typography.sizes.xl, 
+  fontWeight: theme.typography.weights.bold as any, 
+  color: theme.colors.text,
+  marginBottom: theme.spacing.md
+};
+
+const metaLabelStyle = { 
+  fontSize: theme.typography.sizes.xs, 
+  fontWeight: theme.typography.weights.medium as any,
+  color: theme.colors.textMuted,
+  textTransform: 'uppercase' as const,
+  letterSpacing: 1
+};
+
+const metaValueStyle = { 
+  fontSize: theme.typography.sizes.lg, 
+  fontWeight: theme.typography.weights.semibold as any, 
+  color: theme.colors.text 
+};
+
 const searchFilters = [
   { title: 'All', value: 'all' },
   { title: 'Creators', value: 'creator' },
@@ -27,15 +56,8 @@ const searchFilters = [
   { title: 'Content', value: 'content' },
   { title: 'Classes', value: 'class' },
 ] as const;
+
 const appearanceModes = ['system', 'light', 'dark'] as const;
-const heroCardStyle = {
-  borderRadius: 28,
-  borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.35)',
-  backgroundColor: 'rgba(255,255,255,0.34)',
-  padding: 16,
-  gap: 8,
-} as const;
 
 function SettingsToggle({
   title,
@@ -49,11 +71,19 @@ function SettingsToggle({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <View style={[heroCardStyle, { flexBasis: '47%', flexGrow: 1 }]}>
-      <Text style={{ fontSize: 15, fontWeight: '700', color: '#10211D' }}>{title}</Text>
-      <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>{body}</Text>
-      <Button onPress={() => onChange(!value)} title={value ? 'Enabled' : 'Disabled'} variant={value ? 'primary' : 'secondary'} />
-    </View>
+    <Surface style={{ flex: 1, minWidth: '45%' }}>
+      <Text style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>
+        {title}
+      </Text>
+      <Text style={{ fontSize: theme.typography.sizes.sm, lineHeight: 20, color: theme.colors.textSecondary, marginVertical: theme.spacing.xs }}>
+        {body}
+      </Text>
+      <Button 
+        onPress={() => onChange(!value)} 
+        title={value ? 'Enabled' : 'Disabled'} 
+        variant={value ? 'primary' : 'secondary'} 
+      />
+    </Surface>
   );
 }
 
@@ -71,11 +101,15 @@ function SummaryTile({
   body: string;
 }) {
   return (
-    <View style={[heroCardStyle, { flexBasis: '47%', flexGrow: 1 }]}>
+    <Surface style={{ flex: 1, minWidth: '45%' }}>
       <Text style={metaLabelStyle}>{label}</Text>
-      <Text style={{ fontSize: 22, fontWeight: '700', color: '#10211D' }}>{value}</Text>
-      <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>{body}</Text>
-    </View>
+      <Text style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold as any, color: theme.colors.text, marginVertical: theme.spacing.xs }}>
+        {value}
+      </Text>
+      <Text style={{ fontSize: theme.typography.sizes.sm, lineHeight: 20, color: theme.colors.textSecondary }}>
+        {body}
+      </Text>
+    </Surface>
   );
 }
 
@@ -94,67 +128,69 @@ export function HomeScreen() {
 
   return (
     <Screen>
+      <Heading
+        eyebrow="LiveGate Home"
+        title="Discover Premium Learning"
+        body="Explore live sessions, premium content, and expert-led classes from top creators."
+      />
+      
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md }}>
+        <SummaryTile
+          label="Creators"
+          value={featuredCreators.toString()}
+          body="Featured experts"
+        />
+        <SummaryTile
+          label="Live Sessions"
+          value={featuredLives.toString()}
+          body="Active & upcoming"
+        />
+        <SummaryTile
+          label="Classes"
+          value={featuredClasses.toString()}
+          body="Structured courses"
+        />
+      </View>
+
       <Surface>
-        <Text style={{ fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase', color: '#60726C' }}>
-          LiveGate home
+        <Text style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text, marginBottom: theme.spacing.sm }}>
+          Quick Actions
         </Text>
-        <Text style={{ fontSize: 32, lineHeight: 38, fontWeight: '700', color: '#10211D', letterSpacing: -0.8 }}>
-          Discover premium lives, classes, and locked expertise.
-        </Text>
-        <Text style={{ fontSize: 15, lineHeight: 24, color: '#60726C' }}>
-          The mobile home is designed to keep discovery, access state, and monetized learning clear at a glance.
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-          <View style={[heroCardStyle, { flexBasis: '31%', flexGrow: 1 }]}>
-            <Text style={metaLabelStyle}>Creators</Text>
-            <Text style={{ fontSize: 24, fontWeight: '700', color: '#10211D' }}>{featuredCreators}</Text>
-            <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>Featured in the feed</Text>
-          </View>
-          <View style={[heroCardStyle, { flexBasis: '31%', flexGrow: 1 }]}>
-            <Text style={metaLabelStyle}>Lives</Text>
-            <Text style={{ fontSize: 24, fontWeight: '700', color: '#10211D' }}>{featuredLives}</Text>
-            <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>Paid or upcoming sessions</Text>
-          </View>
-          <View style={[heroCardStyle, { flexBasis: '31%', flexGrow: 1 }]}>
-            <Text style={metaLabelStyle}>Classes</Text>
-            <Text style={{ fontSize: 24, fontWeight: '700', color: '#10211D' }}>{featuredClasses}</Text>
-            <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>Structured learning paths</Text>
-          </View>
-        </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          <Button onPress={() => router.push('/(viewer)/(tabs)/assistant')} title="Ask AI concierge" />
-          <Button onPress={() => router.push('/(viewer)/(tabs)/library')} title="Open library" variant="secondary" />
-          {sessionRoles.includes('creator') ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+          <Button onPress={() => router.push('/(viewer)/(tabs)/assistant')} title="Ask AI Assistant" />
+          <Button onPress={() => router.push('/(viewer)/(tabs)/library')} title="My Library" variant="secondary" />
+          {sessionRoles.includes('creator') && (
             <Button
               onPress={() => {
                 setActiveRole('creator');
                 router.replace('/(creator)/(tabs)/dashboard');
               }}
-              title="Switch to creator"
+              title="Creator Mode"
               variant="ghost"
             />
-          ) : null}
+          )}
         </View>
       </Surface>
-      {session?.isDemo ? (
+
+      {session?.isDemo && (
         <Surface>
-          <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
-            Demo mode
+          <Badge variant="warning">Demo Mode</Badge>
+          <Text style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text, marginTop: theme.spacing.xs }}>
+            Preview Experience
           </Text>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>
-            You are previewing LiveGate with a demo participant.
-          </Text>
-          <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
-            Use the dashboards, AI assistant, and role switcher to review the full navigation flow before connecting live data.
+          <Text style={{ fontSize: theme.typography.sizes.sm, lineHeight: 22, color: theme.colors.textSecondary, marginTop: theme.spacing.xs }}>
+            You're exploring LiveGate with demo data. All features are available for testing.
           </Text>
         </Surface>
-      ) : null}
+      )}
+
       <Heading
-        body="Browse by category, then move into the live, creator, content, and class details that matter."
-        eyebrow="Explore"
-        title="Choose a lane quickly"
+        eyebrow="Browse"
+        title="Categories"
+        body="Find content by topic and expertise area."
       />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
         {homeCategories.map((category) => (
           <CategoryChip
             key={category.slug}
@@ -163,52 +199,57 @@ export function HomeScreen() {
           />
         ))}
       </View>
-      {query.isLoading ? <LoadingState label="Loading home feed..." /> : null}
-      {query.isError ? <EmptyState body={(query.error as Error).message} title="Home feed unavailable" /> : null}
-      {query.data ? (
+
+      {query.isLoading && <LoadingState label="Loading content..." />}
+      {query.isError && <EmptyState title="Content Unavailable" body={(query.error as Error).message} />}
+      
+      {query.data && (
         <>
-          <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Trending lives</Text>
+          <View style={{ gap: theme.spacing.md }}>
+            <Text style={sectionTitleStyle}>Trending Lives</Text>
             {query.data.trendingLives.length ? (
               query.data.trendingLives.map((item) => (
                 <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
               ))
             ) : (
-              <EmptyState body="No live sessions returned yet from the API." title="No lives yet" />
+              <EmptyState title="No Live Sessions" body="Check back soon for new live content." />
             )}
           </View>
-          <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Featured creators</Text>
+
+          <View style={{ gap: theme.spacing.md }}>
+            <Text style={sectionTitleStyle}>Featured Creators</Text>
             {query.data.featuredCreators.length ? (
               query.data.featuredCreators.map((item) => (
                 <CreatorCard key={item.id} creator={item} onPress={() => router.push(`/(viewer)/creator/${item.id}`)} />
               ))
             ) : (
-              <EmptyState body="No creator feed returned yet from the API." title="No creators yet" />
+              <EmptyState title="No Creators" body="Featured creators will appear here." />
             )}
           </View>
-          <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Premium content</Text>
+
+          <View style={{ gap: theme.spacing.md }}>
+            <Text style={sectionTitleStyle}>Premium Content</Text>
             {query.data.premiumContent.length ? (
               query.data.premiumContent.map((item) => (
                 <ContentCard content={item} key={item.id} onPress={() => router.push(`/(viewer)/content/${item.id}`)} />
               ))
             ) : (
-              <EmptyState body="Locked content highlights will appear here after the API is connected." title="No content yet" />
+              <EmptyState title="No Premium Content" body="Exclusive content will be featured here." />
             )}
           </View>
-          <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Recommended classes</Text>
+
+          <View style={{ gap: theme.spacing.md }}>
+            <Text style={sectionTitleStyle}>Recommended Classes</Text>
             {query.data.recommendedClasses.length ? (
               query.data.recommendedClasses.map((item) => (
                 <ClassCard classItem={item} key={item.id} onPress={() => router.push(`/(viewer)/class/${item.id}`)} />
               ))
             ) : (
-              <EmptyState body="Class recommendations will appear here once the backend returns results." title="No classes yet" />
+              <EmptyState title="No Classes" body="Structured courses will appear here." />
             )}
           </View>
         </>
-      ) : null}
+      )}
     </Screen>
   );
 }

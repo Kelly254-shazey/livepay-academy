@@ -9,7 +9,7 @@ export default function ViewerTabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.colors.accent,
-        tabBarInactiveTintColor: theme.colors.mutedText,
+        tabBarInactiveTintColor: theme.colors.textMuted,
         tabBarStyle: {
           position: 'absolute',
           left: 12,

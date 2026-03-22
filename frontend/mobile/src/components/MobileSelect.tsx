@@ -54,15 +54,15 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   placeholder: {
-    color: theme.colors.mutedText,
+    color: theme.colors.textMuted,
   },
   caret: {
     fontSize: 12,
-    color: theme.colors.mutedText,
+    color: theme.colors.textMuted,
   },
   hint: {
     fontSize: 12,
-    color: theme.colors.mutedText,
+    color: theme.colors.textMuted,
     marginTop: theme.spacing.xs,
   },
   errorText: {

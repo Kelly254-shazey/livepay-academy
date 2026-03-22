@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: 12,
-    color: theme.colors.mutedText,
+    color: theme.colors.textMuted,
     marginTop: theme.spacing.xs,
   },
   errorText: {
@@ -86,7 +86,7 @@ export function MobileInput({
           editable={editable}
           multiline={multiline}
           maxLength={maxLength}
-          placeholderTextColor={theme.colors.mutedText}
+          placeholderTextColor={theme.colors.textMuted}
           style={[
             styles.input,
             icon ? { paddingLeft: 44 } : null,

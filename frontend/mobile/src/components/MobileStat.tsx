@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: theme.colors.mutedText,
+    color: theme.colors.textMuted,
     marginBottom: theme.spacing.sm,
   },
   value: {

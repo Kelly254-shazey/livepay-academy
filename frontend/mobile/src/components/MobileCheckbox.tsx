@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 12,
-    color: theme.colors.mutedText,
+    color: theme.colors.textMuted,
     marginTop: theme.spacing.xs,
   },
   error: {

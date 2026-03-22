@@ -15,7 +15,7 @@ const sizeStyles = {
 
 const statusColors = {
   online: theme.colors.success,
-  offline: theme.colors.mutedText,
+  offline: theme.colors.textMuted,
   away: theme.colors.warning,
 };
 

@@ -1,54 +1,53 @@
 interface AvatarProps {
   src?: string;
   alt?: string;
-  initials?: string;
+  name?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
-  status?: 'online' | 'offline' | 'away';
+  className?: string;
 }
 
 const sizeStyles = {
-  sm: 'w-8 h-8 text-xs',
-  md: 'w-10 h-10 text-sm',
-  lg: 'w-12 h-12 text-base',
-  xl: 'w-16 h-16 text-lg',
+  sm: 'h-8 w-8 text-sm',
+  md: 'h-10 w-10 text-base',
+  lg: 'h-12 w-12 text-lg',
+  xl: 'h-16 w-16 text-xl',
 };
 
-const statusColors = {
-  online: 'bg-success',
-  offline: 'bg-muted',
-  away: 'bg-warning',
-};
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(word => word[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
 
 export function Avatar({
   src,
-  alt = 'User avatar',
-  initials,
+  alt,
+  name,
   size = 'md',
-  status,
+  className,
 }: AvatarProps) {
+  const initials = name ? getInitials(name) : '?';
+
   return (
-    <div className="relative inline-block">
-      <div
-        className={`
-          ${sizeStyles[size]}
-          rounded-full bg-gradient-to-br from-accent to-accent/50
-          flex items-center justify-center overflow-hidden
-          border-2 border-surface flex-shrink-0
-        `}
-      >
-        {src ? (
-          <img src={src} alt={alt} className="w-full h-full object-cover" />
-        ) : (
-          <span className="font-semibold text-surface">{initials}</span>
-        )}
-      </div>
-      {status && (
-        <div
-          className={`
-            absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-surface
-            ${statusColors[status]}
-          `}
+    <div
+      className={`
+        inline-flex items-center justify-center rounded-full
+        bg-surface-muted text-text-secondary font-medium
+        ${sizeStyles[size]}
+        ${className || ''}
+      `}
+    >
+      {src ? (
+        <img
+          src={src}
+          alt={alt || name || 'Avatar'}
+          className="h-full w-full rounded-full object-cover"
         />
+      ) : (
+        <span>{initials}</span>
       )}
     </div>
   );

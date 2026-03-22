@@ -13,47 +13,57 @@ interface MobileButtonProps {
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.md,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
+    borderWidth: 1,
   },
   text: {
-    fontWeight: '600',
+    fontFamily: theme.typography.fontFamily,
+    fontWeight: theme.typography.weights.semibold,
   },
 });
 
 const variantStyles = {
   primary: {
     backgroundColor: theme.colors.primary,
-    pressedColor: theme.colors.primary + 'DD',
+    borderColor: theme.colors.primary,
+    textColor: '#ffffff',
   },
   secondary: {
     backgroundColor: theme.colors.surface,
-    borderWidth: 2,
-    borderColor: theme.colors.accent,
-    pressedColor: theme.colors.accent + '10',
+    borderColor: theme.colors.border,
+    textColor: theme.colors.text,
   },
   ghost: {
     backgroundColor: 'transparent',
-    pressedColor: theme.colors.accent + '10',
+    borderColor: 'transparent',
+    textColor: theme.colors.text,
   },
   danger: {
-    backgroundColor: theme.colors.error,
-    pressedColor: theme.colors.error + 'DD',
+    backgroundColor: theme.colors.danger,
+    borderColor: theme.colors.danger,
+    textColor: '#ffffff',
   },
 };
 
 const sizeStyles = {
-  sm: { paddingVertical: 8, paddingHorizontal: 12 },
-  md: { paddingVertical: 12, paddingHorizontal: 16 },
-  lg: { paddingVertical: 16, paddingHorizontal: 20 },
-};
-
-const textSizes = {
-  sm: 12,
-  md: 14,
-  lg: 16,
+  sm: { 
+    paddingVertical: theme.spacing.sm, 
+    paddingHorizontal: theme.spacing.md,
+    fontSize: theme.typography.sizes.sm,
+  },
+  md: { 
+    paddingVertical: theme.spacing.md, 
+    paddingHorizontal: theme.spacing.lg,
+    fontSize: theme.typography.sizes.base,
+  },
+  lg: { 
+    paddingVertical: theme.spacing.lg, 
+    paddingHorizontal: theme.spacing.xl,
+    fontSize: theme.typography.sizes.lg,
+  },
 };
 
 export function MobileButton({
@@ -67,14 +77,6 @@ export function MobileButton({
 }: MobileButtonProps) {
   const varStyle = variantStyles[variant];
   const sizeStyle = sizeStyles[size];
-  const textSize = textSizes[size];
-
-  const textColor =
-    variant === 'primary' || variant === 'danger'
-      ? theme.colors.surface
-      : variant === 'secondary'
-        ? theme.colors.accent
-        : theme.colors.text;
 
   return (
     <TouchableOpacity
@@ -83,19 +85,27 @@ export function MobileButton({
       activeOpacity={0.7}
       style={[
         styles.button,
-        varStyle,
-        sizeStyle,
+        {
+          backgroundColor: varStyle.backgroundColor,
+          borderColor: varStyle.borderColor,
+          paddingVertical: sizeStyle.paddingVertical,
+          paddingHorizontal: sizeStyle.paddingHorizontal,
+        },
         fullWidth && { width: '100%' },
         disabled && { opacity: 0.5 },
+        theme.shadow.sm,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={textColor} size="small" />
+        <ActivityIndicator color={varStyle.textColor} size="small" />
       ) : (
         <Text
           style={[
             styles.text,
-            { fontSize: textSize, color: textColor },
+            {
+              fontSize: sizeStyle.fontSize,
+              color: varStyle.textColor,
+            },
           ]}
         >
           {title}

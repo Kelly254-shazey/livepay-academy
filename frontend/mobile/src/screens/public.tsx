@@ -113,7 +113,7 @@ function DemoParticipantsPanel({
 
 export function SplashScreenView() {
   return (
-    <Screen scroll={false}>
+    <Screen>
       <View style={{ flex: 1, justifyContent: 'center', gap: 16 }}>
         <Text style={{ fontSize: 44, fontWeight: '700', color: '#10211D' }}>{brand.name}</Text>
         <Text style={{ fontSize: 16, lineHeight: 24, color: '#60726C' }}>{brand.tagline}</Text>

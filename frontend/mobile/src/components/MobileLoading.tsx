@@ -15,7 +15,7 @@ const styles = StyleSheet.create({
   },
   message: {
     fontSize: 14,
-    color: theme.colors.muted,
+    color: theme.colors.textMuted,
   },
 });
 

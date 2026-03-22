@@ -15,47 +15,52 @@ export function Button({
   variant = 'primary',
   size = 'md',
   fullWidth = false,
+  leftIcon,
+  rightIcon,
+  children,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
   size?: 'sm' | 'md' | 'lg';
   fullWidth?: boolean;
+  leftIcon?: ReactNode;
+  rightIcon?: ReactNode;
 }) {
   const variants = {
-    primary:
-      'border border-accent/60 bg-accent text-surface shadow-glass hover:-translate-y-0.5 hover:bg-accent/90 hover:shadow-glass-lg focus-visible:ring-2 focus-visible:ring-accent/20',
-    secondary:
-      'border border-white/40 bg-white/25 text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] backdrop-blur-xl hover:-translate-y-0.5 hover:bg-white/35 hover:border-white/55 focus-visible:ring-2 focus-visible:ring-text/10',
-    ghost:
-      'border border-transparent bg-transparent text-muted hover:bg-white/20 hover:text-text focus-visible:ring-2 focus-visible:ring-text/10',
-    danger:
-      'border border-danger/60 bg-danger text-white shadow-[0_14px_36px_rgba(166,75,64,0.2)] hover:-translate-y-0.5 hover:bg-danger/90 focus-visible:ring-2 focus-visible:ring-danger/20',
-    success:
-      'border border-success/60 bg-success text-white shadow-[0_14px_36px_rgba(25,107,89,0.18)] hover:-translate-y-0.5 hover:bg-success/90 focus-visible:ring-2 focus-visible:ring-success/20',
+    primary: 'bg-accent text-white border-accent hover:bg-accent-hover focus:ring-accent/20',
+    secondary: 'bg-surface text-text border-border hover:bg-surface-muted focus:ring-accent/20',
+    ghost: 'bg-transparent text-text border-transparent hover:bg-hover focus:ring-accent/20',
+    danger: 'bg-danger text-white border-danger hover:bg-red-600 focus:ring-danger/20',
+    success: 'bg-success text-white border-success hover:bg-green-600 focus:ring-success/20',
   };
   const sizes = {
-    sm: 'rounded-full px-3.5 py-2 text-sm',
-    md: 'rounded-full px-4.5 py-2.5 text-sm',
-    lg: 'rounded-full px-6 py-3.5 text-base',
+    sm: 'px-3 py-1.5 text-sm rounded-lg',
+    md: 'px-4 py-2 text-sm rounded-lg',
+    lg: 'px-6 py-2.5 text-base rounded-lg',
   };
 
   return (
     <button
       className={cx(
-        'inline-flex items-center justify-center font-semibold tracking-[-0.01em] transition duration-200 disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-55',
+        'inline-flex items-center justify-center gap-2 font-semibold border transition-all duration-200',
+        'focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
         variants[variant],
         sizes[size],
         fullWidth && 'w-full',
         className,
       )}
       {...props}
-    />
+    >
+      {leftIcon}
+      {children}
+      {rightIcon}
+    </button>
   );
 }
 
 export function Card({ className, children }: PropsWithChildren<{ className?: string }>) {
   return (
-    <div className={cx('glass-card rounded-[28px] p-6 shadow-glass sm:p-7', className)}>
+    <div className={cx('bg-surface border border-border rounded-xl p-6 shadow-sm', className)}>
       {children}
     </div>
   );
@@ -81,18 +86,25 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 
 export function Badge({
   children,
-  tone = 'default',
-}: PropsWithChildren<{ tone?: 'default' | 'accent' | 'success' | 'warning' | 'danger' }>) {
-  const tones = {
-    default: 'border-white/35 bg-white/20 text-text',
-    accent: 'border-accent/20 bg-accent/12 text-accent',
-    success: 'border-success/20 bg-success/12 text-success',
-    warning: 'border-warning/20 bg-warning/12 text-warning',
-    danger: 'border-danger/20 bg-danger/12 text-danger',
+  variant,
+  tone, // backward compatibility
+}: PropsWithChildren<{ 
+  variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger';
+  tone?: 'default' | 'accent' | 'success' | 'warning' | 'danger'; // backward compatibility
+}>) {
+  // Use variant if provided, otherwise map tone to variant for backward compatibility
+  const finalVariant = variant || (tone === 'accent' ? 'primary' : tone) || 'default';
+  
+  const variants = {
+    default: 'bg-surface-muted text-text border-border',
+    primary: 'bg-accent-muted text-accent border-accent/20',
+    success: 'bg-green-50 text-green-700 border-green-200',
+    warning: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+    danger: 'bg-red-50 text-red-700 border-red-200',
   };
 
   return (
-    <span className={cx('inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] backdrop-blur-xl', tones[tone])}>
+    <span className={cx('inline-flex items-center px-2.5 py-1 text-sm font-medium rounded-full border', variants[finalVariant])}>
       {children}
     </span>
   );
