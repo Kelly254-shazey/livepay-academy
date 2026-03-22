@@ -19,11 +19,11 @@ interface MobileCardProps {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    ...theme.shadow.sm,
+    borderColor: theme.colors.borderSubtle,
+    backgroundColor: theme.colors.surfaceElevated,
+    ...theme.shadow.md,
   },
 });
 

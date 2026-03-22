@@ -1,7 +1,7 @@
 import { Redirect, Stack } from 'expo-router';
 import { useSessionStore } from '@/store/session-store';
 
-function nextPathForRole(role: 'viewer' | 'creator' | 'moderator' | 'admin') {
+function nextPathForRole(role: 'viewer' | 'creator' | 'moderator' | 'admin', roles?: string[]) {
   if (role === 'creator') return '/(creator)/(tabs)/dashboard';
   if (role === 'admin' || role === 'moderator') return '/(staff)/dashboard';
   return '/(viewer)/(tabs)/home';
@@ -16,7 +16,7 @@ export default function PublicLayout() {
   }
 
   if (session) {
-    return <Redirect href={nextPathForRole(session.user.role)} />;
+    return <Redirect href={nextPathForRole(session.user.role, session.user.roles)} />;
   }
 
   return <Stack screenOptions={{ headerShown: false }} />;

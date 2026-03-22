@@ -13,15 +13,17 @@ interface MobileButtonProps {
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.pill,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
     borderWidth: 1,
+    minHeight: 52,
   },
   text: {
     fontFamily: theme.typography.fontFamily,
     fontWeight: theme.typography.weights.semibold,
+    letterSpacing: 0.2,
   },
 });
 
@@ -30,38 +32,42 @@ const variantStyles = {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
     textColor: '#ffffff',
+    shadow: theme.shadow.md,
   },
   secondary: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderColor: theme.colors.borderSubtle,
     textColor: theme.colors.text,
+    shadow: theme.shadow.sm,
   },
   ghost: {
-    backgroundColor: 'transparent',
+    backgroundColor: theme.colors.primarySoft,
     borderColor: 'transparent',
-    textColor: theme.colors.text,
+    textColor: theme.colors.accent,
+    shadow: undefined,
   },
   danger: {
     backgroundColor: theme.colors.danger,
     borderColor: theme.colors.danger,
     textColor: '#ffffff',
+    shadow: theme.shadow.sm,
   },
 };
 
 const sizeStyles = {
   sm: { 
-    paddingVertical: theme.spacing.sm, 
-    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 10,
+    paddingHorizontal: theme.spacing.lg,
     fontSize: theme.typography.sizes.sm,
   },
   md: { 
-    paddingVertical: theme.spacing.md, 
-    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: 14,
+    paddingHorizontal: theme.spacing.xl,
     fontSize: theme.typography.sizes.base,
   },
   lg: { 
-    paddingVertical: theme.spacing.lg, 
-    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: 16,
+    paddingHorizontal: theme.spacing.xxl,
     fontSize: theme.typography.sizes.lg,
   },
 };
@@ -93,7 +99,7 @@ export function MobileButton({
         },
         fullWidth && { width: '100%' },
         disabled && { opacity: 0.5 },
-        theme.shadow.sm,
+        varStyle.shadow,
       ]}
     >
       {loading ? (

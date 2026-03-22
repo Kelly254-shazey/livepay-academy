@@ -240,7 +240,7 @@ async function safeFetch(url: string, options: RequestInit): Promise<Response> {
       'User-Agent': 'LiveGate-Mobile/1.0',
     },
     redirect: 'error', // Prevent redirect-based SSRF
-    timeout: 30000, // 30 second timeout
+    signal: options.signal ?? AbortSignal.timeout(30000), // 30 second timeout
   };
   
   // Make the actual request with all validations passed

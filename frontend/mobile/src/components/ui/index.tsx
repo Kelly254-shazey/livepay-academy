@@ -11,6 +11,7 @@ import {
   type TextStyle,
   type StyleProp,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/theme';
 import { MobileButton } from '@/components/MobileButton';
 
@@ -21,14 +22,23 @@ interface ScreenProps {
 }
 
 export function Screen({ children, style }: ScreenProps) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <ScrollView
-      style={[styles.screen, style]}
-      contentContainerStyle={styles.screenContent}
-      showsVerticalScrollIndicator={false}
-    >
-      {children}
-    </ScrollView>
+    <View style={styles.screenShell}>
+      <View style={styles.screenGlowPrimary} />
+      <View style={styles.screenGlowSecondary} />
+      <ScrollView
+        style={[styles.screen, style]}
+        contentContainerStyle={[
+          styles.screenContent,
+          { paddingBottom: Math.max(insets.bottom + theme.spacing.xxxl, 112) },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {children}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -190,32 +200,59 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  screenShell: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  screenGlowPrimary: {
+    position: 'absolute',
+    top: -80,
+    right: -20,
+    width: 220,
+    height: 220,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.backgroundAccent,
+    opacity: 0.9,
+  },
+  screenGlowSecondary: {
+    position: 'absolute',
+    top: 120,
+    left: -60,
+    width: 180,
+    height: 180,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.primarySoft,
+    opacity: 0.45,
+  },
   screenContent: {
-    padding: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.xxxl,
     gap: theme.spacing.lg,
   },
   surface: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.borderSubtle,
-    ...theme.shadow.sm,
+    gap: theme.spacing.md,
+    ...theme.shadow.md,
   },
   headingContainer: {
-    gap: theme.spacing.xs,
+    gap: theme.spacing.sm,
   },
   eyebrow: {
     fontSize: theme.typography.sizes.xs,
     fontWeight: theme.typography.weights.medium,
-    color: theme.colors.textMuted,
+    color: theme.colors.accent,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.6,
   },
   title: {
-    fontSize: theme.typography.sizes['3xl'],
+    fontSize: theme.typography.sizes['4xl'],
     fontWeight: theme.typography.weights.bold,
     color: theme.colors.text,
-    lineHeight: theme.typography.sizes['3xl'] * 1.2,
+    lineHeight: theme.typography.sizes['4xl'] * 1.12,
+    fontFamily: theme.typography.displayFontFamily,
   },
   body: {
     fontSize: theme.typography.sizes.base,
@@ -228,20 +265,22 @@ const styles = StyleSheet.create({
   label: {
     fontSize: theme.typography.sizes.sm,
     fontWeight: theme.typography.weights.medium,
-    color: theme.colors.text,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.xs,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
-    padding: theme.spacing.md,
+    borderColor: theme.colors.borderSubtle,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
     fontSize: theme.typography.sizes.base,
     color: theme.colors.text,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surfaceMuted,
     fontFamily: theme.typography.fontFamily,
   },
   textInputMultiline: {
-    minHeight: 100,
+    minHeight: 120,
     textAlignVertical: 'top',
   },
   textInputError: {
@@ -260,6 +299,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: theme.typography.sizes.base,
     color: theme.colors.textMuted,
+    fontWeight: theme.typography.weights.medium,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -272,6 +312,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.text,
     textAlign: 'center',
+    fontFamily: theme.typography.displayFontFamily,
   },
   emptyBody: {
     fontSize: theme.typography.sizes.base,
@@ -283,46 +324,50 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
   },
   badge: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 6,
     borderRadius: theme.radius.pill,
     alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   badgeText: {
     fontSize: theme.typography.sizes.xs,
     fontWeight: theme.typography.weights.medium,
+    letterSpacing: 0.4,
   },
   avatar: {
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surfaceMuted,
+    backgroundColor: theme.colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.textSecondary,
+    color: theme.colors.accent,
+    fontFamily: theme.typography.displayFontFamily,
   },
 });
 
 const badgeVariants = {
   default: {
-    container: { backgroundColor: theme.colors.surfaceMuted },
+    container: { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.borderSubtle },
     text: { color: theme.colors.text },
   },
   primary: {
-    container: { backgroundColor: theme.colors.accentMuted },
+    container: { backgroundColor: theme.colors.accentMuted, borderColor: '#b3ddd3' },
     text: { color: theme.colors.accent },
   },
   success: {
-    container: { backgroundColor: '#dcfce7' },
+    container: { backgroundColor: theme.colors.successMuted, borderColor: '#bde3d6' },
     text: { color: theme.colors.success },
   },
   warning: {
-    container: { backgroundColor: '#fef3c7' },
+    container: { backgroundColor: theme.colors.warningMuted, borderColor: '#ecd9aa' },
     text: { color: theme.colors.warning },
   },
   danger: {
-    container: { backgroundColor: '#fee2e2' },
+    container: { backgroundColor: theme.colors.dangerMuted, borderColor: '#eab7ae' },
     text: { color: theme.colors.danger },
   },
 };

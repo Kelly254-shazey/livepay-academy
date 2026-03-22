@@ -9,11 +9,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { z } from 'zod';
 import { mobileApi } from '@/api/client';
-import { Button, Heading, Screen, Surface, TextField } from '@/components/ui';
+import { Badge, Button, Heading, Screen, Surface, TextField } from '@/components/ui';
 import { useSessionStore } from '@/store/session-store';
+import { theme } from '@/theme';
 
 const publicModes = [
   {
@@ -25,15 +26,15 @@ const publicModes = [
   },
   {
     id: 'creator',
-    title: 'Creator',
+    title: 'Content Creator',
     body: 'Host paid live sessions, publish premium content, and monetize classes.',
     roles: ['creator'] as UserRole[],
     activeRole: 'creator' as UserRole,
   },
   {
     id: 'hybrid',
-    title: 'Viewer + Creator',
-    body: 'Use one account for both audience and creator workflows, then switch role context later.',
+    title: 'Viewer + Content Creator',
+    body: 'Use one account for both audience and content creator workflows, then switch role context later.',
     roles: ['viewer', 'creator'] as UserRole[],
     activeRole: 'viewer' as UserRole,
   },
@@ -42,7 +43,7 @@ const publicModes = [
 const onboardingHighlights = [
   {
     title: 'Paid live sessions',
-    body: 'Creators define pricing while the backend enforces payment before entry.',
+    body: 'Content creators define pricing while the backend enforces payment before entry.',
   },
   {
     title: 'Premium content and classes',
@@ -50,14 +51,22 @@ const onboardingHighlights = [
   },
   {
     title: 'Hybrid identity',
-    body: 'One account can behave like a viewer and creator, then switch context later.',
+    body: 'One account can behave like a viewer and content creator, then switch context later.',
   },
 ] as const;
 
-function nextPathForRole(role: UserRole) {
+function nextPathForRole(role: UserRole, roles: UserRole[] = [role]) {
   if (role === 'creator') return '/(creator)/(tabs)/dashboard';
   if (role === 'admin' || role === 'moderator') return '/(staff)/dashboard';
   return '/(viewer)/(tabs)/home';
+}
+
+function formatRoleLabel(role: UserRole) {
+  if (role === 'creator') return 'Content Creator';
+  if (role === 'viewer') return 'Viewer';
+  if (role === 'moderator') return 'Moderator';
+  if (role === 'admin') return 'Admin';
+  return role;
 }
 
 const signInSchema = z.object({
@@ -92,18 +101,12 @@ function DemoParticipantsPanel({
 }) {
   return (
     <View style={{ gap: 12 }}>
-      <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>{title}</Text>
+      <Text style={styles.panelTitle}>{title}</Text>
       {participants.map((participant) => (
-        <Surface key={participant.id}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>
-            {participant.fullName}
-          </Text>
-          <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
-            {participant.roleLabel}
-          </Text>
-          <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
-            {participant.summary}
-          </Text>
+        <Surface key={participant.id} style={styles.demoCard}>
+          <Badge variant="primary">{participant.roleLabel.replace(/Creator/g, 'Content Creator')}</Badge>
+          <Text style={styles.demoName}>{participant.fullName}</Text>
+          <Text style={styles.demoSummary}>{participant.summary}</Text>
           <Button onPress={() => onUse(participant)} title={`Use ${participant.title}`} variant="secondary" />
         </Surface>
       ))}
@@ -114,9 +117,10 @@ function DemoParticipantsPanel({
 export function SplashScreenView() {
   return (
     <Screen>
-      <View style={{ flex: 1, justifyContent: 'center', gap: 16 }}>
-        <Text style={{ fontSize: 44, fontWeight: '700', color: '#10211D' }}>{brand.name}</Text>
-        <Text style={{ fontSize: 16, lineHeight: 24, color: '#60726C' }}>{brand.tagline}</Text>
+      <View style={styles.splashWrap}>
+        <Badge variant="primary">Premium live learning</Badge>
+        <Text style={styles.splashTitle}>{brand.name}</Text>
+        <Text style={styles.splashBody}>{brand.tagline}</Text>
       </View>
     </Screen>
   );
@@ -127,35 +131,24 @@ export function OnboardingScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="LiveGate combines premium discovery, paid expertise, and structured learning into one restrained mobile experience."
-        eyebrow="Onboarding"
-        title="A serious home for paid live expertise."
-      />
+      <Heading title="Welcome to LiveGate" />
       <Surface>
-        <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
+        <Text style={styles.sectionEyebrow}>
           What the app is built to do
         </Text>
         {onboardingHighlights.map((item) => (
           <View
             key={item.title}
-            style={{
-              borderRadius: 22,
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.35)',
-              backgroundColor: 'rgba(255,255,255,0.34)',
-              padding: 16,
-              gap: 6,
-            }}
+            style={styles.highlightCard}
           >
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>{item.title}</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{item.body}</Text>
+            <Text style={styles.highlightTitle}>{item.title}</Text>
+            <Text style={styles.highlightBody}>{item.body}</Text>
           </View>
         ))}
       </Surface>
       {productRules.slice(0, 3).map((rule) => (
-        <Surface key={rule}>
-          <Text style={{ fontSize: 16, fontWeight: '600', color: '#10211D' }}>{rule}</Text>
+        <Surface key={rule} style={styles.ruleCard}>
+          <Text style={styles.ruleText}>{rule}</Text>
         </Surface>
       ))}
       <Button
@@ -175,20 +168,48 @@ export function RoleSelectionScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Choose the public mode that should shape your first experience. Staff access uses a separate hidden portal."
-        eyebrow="Mode"
-        title="How are you using LiveGate?"
-      />
+      <View style={styles.roleHero}>
+        <View style={styles.roleHeroBackdropTop} />
+        <View style={styles.roleHeroBackdropBottom} />
+        <View style={styles.roleHeroHeader}>
+          <Badge variant="primary">Live now</Badge>
+          <Badge variant="default">For you</Badge>
+        </View>
+        <View style={styles.roleHeroFeed}>
+          <View style={[styles.roleHeroTile, styles.roleHeroTilePrimary]}>
+            <Text style={styles.roleHeroTileKicker}>Trending stream</Text>
+            <Text style={styles.roleHeroTileTitle}>Content creator drop-ins, premium rooms, and bite-size discovery.</Text>
+          </View>
+          <View style={styles.roleHeroAside}>
+            <View style={[styles.roleHeroTile, styles.roleHeroTileSmall]}>
+              <Text style={styles.roleHeroMetric}>24/7</Text>
+              <Text style={styles.roleHeroTileCaption}>Discovery rhythm</Text>
+            </View>
+            <View style={[styles.roleHeroTile, styles.roleHeroTileSmall, styles.roleHeroTileAccent]}>
+              <Text style={styles.roleHeroMetric}>1 tap</Text>
+              <Text style={styles.roleHeroTileCaption}>Switch roles later</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <Surface style={styles.roleIntroCard}>
+        <Text style={styles.sectionEyebrow}>Mode</Text>
+        <Text style={styles.roleIntroTitle}>How are you using LiveGate?</Text>
+        <Text style={styles.roleIntroBody}>
+          Choose the public mode that should shape your first experience.
+        </Text>
+      </Surface>
       {publicModes.map((mode) => {
         const selected =
           preferredRoles.length === mode.roles.length &&
           mode.roles.every((role) => preferredRoles.includes(role));
 
         return (
-          <Surface key={mode.id}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#10211D' }}>{mode.title}</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{mode.body}</Text>
+          <Surface key={mode.id} style={selected ? styles.modeCardActive : undefined}>
+            <Badge variant={selected ? 'primary' : 'default'}>{selected ? 'Selected' : 'Mode'}</Badge>
+            <Text style={styles.modeTitle}>{mode.title}</Text>
+            <Text style={styles.modeBody}>{mode.body}</Text>
             <Button
               onPress={() => setPreferredRoles(mode.roles, mode.activeRole)}
               title={selected ? 'Selected' : `Use ${mode.title}`}
@@ -219,7 +240,7 @@ export function SignInScreen() {
     onSuccess: (session) => {
       const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
       setSession(normalized);
-      router.replace(nextPathForRole(normalized.user.role));
+      router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
     },
   });
 
@@ -227,11 +248,7 @@ export function SignInScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Sign in with a public viewer, creator, or hybrid account. Staff access is handled elsewhere."
-        eyebrow="Auth"
-        title="Sign in"
-      />
+      <Heading title="Sign in" />
       <Surface>
         <Controller
           control={form.control}
@@ -247,10 +264,10 @@ export function SignInScreen() {
             <TextField label="Password" onChangeText={field.onChange} placeholder="Password" secureTextEntry value={field.value} />
           )}
         />
-        <Text style={{ color: '#60726C' }}>
-          Selected mode: {preferredRoles.join(' + ')}
+        <Text style={styles.statusText}>
+          Selected mode: {preferredRoles.map(formatRoleLabel).join(' + ')}
         </Text>
-        {mutation.isError ? <Text style={{ color: '#A64B40' }}>{(mutation.error as Error).message}</Text> : null}
+        {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Signing in...' : 'Sign in'} />
       </Surface>
       <DemoParticipantsPanel
@@ -282,17 +299,13 @@ export function SignUpScreen() {
     onSuccess: (session) => {
       const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
       setSession(normalized);
-      router.replace(nextPathForRole(normalized.user.role));
+      router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
     },
   });
 
   return (
     <Screen>
-      <Heading
-        body="Create a public LiveGate account with viewer, creator, or hybrid access."
-        eyebrow="Auth"
-        title="Create account"
-      />
+      <Heading title="Create account" />
       <Surface>
         <Controller
           control={form.control}
@@ -315,10 +328,10 @@ export function SignUpScreen() {
             <TextField label="Password" onChangeText={field.onChange} placeholder="Create password" secureTextEntry value={field.value} />
           )}
         />
-        <Text style={{ color: '#60726C' }}>
-          Account mode: {preferredRoles.join(' + ')}
+        <Text style={styles.statusText}>
+          Account mode: {preferredRoles.map(formatRoleLabel).join(' + ')}
         </Text>
-        {mutation.isError ? <Text style={{ color: '#A64B40' }}>{(mutation.error as Error).message}</Text> : null}
+        {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Creating...' : 'Create account'} />
       </Surface>
     </Screen>
@@ -353,11 +366,7 @@ export function StaffAccessScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Moderators and admins use this separate staff route. It is intentionally not part of the public onboarding path."
-        eyebrow="Staff portal"
-        title="Restricted access"
-      />
+      <Heading title="Restricted access" />
       <Surface>
         <Controller
           control={form.control}
@@ -373,7 +382,7 @@ export function StaffAccessScreen() {
             <TextField label="Password" onChangeText={field.onChange} placeholder="Password" secureTextEntry value={field.value} />
           )}
         />
-        {mutation.isError ? <Text style={{ color: '#A64B40' }}>{(mutation.error as Error).message}</Text> : null}
+        {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Opening portal...' : 'Enter staff portal'} />
       </Surface>
       <DemoParticipantsPanel
@@ -401,11 +410,7 @@ export function ForgotPasswordScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Request a password reset token through the real API or use demo recovery if the backend is offline."
-        eyebrow="Recovery"
-        title="Forgot password"
-      />
+      <Heading title="Forgot password" />
       <Surface>
         <Controller
           control={form.control}
@@ -414,8 +419,8 @@ export function ForgotPasswordScreen() {
             <TextField label="Email" onChangeText={field.onChange} placeholder="you@livegate.com" value={field.value} />
           )}
         />
-        {mutation.isSuccess ? <Text style={{ color: '#196B59' }}>{mutation.data.message}</Text> : null}
-        {mutation.isError ? <Text style={{ color: '#A64B40' }}>{(mutation.error as Error).message}</Text> : null}
+        {mutation.isSuccess ? <Text style={styles.successText}>{mutation.data.message}</Text> : null}
+        {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title="Send reset email" />
       </Surface>
     </Screen>
@@ -434,11 +439,7 @@ export function ResetPasswordScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Complete password reset with a token from your backend or continue in demo mode."
-        eyebrow="Recovery"
-        title="Reset password"
-      />
+      <Heading title="Reset password" />
       <Surface>
         <Controller
           control={form.control}
@@ -461,10 +462,218 @@ export function ResetPasswordScreen() {
             <TextField label="New password" onChangeText={field.onChange} placeholder="New password" secureTextEntry value={field.value} />
           )}
         />
-        {mutation.isSuccess ? <Text style={{ color: '#196B59' }}>{mutation.data.message}</Text> : null}
-        {mutation.isError ? <Text style={{ color: '#A64B40' }}>{(mutation.error as Error).message}</Text> : null}
+        {mutation.isSuccess ? <Text style={styles.successText}>{mutation.data.message}</Text> : null}
+        {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title="Update password" />
       </Surface>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  splashWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing['4xl'],
+  },
+  splashTitle: {
+    fontSize: theme.typography.sizes['5xl'],
+    lineHeight: 54,
+    color: theme.colors.text,
+    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.displayFontFamily,
+  },
+  splashBody: {
+    fontSize: theme.typography.sizes.lg,
+    lineHeight: 28,
+    color: theme.colors.textSecondary,
+    maxWidth: 320,
+  },
+  roleHero: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    borderColor: '#beded6',
+    backgroundColor: '#10211d',
+    padding: theme.spacing.lg,
+    gap: theme.spacing.lg,
+    minHeight: 230,
+    ...theme.shadow.lg,
+  },
+  roleHeroBackdropTop: {
+    position: 'absolute',
+    top: -30,
+    right: -10,
+    width: 170,
+    height: 170,
+    borderRadius: theme.radius.pill,
+    backgroundColor: '#1f8a70',
+    opacity: 0.28,
+  },
+  roleHeroBackdropBottom: {
+    position: 'absolute',
+    bottom: -45,
+    left: -20,
+    width: 220,
+    height: 150,
+    borderRadius: theme.radius.pill,
+    backgroundColor: '#2dd4bf',
+    opacity: 0.18,
+  },
+  roleHeroHeader: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  roleHeroFeed: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    alignItems: 'stretch',
+  },
+  roleHeroTile: {
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    padding: theme.spacing.lg,
+    justifyContent: 'space-between',
+  },
+  roleHeroTilePrimary: {
+    flex: 1.35,
+    minHeight: 128,
+  },
+  roleHeroAside: {
+    flex: 0.95,
+    gap: theme.spacing.md,
+  },
+  roleHeroTileSmall: {
+    flex: 1,
+    minHeight: 58,
+  },
+  roleHeroTileAccent: {
+    backgroundColor: 'rgba(216,235,229,0.16)',
+  },
+  roleHeroTileKicker: {
+    fontSize: theme.typography.sizes.xs,
+    color: '#bdeee4',
+    textTransform: 'uppercase',
+    letterSpacing: 1.4,
+    fontWeight: theme.typography.weights.medium,
+  },
+  roleHeroTileTitle: {
+    fontSize: theme.typography.sizes.xl,
+    lineHeight: 29,
+    color: '#fffaf2',
+    fontWeight: theme.typography.weights.semibold,
+    fontFamily: theme.typography.displayFontFamily,
+  },
+  roleHeroMetric: {
+    fontSize: theme.typography.sizes['2xl'],
+    color: '#fffaf2',
+    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.displayFontFamily,
+  },
+  roleHeroTileCaption: {
+    fontSize: theme.typography.sizes.sm,
+    color: '#d6e6df',
+    lineHeight: 20,
+  },
+  roleIntroCard: {
+    backgroundColor: theme.colors.surface,
+  },
+  roleIntroTitle: {
+    fontSize: theme.typography.sizes['3xl'],
+    lineHeight: 38,
+    color: theme.colors.text,
+    fontWeight: theme.typography.weights.bold,
+    fontFamily: theme.typography.displayFontFamily,
+  },
+  roleIntroBody: {
+    fontSize: theme.typography.sizes.base,
+    lineHeight: 25,
+    color: theme.colors.textSecondary,
+  },
+  panelTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.text,
+    fontFamily: theme.typography.displayFontFamily,
+  },
+  demoCard: {
+    backgroundColor: theme.colors.surface,
+  },
+  demoName: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.text,
+  },
+  demoSummary: {
+    fontSize: theme.typography.sizes.sm,
+    lineHeight: 22,
+    color: theme.colors.textSecondary,
+  },
+  sectionEyebrow: {
+    fontSize: theme.typography.sizes.xs,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: theme.colors.accent,
+    fontWeight: theme.typography.weights.medium,
+  },
+  highlightCard: {
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: '#d8ede7',
+    backgroundColor: '#eef8f4',
+    padding: theme.spacing.lg,
+    gap: theme.spacing.xs,
+  },
+  highlightTitle: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.text,
+  },
+  highlightBody: {
+    fontSize: theme.typography.sizes.sm,
+    lineHeight: 22,
+    color: theme.colors.textSecondary,
+  },
+  ruleCard: {
+    backgroundColor: theme.colors.surface,
+  },
+  ruleText: {
+    fontSize: theme.typography.sizes.base,
+    lineHeight: 24,
+    color: theme.colors.text,
+    fontWeight: theme.typography.weights.medium,
+  },
+  modeCardActive: {
+    borderColor: '#b3ddd3',
+    backgroundColor: '#f5fbf9',
+  },
+  modeTitle: {
+    fontSize: theme.typography.sizes.xl,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.text,
+    fontFamily: theme.typography.displayFontFamily,
+  },
+  modeBody: {
+    fontSize: theme.typography.sizes.sm,
+    lineHeight: 22,
+    color: theme.colors.textSecondary,
+  },
+  statusText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.textMuted,
+  },
+  successText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.success,
+    fontWeight: theme.typography.weights.medium,
+  },
+  errorText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.danger,
+    fontWeight: theme.typography.weights.medium,
+  },
+});

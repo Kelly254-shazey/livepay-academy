@@ -57,7 +57,7 @@ export function CreatorCard({
     <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.96 : 1 })}>
       <Surface>
         <View style={{ ...badgeBase, backgroundColor: theme.colors.accentMuted }}>
-          <Text style={{ color: theme.colors.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1.3 }}>CREATOR</Text>
+          <Text style={{ color: theme.colors.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1.3 }}>CONTENT CREATOR</Text>
         </View>
         <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>{creator.displayName}</Text>
         <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary, marginTop: -4 }}>@{creator.handle}</Text>
@@ -165,7 +165,7 @@ export function WalletCards({ wallet }: { wallet: WalletSummary }) {
       <Surface>
         <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>Lifetime earnings</Text>
         <Text style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold as any, color: theme.colors.text }}>{formatCurrency(wallet.lifetimeEarnings, wallet.currency)}</Text>
-        <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>Total creator earnings recorded</Text>
+        <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>Total content creator earnings recorded</Text>
       </Surface>
     </View>
   );

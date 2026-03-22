@@ -27,6 +27,7 @@ import {
   TextField,
 } from '@/components/ui';
 import { useSessionStore } from '@/store/session-store';
+import { theme } from '@/theme';
 
 const payoutSchema = z.object({
   amount: z.coerce.number().positive(),
@@ -68,6 +69,14 @@ const accessModes = [
 type VisibilityMode = (typeof visibilityModes)[number]['value'];
 type AccessMode = (typeof accessModes)[number]['value'];
 
+function formatRoleLabel(role: string) {
+  if (role === 'creator') return 'Content Creator';
+  if (role === 'viewer') return 'Viewer';
+  if (role === 'moderator') return 'Moderator';
+  if (role === 'admin') return 'Admin';
+  return role;
+}
+
 function SettingsToggle({
   title,
   body,
@@ -80,9 +89,9 @@ function SettingsToggle({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <Surface style={{ flexBasis: '47%', flexGrow: 1 }}>
-      <Text style={{ fontSize: 15, fontWeight: '700', color: '#10211D' }}>{title}</Text>
-      <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>{body}</Text>
+    <Surface style={{ flexBasis: '47%', flexGrow: 1, backgroundColor: theme.colors.surface }}>
+      <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text }}>{title}</Text>
+      <Text style={{ fontSize: 13, lineHeight: 20, color: theme.colors.textSecondary }}>{body}</Text>
       <Button
         onPress={() => onChange(!value)}
         title={value ? 'Enabled' : 'Disabled'}
@@ -102,10 +111,10 @@ function SummaryTile({
   body: string;
 }) {
   return (
-    <Surface style={{ flexBasis: '47%', flexGrow: 1 }}>
-      <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>{label}</Text>
-      <Text style={{ fontSize: 24, fontWeight: '700', color: '#10211D' }}>{value}</Text>
-      <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>{body}</Text>
+    <Surface style={{ flexBasis: '47%', flexGrow: 1, backgroundColor: theme.colors.surface }}>
+      <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: theme.colors.textMuted }}>{label}</Text>
+      <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text, fontFamily: theme.typography.displayFontFamily }}>{value}</Text>
+      <Text style={{ fontSize: 13, lineHeight: 20, color: theme.colors.textSecondary }}>{body}</Text>
     </Surface>
   );
 }
@@ -131,11 +140,7 @@ export function CreatorDashboardScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="A calm operating layer for earnings, payouts, follower momentum, publishing, and creator-side navigation."
-        eyebrow="Creator dashboard"
-        title="Studio overview"
-      />
+      <Heading title="Studio overview" />
       <Surface>
         <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
           Quick actions
@@ -156,8 +161,8 @@ export function CreatorDashboardScreen() {
           />
         ) : null}
       </Surface>
-      {query.isLoading ? <LoadingState label="Loading creator dashboard..." /> : null}
-      {query.isError ? <EmptyState body={(query.error as Error).message} title="Creator dashboard unavailable" /> : null}
+      {query.isLoading ? <LoadingState label="Loading content creator dashboard..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Content creator dashboard unavailable" /> : null}
       {query.data ? (
         <>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
@@ -170,7 +175,7 @@ export function CreatorDashboardScreen() {
           <Surface>
             <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Studio posture</Text>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-              Your creator workspace keeps lives, library items, earnings, and payout actions on one surface so
+              Your content creator workspace keeps lives, library items, earnings, and payout actions on one surface so
               pricing and access remain legible.
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
@@ -195,11 +200,7 @@ export function CreatorLivesScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Create, review, and manage paid live sessions with a smaller-screen creator workflow."
-        eyebrow="Lives"
-        title="Live sessions"
-      />
+      <Heading title="Live sessions" />
       <Surface>
         <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
           Use the live builder to set pricing, visibility, and timing before viewers receive access.
@@ -215,7 +216,7 @@ export function CreatorLivesScreen() {
         <>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <SummaryTile
-              body="Sessions visible in the current creator view."
+              body="Sessions visible in the current content creator view."
               label="Inventory"
               value={String(query.data.trendingLives.length)}
             />
@@ -236,7 +237,7 @@ export function CreatorLivesScreen() {
             <EmptyState body="Created lives will surface here once inventory exists." title="No live sessions yet" />
           )}
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Creator guardrails</Text>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Content creator guardrails</Text>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
               Paid sessions must resolve payment before room access. Private sessions should use invite-driven access
               and clear host notes so moderators and viewers know what to expect.
@@ -256,11 +257,7 @@ export function CreatorLibraryScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Manage premium content and class inventory without cluttering the main dashboard."
-        eyebrow="Library"
-        title="Creator library"
-      />
+      <Heading title="Content creator library" />
       {query.isLoading ? <LoadingState label="Loading library..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Library unavailable" /> : null}
       {query.data ? (
@@ -277,7 +274,7 @@ export function CreatorLibraryScreen() {
               value={String(query.data.recommendedClasses.length)}
             />
             <SummaryTile
-              body="All monetized items across your creator surface."
+              body="All monetized items across your content creator surface."
               label="Total items"
               value={String(query.data.premiumContent.length + query.data.recommendedClasses.length)}
             />
@@ -290,7 +287,7 @@ export function CreatorLibraryScreen() {
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
               <Button onPress={() => router.push('/(creator)/create-live')} title="Create companion live" />
-              <Button onPress={() => router.push('/(creator)/settings')} title="Review creator settings" variant="secondary" />
+              <Button onPress={() => router.push('/(creator)/settings')} title="Review content creator settings" variant="secondary" />
             </View>
           </Surface>
           <View style={{ gap: 12 }}>
@@ -325,7 +322,7 @@ export function CreatorWalletScreen() {
 
   return (
     <Screen>
-      <Heading body="Available balance, pending balance, and creator earnings." eyebrow="Wallet" title="Earnings" />
+      <Heading title="Earnings" />
       {query.isLoading ? <LoadingState label="Loading wallet..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Wallet unavailable" /> : null}
       {query.data ? (
@@ -333,7 +330,7 @@ export function CreatorWalletScreen() {
           <WalletCards wallet={query.data.wallet} />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <SummaryTile
-              body="Creator share already settled into your balance."
+              body="Content creator share already settled into your balance."
               label="Available now"
               value={formatCurrency(query.data.wallet.availableBalance, query.data.wallet.currency)}
             />
@@ -343,7 +340,7 @@ export function CreatorWalletScreen() {
               value={formatCurrency(query.data.wallet.pendingBalance, query.data.wallet.currency)}
             />
             <SummaryTile
-              body="Total creator earnings tracked across successful purchases."
+              body="Total content creator earnings tracked across successful purchases."
               label="Lifetime"
               value={formatCurrency(query.data.wallet.lifetimeEarnings, query.data.wallet.currency)}
             />
@@ -356,7 +353,7 @@ export function CreatorWalletScreen() {
           <Surface>
             <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>How money moves</Text>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-              LiveGate keeps 20% of successful transactions while 80% settles to creator balances. Pending funds stay
+              LiveGate keeps 20% of successful transactions while 80% settles to content creator balances. Pending funds stay
               separate until they are eligible for payout.
             </Text>
             <Button onPress={() => router.push('/(creator)/payouts')} title="Request payout" />
@@ -378,21 +375,17 @@ export function CreatorProfileScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Creator identity, hybrid role switching, notifications, and account actions stay close without crowding the studio."
-        eyebrow="Profile"
-        title="Creator profile"
-      />
+      <Heading title="Content creator profile" />
       <Surface>
         <Text style={{ fontSize: 20, fontWeight: '700', color: '#10211D' }}>
-          {session?.user.fullName ?? 'LiveGate creator'}
+          {session?.user.fullName ?? 'LiveGate content creator'}
         </Text>
         <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
           {session?.user.email ?? 'No email loaded'}
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {roles.map((role) => (
-            <CategoryChip active={session?.user.role === role} key={role} title={role} />
+            <CategoryChip active={session?.user.role === role} key={role} title={formatRoleLabel(role)} />
           ))}
         </View>
         {roles.includes('viewer') ? (
@@ -431,11 +424,7 @@ export function PayoutsScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Request creator payouts from a compact, production-style form."
-        eyebrow="Payouts"
-        title="Request payout"
-      />
+      <Heading title="Request payout" />
       <Surface>
         <Controller
           control={form.control}
@@ -532,11 +521,7 @@ export function CreateLiveScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Set the session title, category, pricing, visibility, and host notes before viewers see the live."
-        eyebrow="Create live"
-        title="New live session"
-      />
+      <Heading title="New live session" />
       <Surface>
         <TextField label="Session title" onChangeText={setTitle} placeholder="New York open breakdown" value={title} />
         <TextField
@@ -613,8 +598,8 @@ export function CreateLiveScreen() {
           value={formatCurrency(platformCommission)}
         />
         <SummaryTile
-          body="Creator share after LiveGate commission."
-          label="Creator share"
+          body="Content creator share after LiveGate commission."
+          label="Content creator share"
           value={formatCurrency(creatorNet)}
         />
         <SummaryTile
@@ -683,7 +668,7 @@ export function CreatorNotificationsScreen() {
 
   return (
     <Screen>
-      <Heading body="Announcements, payouts, reviews, and creator system updates." eyebrow="Notifications" title="Creator updates" />
+      <Heading title="Content creator updates" />
       {query.isLoading ? <LoadingState label="Loading notifications..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Notifications unavailable" /> : null}
       {query.data ? query.data.items.map((item) => <NotificationRow item={item} key={item.id} />) : null}
@@ -729,12 +714,8 @@ export function CreatorSettingsScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Profile customization, payout preferences, notification controls, and account settings belong here."
-        eyebrow="Settings"
-        title="Creator settings"
-      />
-      {query.isLoading ? <LoadingState label="Loading creator settings..." /> : null}
+      <Heading title="Content creator settings" />
+      {query.isLoading ? <LoadingState label="Loading content creator settings..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Settings unavailable" /> : null}
       {settings ? (
         <>
@@ -790,7 +771,7 @@ export function CreatorSettingsScreen() {
                   active={settings.defaultRole === role}
                   key={role}
                   onPress={() => setSettings((current) => (current ? { ...current, defaultRole: role } : current))}
-                  title={role}
+                  title={formatRoleLabel(role)}
                 />
               ))}
             </View>
@@ -850,7 +831,7 @@ export function CreatorSettingsScreen() {
               value={settings.notificationPreferences.purchaseUpdates}
             />
             <SettingsToggle
-              body="Allow class launches and creator announcements to stay enabled."
+              body="Allow class launches and content creator announcements to stay enabled."
               onChange={(value) =>
                 setSettings((current) =>
                   current
@@ -861,7 +842,7 @@ export function CreatorSettingsScreen() {
                     : current,
                 )
               }
-              title="Creator announcements"
+              title="Content creator announcements"
               value={settings.notificationPreferences.creatorAnnouncements}
             />
             <SettingsToggle
@@ -897,7 +878,7 @@ export function CreatorSettingsScreen() {
               value={settings.appearancePreferences.compactMode}
             />
             <SettingsToggle
-              body="Keep your creator profile visible to the wider learning community."
+              body="Keep your content creator profile visible to the wider learning community."
               onChange={(value) =>
                 setSettings((current) =>
                   current
@@ -912,7 +893,7 @@ export function CreatorSettingsScreen() {
               value={settings.privacyPreferences.communityVisibility}
             />
             <SettingsToggle
-              body="Keep your creator profile visible in public discovery."
+              body="Keep your content creator profile visible in public discovery."
               onChange={(value) =>
                 setSettings((current) =>
                   current
@@ -923,14 +904,14 @@ export function CreatorSettingsScreen() {
                     : current,
                 )
               }
-              title="Public creator profile"
+              title="Public content creator profile"
               value={settings.privacyPreferences.publicCreatorProfile}
             />
           </View>
           <Surface>
             <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Current profile posture</Text>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-              Default role: {settings.defaultRole}. Theme: {settings.appearancePreferences.theme}. Public creator
+              Default role: {formatRoleLabel(settings.defaultRole)}. Theme: {settings.appearancePreferences.theme}. Public content creator
               profile: {settings.privacyPreferences.publicCreatorProfile ? 'enabled' : 'disabled'}.
             </Text>
           </Surface>

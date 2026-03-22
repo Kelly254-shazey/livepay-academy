@@ -1,5 +1,7 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ProfileSettingsPayload } from '@livegate/shared';
-import { categories, formatCurrency, getSessionRoles } from '@livegate/shared';
+import { categories, DEMO_LIVE_ACCESS_CODE, formatCurrency, getSessionRoles } from '@livegate/shared';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -32,7 +34,8 @@ const sectionTitleStyle = {
   fontSize: theme.typography.sizes.xl, 
   fontWeight: theme.typography.weights.bold as any, 
   color: theme.colors.text,
-  marginBottom: theme.spacing.md
+  marginBottom: theme.spacing.md,
+  fontFamily: theme.typography.displayFontFamily,
 };
 
 const metaLabelStyle = { 
@@ -51,13 +54,66 @@ const metaValueStyle = {
 
 const searchFilters = [
   { title: 'All', value: 'all' },
-  { title: 'Creators', value: 'creator' },
+  { title: 'Content Creators', value: 'creator' },
   { title: 'Lives', value: 'live' },
   { title: 'Content', value: 'content' },
   { title: 'Classes', value: 'class' },
 ] as const;
 
+const demoStreamScenes: Record<
+  string,
+  Array<{ title: string; body: string; length: string }>
+> = {
+  'live-nairobi-city-lights': [
+    { title: 'Rooftop skyline sweep', body: 'Golden-hour transition into city lights and traffic glow.', length: '08:12' },
+    { title: 'Downtown street pulse', body: 'Busy crossings, storefront light, and crowd energy.', length: '06:48' },
+    { title: 'Night avenue close-up', body: 'Ambient cars, signage, and slow architectural details.', length: '05:35' },
+  ],
+  'live-tokyo-after-dark': [
+    { title: 'Neon crossing pass', body: 'High-footfall junctions with layered night color.', length: '07:20' },
+    { title: 'Laneway texture walk', body: 'Hidden side streets, signage, and close city detail.', length: '04:52' },
+    { title: 'Station rush sequence', body: 'Late commuters, reflections, and movement rhythm.', length: '06:05' },
+  ],
+  'live-coral-reef-window': [
+    { title: 'Reef drift camera', body: 'Soft coral motion and schools of fish moving through frame.', length: '09:14' },
+    { title: 'Blue-water glide', body: 'Open-water calm with slow underwater depth changes.', length: '05:41' },
+    { title: 'Marine life close pass', body: 'A slower look at reef texture and species behavior.', length: '07:03' },
+  ],
+};
+
+const demoLiveVideoSources: Record<string, string> = {
+  'live-nairobi-city-lights': 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+  'live-tokyo-after-dark': 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+  'live-coral-reef-window': 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+};
+
+const demoLiveComments: Record<string, string[]> = {
+  'live-nairobi-city-lights': [
+    'The skyline colors look clean tonight.',
+    'Watching from Kampala, stream quality is good.',
+    'That rooftop angle feels cinematic.',
+  ],
+  'live-tokyo-after-dark': [
+    'The neon reflections are sharp.',
+    'This feels like a real night walk.',
+    'Please keep the camera on this street for a bit longer.',
+  ],
+  'live-coral-reef-window': [
+    'The reef drift is so calming.',
+    'That fish pass was beautiful.',
+    'This is exactly the kind of slow live stream I wanted.',
+  ],
+};
+
 const appearanceModes = ['system', 'light', 'dark'] as const;
+
+function formatRoleLabel(role: string) {
+  if (role === 'creator') return 'Content Creator';
+  if (role === 'viewer') return 'Viewer';
+  if (role === 'moderator') return 'Moderator';
+  if (role === 'admin') return 'Admin';
+  return role;
+}
 
 function SettingsToggle({
   title,
@@ -71,7 +127,7 @@ function SettingsToggle({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <Surface style={{ flex: 1, minWidth: '45%' }}>
+    <Surface style={{ flex: 1, minWidth: '45%', backgroundColor: theme.colors.surface }}>
       <Text style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>
         {title}
       </Text>
@@ -101,7 +157,7 @@ function SummaryTile({
   body: string;
 }) {
   return (
-    <Surface style={{ flex: 1, minWidth: '45%' }}>
+    <Surface style={{ flex: 1, minWidth: '45%', backgroundColor: theme.colors.surface }}>
       <Text style={metaLabelStyle}>{label}</Text>
       <Text style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold as any, color: theme.colors.text, marginVertical: theme.spacing.xs }}>
         {value}
@@ -120,135 +176,189 @@ export function HomeScreen() {
     queryKey: ['mobile-home'],
     queryFn: mobileApi.getHomeFeed,
   });
-  const homeCategories = query.data?.categories?.length ? query.data.categories.slice(0, 6) : categories.slice(0, 6);
   const sessionRoles = getSessionRoles(session);
-  const featuredCreators = query.data?.featuredCreators.length ?? 0;
-  const featuredLives = query.data?.trendingLives.length ?? 0;
-  const featuredClasses = query.data?.recommendedClasses.length ?? 0;
+  const onlineLives = query.data?.trendingLives.filter((item) => item.isLive) ?? [];
+  const onlineCreatorCount = onlineLives.length;
 
   return (
     <Screen>
-      <Heading
-        eyebrow="LiveGate Home"
-        title="Discover Premium Learning"
-        body="Explore live sessions, premium content, and expert-led classes from top creators."
-      />
-      
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md }}>
-        <SummaryTile
-          label="Creators"
-          value={featuredCreators.toString()}
-          body="Featured experts"
+      <View
+        style={{
+          position: 'relative',
+          overflow: 'hidden',
+          borderRadius: theme.radius.xl,
+          borderWidth: 1,
+          borderColor: '#beded6',
+          backgroundColor: '#10211d',
+          padding: theme.spacing.lg,
+          gap: theme.spacing.lg,
+          minHeight: 230,
+          ...theme.shadow.lg,
+        }}
+      >
+        <View
+          style={{
+            position: 'absolute',
+            top: -30,
+            right: -10,
+            width: 170,
+            height: 170,
+            borderRadius: theme.radius.pill,
+            backgroundColor: '#1f8a70',
+            opacity: 0.28,
+          }}
         />
-        <SummaryTile
-          label="Live Sessions"
-          value={featuredLives.toString()}
-          body="Active & upcoming"
+        <View
+          style={{
+            position: 'absolute',
+            bottom: -45,
+            left: -20,
+            width: 220,
+            height: 150,
+            borderRadius: theme.radius.pill,
+            backgroundColor: '#2dd4bf',
+            opacity: 0.18,
+          }}
         />
-        <SummaryTile
-          label="Classes"
-          value={featuredClasses.toString()}
-          body="Structured courses"
-        />
-      </View>
-
-      <Surface>
-        <Text style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text, marginBottom: theme.spacing.sm }}>
-          Quick Actions
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-          <Button onPress={() => router.push('/(viewer)/(tabs)/assistant')} title="Ask AI Assistant" />
-          <Button onPress={() => router.push('/(viewer)/(tabs)/library')} title="My Library" variant="secondary" />
-          {sessionRoles.includes('creator') && (
-            <Button
-              onPress={() => {
-                setActiveRole('creator');
-                router.replace('/(creator)/(tabs)/dashboard');
-              }}
-              title="Creator Mode"
-              variant="ghost"
-            />
-          )}
+        <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+          <Badge variant="primary">Live now</Badge>
+          <Badge variant="default">For you</Badge>
         </View>
-      </Surface>
-
-      {session?.isDemo && (
-        <Surface>
-          <Badge variant="warning">Demo Mode</Badge>
-          <Text style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text, marginTop: theme.spacing.xs }}>
-            Preview Experience
-          </Text>
-          <Text style={{ fontSize: theme.typography.sizes.sm, lineHeight: 22, color: theme.colors.textSecondary, marginTop: theme.spacing.xs }}>
-            You're exploring LiveGate with demo data. All features are available for testing.
-          </Text>
-        </Surface>
-      )}
-
-      <Heading
-        eyebrow="Browse"
-        title="Categories"
-        body="Find content by topic and expertise area."
-      />
-      
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-        {homeCategories.map((category) => (
-          <CategoryChip
-            key={category.slug}
-            onPress={() => router.push(`/(viewer)/category/${category.slug}`)}
-            title={category.title}
-          />
-        ))}
+        <View style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'stretch' }}>
+          <View
+            style={{
+              flex: 1.35,
+              minHeight: 128,
+              borderRadius: theme.radius.lg,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.12)',
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              padding: theme.spacing.lg,
+              justifyContent: 'space-between',
+            }}
+          >
+            <Text
+              style={{
+                fontSize: theme.typography.sizes.xs,
+                color: '#bdeee4',
+                textTransform: 'uppercase',
+                letterSpacing: 1.4,
+                fontWeight: theme.typography.weights.medium,
+              }}
+            >
+              Trending stream
+            </Text>
+            <Text
+              style={{
+                fontSize: theme.typography.sizes.xl,
+                lineHeight: 29,
+                color: '#fffaf2',
+                fontWeight: theme.typography.weights.semibold,
+                fontFamily: theme.typography.displayFontFamily,
+              }}
+            >
+              Content creator drop-ins, premium rooms, and bite-size discovery.
+            </Text>
+          </View>
+          <View style={{ flex: 0.95, gap: theme.spacing.md }}>
+            <View
+              style={{
+                flex: 1,
+                minHeight: 58,
+                borderRadius: theme.radius.lg,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.12)',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                padding: theme.spacing.lg,
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: theme.typography.sizes['2xl'],
+                  color: '#fffaf2',
+                  fontWeight: theme.typography.weights.bold,
+                  fontFamily: theme.typography.displayFontFamily,
+                }}
+              >
+                24/7
+              </Text>
+              <Text style={{ fontSize: theme.typography.sizes.sm, color: '#d6e6df', lineHeight: 20 }}>
+                Discovery rhythm
+              </Text>
+            </View>
+            <View
+              style={{
+                flex: 1,
+                minHeight: 58,
+                borderRadius: theme.radius.lg,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.12)',
+                backgroundColor: 'rgba(216,235,229,0.16)',
+                padding: theme.spacing.lg,
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: theme.typography.sizes['2xl'],
+                  color: '#fffaf2',
+                  fontWeight: theme.typography.weights.bold,
+                  fontFamily: theme.typography.displayFontFamily,
+                }}
+              >
+                1 tap
+              </Text>
+              <Text style={{ fontSize: theme.typography.sizes.sm, color: '#d6e6df', lineHeight: 20 }}>
+                Switch roles later
+              </Text>
+            </View>
+          </View>
+        </View>
       </View>
 
-      {query.isLoading && <LoadingState label="Loading content..." />}
-      {query.isError && <EmptyState title="Content Unavailable" body={(query.error as Error).message} />}
+      {query.isLoading && <LoadingState label="Loading live creators..." />}
+      {query.isError && <EmptyState title="Live creators unavailable" body={(query.error as Error).message} />}
       
       {query.data && (
-        <>
+        <View style={{ gap: theme.spacing.md }}>
+          <Text style={sectionTitleStyle}>Watch now</Text>
+          {onlineLives.length ? (
+            onlineLives.map((item) => (
+              <Surface key={item.id} style={{ backgroundColor: theme.colors.surface }}>
+                <Badge variant="danger">Live</Badge>
+                <Text style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.semibold, color: theme.colors.text }}>
+                  {item.creator.displayName}
+                </Text>
+                <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>
+                  {item.title}
+                </Text>
+                <Text style={{ fontSize: theme.typography.sizes.sm, lineHeight: 22, color: theme.colors.textSecondary }}>
+                  {item.description}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                  <View style={{ gap: 4 }}>
+                    <Text style={metaLabelStyle}>Watching now</Text>
+                    <Text style={metaValueStyle}>{item.viewerCount}</Text>
+                  </View>
+                  <View style={{ gap: 4 }}>
+                    <Text style={metaLabelStyle}>Price</Text>
+                    <Text style={metaValueStyle}>{formatCurrency(item.price)}</Text>
+                  </View>
+                </View>
+                <Button onPress={() => router.push(`/(viewer)/live/${item.id}`)} title="Watch this live" />
+              </Surface>
+            ))
+          ) : (
+            <EmptyState title="No one is live right now" body="Come back shortly to see content creators streaming live." />
+          )}
           <View style={{ gap: theme.spacing.md }}>
-            <Text style={sectionTitleStyle}>Trending Lives</Text>
-            {query.data.trendingLives.length ? (
-              query.data.trendingLives.map((item) => (
-                <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
-              ))
-            ) : (
-              <EmptyState title="No Live Sessions" body="Check back soon for new live content." />
-            )}
+            <Text style={sectionTitleStyle}>Upcoming next</Text>
+            {query.data.trendingLives.filter((item) => !item.isLive).slice(0, 2).map((item) => (
+              <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
+            ))}
           </View>
-
-          <View style={{ gap: theme.spacing.md }}>
-            <Text style={sectionTitleStyle}>Featured Creators</Text>
-            {query.data.featuredCreators.length ? (
-              query.data.featuredCreators.map((item) => (
-                <CreatorCard key={item.id} creator={item} onPress={() => router.push(`/(viewer)/creator/${item.id}`)} />
-              ))
-            ) : (
-              <EmptyState title="No Creators" body="Featured creators will appear here." />
-            )}
-          </View>
-
-          <View style={{ gap: theme.spacing.md }}>
-            <Text style={sectionTitleStyle}>Premium Content</Text>
-            {query.data.premiumContent.length ? (
-              query.data.premiumContent.map((item) => (
-                <ContentCard content={item} key={item.id} onPress={() => router.push(`/(viewer)/content/${item.id}`)} />
-              ))
-            ) : (
-              <EmptyState title="No Premium Content" body="Exclusive content will be featured here." />
-            )}
-          </View>
-
-          <View style={{ gap: theme.spacing.md }}>
-            <Text style={sectionTitleStyle}>Recommended Classes</Text>
-            {query.data.recommendedClasses.length ? (
-              query.data.recommendedClasses.map((item) => (
-                <ClassCard classItem={item} key={item.id} onPress={() => router.push(`/(viewer)/class/${item.id}`)} />
-              ))
-            ) : (
-              <EmptyState title="No Classes" body="Structured courses will appear here." />
-            )}
-          </View>
-        </>
+        </View>
       )}
     </Screen>
   );
@@ -257,11 +367,7 @@ export function HomeScreen() {
 export function CategoriesScreen() {
   return (
     <Screen>
-      <Heading
-        body="Each category has a dedicated browsing context for creators, lives, locked content, and classes."
-        eyebrow="Categories"
-        title="Browse with intent"
-      />
+      <Heading title="Browse with intent" />
       {categories.map((category) => (
         <Surface key={category.slug}>
           <Text style={{ fontSize: 18, fontWeight: '600', color: '#171512' }}>{category.title}</Text>
@@ -284,7 +390,7 @@ export function SearchScreen() {
 
   return (
     <Screen>
-      <Heading body="Search creators, lives, premium content, and classes." eyebrow="Search" title="Find what matters" />
+      <Heading title="Find what matters" />
       <TextField label="Search" onChangeText={setQuery} placeholder="Search LiveGate" value={query} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {searchFilters.map((filter) => (
@@ -333,11 +439,7 @@ export function ViewerLibraryScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Purchases, joined lives, saved content, followed creators, notifications, and transaction history converge here."
-        eyebrow="Viewer dashboard"
-        title="Your library"
-      />
+      <Heading title="Your library" />
       {query.isLoading ? <LoadingState label="Loading dashboard..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Viewer dashboard unavailable" /> : null}
       {query.data ? (
@@ -358,7 +460,7 @@ export function ViewerLibraryScreen() {
               value={String(libraryItemCount)}
             />
             <SummaryTile
-              body="Creators you can return to without searching again."
+              body="Content creators you can return to without searching again."
               label="Following"
               value={String(query.data.followedCreators.items.length)}
             />
@@ -406,13 +508,13 @@ export function ViewerLibraryScreen() {
             )}
           </View>
           <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Followed creators</Text>
+            <Text style={sectionTitleStyle}>Followed Content Creators</Text>
             {query.data.followedCreators.items.length ? (
               query.data.followedCreators.items.map((item) => (
                 <CreatorCard creator={item} key={item.id} onPress={() => router.push(`/(viewer)/creator/${item.id}`)} />
               ))
             ) : (
-              <EmptyState body="Creators you follow will appear here for quick access." title="No followed creators" />
+              <EmptyState body="Content creators you follow will appear here for quick access." title="No followed content creators" />
             )}
           </View>
         </>
@@ -429,21 +531,18 @@ export function ViewerProfileScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Profile, navigation shortcuts, hybrid role switching, and account actions stay available without turning the app into a maze."
-        eyebrow="Profile"
-        title="Account"
-      />
-      <Surface>
-        <Text style={{ fontSize: 20, fontWeight: '700', color: '#10211D' }}>
+      <Heading title="Account" />
+      <Surface style={{ backgroundColor: theme.colors.surface }}>
+        <Avatar name={session?.user.fullName} size="lg" />
+        <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text, fontFamily: theme.typography.displayFontFamily }}>
           {session?.user.fullName ?? 'LiveGate viewer'}
         </Text>
-        <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+        <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
           {session?.user.email ?? 'No email loaded'}
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {roles.map((role) => (
-            <CategoryChip active={session?.user.role === role} key={role} title={role} />
+            <CategoryChip active={session?.user.role === role} key={role} title={formatRoleLabel(role)} />
           ))}
         </View>
         {roles.includes('creator') ? (
@@ -452,7 +551,7 @@ export function ViewerProfileScreen() {
               setActiveRole('creator');
               router.replace('/(creator)/(tabs)/dashboard');
             }}
-            title="Switch to creator workspace"
+            title="Switch to content creator workspace"
             variant="secondary"
           />
         ) : null}
@@ -482,7 +581,7 @@ export function CategoryDetailScreen() {
 
   return (
     <Screen>
-      <Heading body="Creators, lives, premium content, and classes are grouped within this category." eyebrow="Category" title={slug?.replace(/-/g, ' ') ?? 'Category'} />
+      <Heading title={slug?.replace(/-/g, ' ') ?? 'Category'} />
       {query.isLoading ? <LoadingState label="Loading category..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Category unavailable" /> : null}
       {query.data ? (
@@ -515,18 +614,18 @@ export function CreatorProfileScreen() {
 
   return (
     <Screen>
-      {query.isLoading ? <LoadingState label="Loading creator..." /> : null}
-      {query.isError ? <EmptyState body={(query.error as Error).message} title="Creator unavailable" /> : null}
+      {query.isLoading ? <LoadingState label="Loading content creator..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Content creator unavailable" /> : null}
       {query.data ? (
         <>
-          <Heading body={query.data.creator.bio ?? query.data.creator.headline} eyebrow="Creator" title={query.data.creator.displayName} />
+          <Heading title={query.data.creator.displayName} />
           <Surface>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <View style={{ gap: 4 }}>
                 <Text style={{ fontSize: 14, color: '#6E675C' }}>@{query.data.creator.handle}</Text>
                 <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{query.data.creator.headline}</Text>
               </View>
-              <Button title="Follow creator" />
+              <Button onPress={() => undefined} title="Follow content creator" />
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {query.data.creator.categories.map((category) => (
@@ -561,7 +660,7 @@ export function CreatorProfileScreen() {
                 </Surface>
               ))
             ) : (
-              <EmptyState body="Creator reviews will appear here when returned by the backend." title="No reviews yet" />
+              <EmptyState body="Content creator reviews will appear here when returned by the backend." title="No reviews yet" />
             )}
           </View>
           <View style={{ gap: 12 }}>
@@ -571,7 +670,7 @@ export function CreatorProfileScreen() {
                 <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
               ))
             ) : (
-              <EmptyState body="Upcoming sessions from this creator will appear here." title="No lives scheduled" />
+              <EmptyState body="Upcoming sessions from this content creator will appear here." title="No lives scheduled" />
             )}
           </View>
           <View style={{ gap: 12 }}>
@@ -581,7 +680,7 @@ export function CreatorProfileScreen() {
                 <ContentCard content={item} key={item.id} onPress={() => router.push(`/(viewer)/content/${item.id}`)} />
               ))
             ) : (
-              <EmptyState body="Locked content from this creator will appear here." title="No premium content" />
+              <EmptyState body="Locked content from this content creator will appear here." title="No premium content" />
             )}
           </View>
           <View style={{ gap: 12 }}>
@@ -591,7 +690,7 @@ export function CreatorProfileScreen() {
                 <ClassCard classItem={item} key={item.id} onPress={() => router.push(`/(viewer)/class/${item.id}`)} />
               ))
             ) : (
-              <EmptyState body="Classes and workshops from this creator will appear here." title="No classes yet" />
+              <EmptyState body="Classes and workshops from this content creator will appear here." title="No classes yet" />
             )}
           </View>
         </>
@@ -602,6 +701,10 @@ export function CreatorProfileScreen() {
 
 export function LiveDetailsScreen() {
   const { liveId } = useLocalSearchParams<{ liveId: string }>();
+  const unlockedDemoLiveIds = useSessionStore((state) => state.unlockedDemoLiveIds);
+  const unlockDemoLiveAccess = useSessionStore((state) => state.unlockDemoLiveAccess);
+  const [accessCode, setAccessCode] = useState('');
+  const [accessMessage, setAccessMessage] = useState<string | null>(null);
   const query = useQuery({
     queryKey: ['mobile-live', liveId],
     queryFn: () => mobileApi.getLiveDetail(liveId),
@@ -614,7 +717,12 @@ export function LiveDetailsScreen() {
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Live unavailable" /> : null}
       {query.data ? (
         <>
-          <Heading body={query.data.live.description} eyebrow="Paid live" title={query.data.live.title} />
+          {(() => {
+            const hasAccess =
+              query.data.live.accessGranted || (liveId ? unlockedDemoLiveIds.includes(liveId) : false);
+
+            return (
+              <>
           <Surface>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
               <View style={{ gap: 4 }}>
@@ -635,29 +743,66 @@ export function LiveDetailsScreen() {
                 <Text style={metaLabelStyle}>Price</Text>
                 <Text style={metaValueStyle}>{formatCurrency(query.data.live.price)}</Text>
               </View>
+              <View style={{ gap: 4 }}>
+                <Text style={metaLabelStyle}>Watching now</Text>
+                <Text style={metaValueStyle}>{query.data.live.viewerCount} viewers</Text>
+              </View>
             </View>
           </Surface>
           <Surface>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-              {query.data.live.accessGranted
-                ? 'Access granted. You can join the live room immediately.'
-                : 'Payment is required before this live can be joined. Connect your payment backend to unlock this flow.'}
+              {hasAccess
+                ? 'Access confirmed. Enter the live room now.'
+                : `Choose one option to continue: make payment, or enter your M-Pesa/payment code if you already paid. For testing, use ${DEMO_LIVE_ACCESS_CODE}.`}
             </Text>
-            {query.data.live.accessGranted ? (
-              <Button onPress={() => router.push(`/(viewer)/live/${liveId}/room`)} title="Join live room" />
-            ) : (
-              <Button
-                onPress={() =>
-                  router.push({
-                    pathname: '/(viewer)/checkout',
-                    params: { productId: liveId, productType: 'live' },
-                  })
-                }
-                title="Continue to checkout"
-                variant="secondary"
-              />
-            )}
+            {hasAccess ? (
+              <Button onPress={() => router.replace(`/(viewer)/live/${liveId}/room`)} title="Enter live now" />
+            ) : null}
+            {!hasAccess ? (
+              <>
+                <Button
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(viewer)/checkout',
+                      params: { productId: liveId, productType: 'live' },
+                    })
+                  }
+                  title="Make payment"
+                />
+                <TextField
+                  label="M-Pesa or payment code"
+                  onChangeText={(value) => {
+                    setAccessCode(value);
+                    if (accessMessage) setAccessMessage(null);
+                  }}
+                  placeholder="Enter payment code"
+                  value={accessCode}
+                />
+                {accessMessage ? (
+                  <Text style={{ color: accessMessage.includes('granted') ? theme.colors.success : theme.colors.danger }}>
+                    {accessMessage}
+                  </Text>
+                ) : null}
+                <Button
+                  onPress={() => {
+                    if (accessCode.trim() === DEMO_LIVE_ACCESS_CODE) {
+                      unlockDemoLiveAccess(liveId);
+                      setAccessMessage('Payment code accepted. Opening live now.');
+                      router.replace(`/(viewer)/live/${liveId}/room`);
+                      return;
+                    }
+
+                    setAccessMessage('Invalid payment code. Use 12345 for testing.');
+                  }}
+                  title="Enter with payment code"
+                  variant="secondary"
+                />
+              </>
+            ) : null}
           </Surface>
+              </>
+            );
+          })()}
         </>
       ) : null}
     </Screen>
@@ -666,11 +811,20 @@ export function LiveDetailsScreen() {
 
 export function LiveRoomScreen() {
   const { liveId } = useLocalSearchParams<{ liveId: string }>();
+  const unlockedDemoLiveIds = useSessionStore((state) => state.unlockedDemoLiveIds);
+  const [showChat, setShowChat] = useState(false);
   const query = useQuery({
     queryKey: ['mobile-live-room', liveId],
     queryFn: () => mobileApi.getLiveRoom(liveId),
     enabled: Boolean(liveId),
   });
+  const videoPlayer = useVideoPlayer(
+    demoLiveVideoSources[liveId ?? ''] ?? 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+    (player) => {
+      player.loop = true;
+      player.play();
+    },
+  );
 
   return (
     <Screen>
@@ -678,42 +832,134 @@ export function LiveRoomScreen() {
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Live room unavailable" /> : null}
       {query.data ? (
         <>
-          <Heading body={query.data.live.description} eyebrow="Live room" title={query.data.live.title} />
-          <Surface>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
-              <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Host</Text>
-                <Text style={metaValueStyle}>{query.data.live.creator.displayName}</Text>
-              </View>
-              <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Viewers</Text>
-                <Text style={metaValueStyle}>{query.data.live.viewerCount}</Text>
-              </View>
-              <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Chat</Text>
-                <Text style={metaValueStyle}>{query.data.chatEnabled ? 'Enabled' : 'Unavailable'}</Text>
-              </View>
-            </View>
-          </Surface>
-          <Surface>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-              Streaming and chat can mount here once your realtime and media providers are connected.
-            </Text>
-            <Text style={sectionTitleStyle}>Chat area</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-              This reserved panel is where live chat messages and composer controls will render after realtime integration.
-            </Text>
-            {query.data.hostNotes?.length ? (
-              <View style={{ gap: 10 }}>
-                <Text style={sectionTitleStyle}>Host notes</Text>
-                {query.data.hostNotes.map((note, index) => (
-                  <Surface key={`${note}-${index}`}>
-                    <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{note}</Text>
-                  </Surface>
-                ))}
-              </View>
-            ) : null}
-          </Surface>
+          {(() => {
+            const hasAccess =
+              query.data.live.accessGranted || (liveId ? unlockedDemoLiveIds.includes(liveId) : false);
+
+            if (!hasAccess) {
+              return (
+                <Surface>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Live room is locked</Text>
+                  <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
+                    Return to the live details screen to complete payment or enter the demo access code.
+                  </Text>
+                  <Button onPress={() => router.replace(`/(viewer)/live/${liveId}`)} title="Back to live details" />
+                </Surface>
+              );
+            }
+
+            const scenes = demoStreamScenes[liveId ?? ''] ?? [];
+
+            return (
+              <>
+                <View style={{ gap: theme.spacing.md }}>
+                  <View
+                    style={{
+                      overflow: 'hidden',
+                      borderRadius: theme.radius.xl,
+                      backgroundColor: '#0b1513',
+                      ...theme.shadow.lg,
+                    }}
+                  >
+                    <View style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Badge variant="danger">Live</Badge>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(11,21,19,0.58)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: theme.radius.pill }}>
+                        <Ionicons color="#fffaf2" name="eye-outline" size={16} />
+                        <Text style={{ color: '#fffaf2', fontSize: 13, fontWeight: '600' }}>{query.data.live.viewerCount}</Text>
+                      </View>
+                    </View>
+
+                    <VideoView
+                      allowsPictureInPicture={false}
+                      contentFit="cover"
+                      fullscreenOptions={{ enable: true }}
+                      nativeControls={false}
+                      player={videoPlayer}
+                      style={{ width: '100%', aspectRatio: 9 / 16, backgroundColor: '#0b1513' }}
+                    />
+
+                    {showChat ? (
+                      <View
+                        style={{
+                          position: 'absolute',
+                          left: 16,
+                          right: 92,
+                          bottom: 122,
+                          zIndex: 2,
+                          gap: 8,
+                        }}
+                      >
+                        {(demoLiveComments[liveId ?? ''] ?? []).slice(0, 3).map((message, index) => (
+                          <View
+                            key={`${message}-${index}`}
+                            style={{
+                              alignSelf: 'flex-start',
+                              maxWidth: '92%',
+                              borderRadius: 18,
+                              backgroundColor: 'rgba(11,21,19,0.62)',
+                              paddingHorizontal: 12,
+                              paddingVertical: 10,
+                            }}
+                          >
+                            <Text style={{ color: '#b8d8cf', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
+                              viewer_{index + 14}
+                            </Text>
+                            <Text style={{ color: '#fffaf2', fontSize: 13, lineHeight: 18 }}>{message}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+
+                    <View style={{ position: 'absolute', right: 14, bottom: 18, zIndex: 2, gap: 12 }}>
+                      <View style={{ alignItems: 'center', gap: 6 }}>
+                        <View style={{ width: 52, height: 52, borderRadius: theme.radius.pill, backgroundColor: 'rgba(11,21,19,0.62)', alignItems: 'center', justifyContent: 'center' }}>
+                          <Ionicons color="#fffaf2" name="people-outline" size={22} />
+                        </View>
+                        <Text style={{ color: '#fffaf2', fontSize: 12, fontWeight: '600' }}>{query.data.live.viewerCount}</Text>
+                      </View>
+                      <View style={{ alignItems: 'center', gap: 6 }}>
+                        <View style={{ width: 52, height: 52, borderRadius: theme.radius.pill, backgroundColor: 'rgba(11,21,19,0.62)', alignItems: 'center', justifyContent: 'center' }}>
+                          <Ionicons color="#fffaf2" name="videocam-outline" size={22} />
+                        </View>
+                        <Text style={{ color: '#fffaf2', fontSize: 12, fontWeight: '600' }}>{scenes.length}</Text>
+                      </View>
+                      <View style={{ alignItems: 'center', gap: 6 }}>
+                        <View style={{ width: 52, height: 52, borderRadius: theme.radius.pill, backgroundColor: 'rgba(11,21,19,0.62)', alignItems: 'center', justifyContent: 'center' }}>
+                          <Ionicons
+                            color="#fffaf2"
+                            name={showChat ? 'chatbubble' : 'chatbubble-outline'}
+                            onPress={() => setShowChat((current) => !current)}
+                            size={22}
+                          />
+                        </View>
+                        <Text style={{ color: '#fffaf2', fontSize: 12, fontWeight: '600' }}>Chat</Text>
+                      </View>
+                    </View>
+
+                    <View style={{ position: 'absolute', left: 16, right: 86, bottom: 18, zIndex: 2, gap: 8 }}>
+                      <Text style={{ color: '#fffaf2', fontSize: theme.typography.sizes.xl, fontWeight: '700', fontFamily: theme.typography.displayFontFamily }}>
+                        {query.data.live.title}
+                      </Text>
+                      <Text style={{ color: '#e5f0ed', fontSize: 14, lineHeight: 21 }}>
+                        {query.data.live.creator.displayName} • {query.data.live.description}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {query.data.hostNotes?.length ? (
+                    <Surface style={{ backgroundColor: theme.colors.surface }}>
+                      <Text style={sectionTitleStyle}>Host notes</Text>
+                      {query.data.hostNotes.map((note, index) => (
+                        <Text key={`${note}-${index}`} style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
+                          {note}
+                        </Text>
+                      ))}
+                    </Surface>
+                  ) : null}
+                </View>
+              </>
+            );
+          })()}
         </>
       ) : null}
     </Screen>
@@ -734,11 +980,11 @@ export function ContentDetailsScreen() {
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Content unavailable" /> : null}
       {query.data ? (
         <>
-          <Heading body={query.data.content.description} eyebrow="Premium content" title={query.data.content.title} />
+          <Heading title={query.data.content.title} />
           <Surface>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Creator</Text>
+                <Text style={metaLabelStyle}>Content Creator</Text>
                 <Text style={metaValueStyle}>{query.data.content.creator.displayName}</Text>
               </View>
               <View style={{ gap: 4 }}>
@@ -795,7 +1041,7 @@ export function ClassDetailsScreen() {
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Class unavailable" /> : null}
       {query.data ? (
         <>
-          <Heading body={query.data.classItem.description} eyebrow="Class" title={query.data.classItem.title} />
+          <Heading title={query.data.classItem.title} />
           <Surface>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
               <View style={{ gap: 4 }}>
@@ -868,7 +1114,7 @@ export function NotificationsScreen() {
 
   return (
     <Screen>
-      <Heading body="Live reminders, purchases, announcements, and payout updates." eyebrow="Notifications" title="Updates" />
+      <Heading title="Updates" />
       {query.isLoading ? <LoadingState label="Loading notifications..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Notifications unavailable" /> : null}
       {query.data ? (
@@ -894,7 +1140,7 @@ export function ViewerWalletScreen() {
 
   return (
     <Screen>
-      <Heading body="Purchases and transaction history remain visible without clutter." eyebrow="Wallet" title="Transactions" />
+      <Heading title="Transactions" />
       {query.isLoading ? <LoadingState label="Loading transactions..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Wallet unavailable" /> : null}
       {query.data ? (
@@ -958,11 +1204,7 @@ export function CheckoutScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="Review the purchase summary, commission split, and access rule before payment is completed."
-        eyebrow="Checkout"
-        title="Secure checkout session"
-      />
+      <Heading title="Secure checkout session" />
       {!productId || !productType ? (
         <EmptyState
           body="Open checkout from a live, premium content item, or class details screen."
@@ -990,8 +1232,8 @@ export function CheckoutScreen() {
               value={formatCurrency(mutation.data.platformCommissionAmount ?? 0, mutation.data.currency)}
             />
             <SummaryTile
-              body="Creator share after LiveGate commission."
-              label="Creator earnings"
+              body="Content creator share after LiveGate commission."
+              label="Content creator earnings"
               value={formatCurrency(mutation.data.creatorEarningsAmount ?? 0, mutation.data.currency)}
             />
             <SummaryTile
@@ -1003,7 +1245,7 @@ export function CheckoutScreen() {
           <Surface>
             <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>{mutation.data.title}</Text>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
-              Creator: {mutation.data.creatorName ?? 'LiveGate creator'}
+              Content creator: {mutation.data.creatorName ?? 'LiveGate content creator'}
             </Text>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
               Product type: {productType}
@@ -1074,7 +1316,7 @@ export function SettingsScreen() {
 
   return (
     <Screen>
-      <Heading body="Quiet account controls without a cluttered settings maze." eyebrow="Settings" title="Preferences" />
+      <Heading title="Preferences" />
       {query.isLoading ? <LoadingState label="Loading settings..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Settings unavailable" /> : null}
       {settings ? (
@@ -1099,7 +1341,7 @@ export function SettingsScreen() {
                   onPress={() =>
                     setSettings((current) => (current ? { ...current, defaultRole: role } : current))
                   }
-                  title={role}
+                  title={formatRoleLabel(role)}
                 />
               ))}
             </View>
@@ -1159,7 +1401,7 @@ export function SettingsScreen() {
               value={settings.notificationPreferences.purchaseUpdates}
             />
             <SettingsToggle
-              body="Receive creator class, live, and content announcements."
+              body="Receive content creator classes, lives, and content announcements."
               onChange={(value) =>
                 setSettings((current) =>
                   current
@@ -1170,7 +1412,7 @@ export function SettingsScreen() {
                     : current,
                 )
               }
-              title="Creator announcements"
+              title="Content creator announcements"
               value={settings.notificationPreferences.creatorAnnouncements}
             />
             <SettingsToggle
@@ -1224,7 +1466,7 @@ export function SettingsScreen() {
           <Surface>
             <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Current profile posture</Text>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-              Default role: {settings.defaultRole}. Theme: {settings.appearancePreferences.theme}. Compact mode:{' '}
+              Default role: {formatRoleLabel(settings.defaultRole)}. Theme: {settings.appearancePreferences.theme}. Compact mode:{' '}
               {settings.appearancePreferences.compactMode ? 'enabled' : 'disabled'}.
             </Text>
           </Surface>

@@ -13,12 +13,14 @@ interface SessionState {
   preferredRole: UserRole;
   preferredRoles: UserRole[];
   session: AuthSession | null;
+  unlockedDemoLiveIds: string[];
   setHydrated: (hydrated: boolean) => void;
   completeOnboarding: () => void;
   setPreferredRole: (role: UserRole) => void;
   setPreferredRoles: (roles: UserRole[], activeRole?: UserRole) => void;
   setActiveRole: (role: UserRole) => void;
   setSession: (session: AuthSession | null) => void;
+  unlockDemoLiveAccess: (liveId: string) => void;
   signOut: () => void;
 }
 
@@ -32,6 +34,7 @@ const createStore = () => {
       preferredRole: 'viewer',
       preferredRoles: ['viewer'],
       session: null,
+      unlockedDemoLiveIds: [],
       setHydrated: (hydrated) => set({ hydrated }),
       completeOnboarding: () => set({ hasSeenOnboarding: true }),
       setPreferredRole: (preferredRole) =>
@@ -58,7 +61,14 @@ const createStore = () => {
               ? null
               : normalizeAuthSession(session, state.preferredRoles, state.preferredRole),
         })),
-      signOut: () => set({ session: null, preferredRole: 'viewer', preferredRoles: ['viewer'] }),
+      unlockDemoLiveAccess: (liveId) =>
+        set((state) => ({
+          unlockedDemoLiveIds: state.unlockedDemoLiveIds.includes(liveId)
+            ? state.unlockedDemoLiveIds
+            : [...state.unlockedDemoLiveIds, liveId],
+        })),
+      signOut: () =>
+        set({ session: null, preferredRole: 'viewer', preferredRoles: ['viewer'], unlockedDemoLiveIds: [] }),
     }));
   } else {
     // Native platform: use persist middleware
@@ -73,6 +83,7 @@ const createStore = () => {
           preferredRole: 'viewer',
           preferredRoles: ['viewer'],
           session: null,
+          unlockedDemoLiveIds: [],
           setHydrated: (hydrated: boolean) => set({ hydrated }),
           completeOnboarding: () => set({ hasSeenOnboarding: true }),
           setPreferredRole: (preferredRole: UserRole) =>
@@ -99,7 +110,14 @@ const createStore = () => {
                   ? null
                   : normalizeAuthSession(session, state.preferredRoles, state.preferredRole),
             })),
-          signOut: () => set({ session: null, preferredRole: 'viewer', preferredRoles: ['viewer'] }),
+          unlockDemoLiveAccess: (liveId: string) =>
+            set((state: SessionState) => ({
+              unlockedDemoLiveIds: state.unlockedDemoLiveIds.includes(liveId)
+                ? state.unlockedDemoLiveIds
+                : [...state.unlockedDemoLiveIds, liveId],
+            })),
+          signOut: () =>
+            set({ session: null, preferredRole: 'viewer', preferredRoles: ['viewer'], unlockedDemoLiveIds: [] }),
         }),
         {
           name: 'livegate-mobile-session',
@@ -109,6 +127,7 @@ const createStore = () => {
             preferredRole: state.preferredRole,
             preferredRoles: state.preferredRoles,
             session: state.session,
+            unlockedDemoLiveIds: state.unlockedDemoLiveIds,
           }),
           onRehydrateStorage: () => (state?: SessionState) => {
             state?.setHydrated(true);

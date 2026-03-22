@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { theme } from '../theme';
 
@@ -10,58 +11,60 @@ interface MobileAlertProps {
 
 const typeStyles = {
   success: {
-    bg: theme.colors.success + '10',
-    border: theme.colors.success,
+    bg: theme.colors.successMuted,
+    border: '#bde3d6',
     text: theme.colors.success,
-    icon: 'OK',
+    icon: 'checkmark',
   },
   error: {
-    bg: theme.colors.error + '10',
-    border: theme.colors.error,
+    bg: theme.colors.dangerMuted,
+    border: '#eab7ae',
     text: theme.colors.error,
-    icon: '!',
+    icon: 'alert',
   },
   warning: {
-    bg: theme.colors.warning + '10',
-    border: theme.colors.warning,
+    bg: theme.colors.warningMuted,
+    border: '#ecd9aa',
     text: theme.colors.warning,
-    icon: '!',
+    icon: 'warning',
   },
   info: {
-    bg: theme.colors.accent + '10',
-    border: theme.colors.accent,
+    bg: theme.colors.accentMuted,
+    border: '#b3ddd3',
     text: theme.colors.accent,
-    icon: 'i',
+    icon: 'information-circle',
   },
 } as const;
 
 const styles = StyleSheet.create({
   alert: {
     borderRadius: theme.radius.lg,
-    borderWidth: 2,
-    padding: theme.spacing.md,
+    borderWidth: 1,
+    padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     flexDirection: 'row',
     gap: theme.spacing.md,
+    ...theme.shadow.sm,
   },
-  icon: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 2,
-    minWidth: 20,
+  iconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
     justifyContent: 'center',
   },
   title: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: theme.typography.weights.semibold,
     marginBottom: theme.spacing.xs,
   },
   message: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: theme.typography.sizes.sm,
+    lineHeight: 20,
   },
   dismissButton: {
     padding: theme.spacing.sm,
@@ -91,7 +94,9 @@ export function MobileAlert({
         },
       ]}
     >
-      <Text style={[styles.icon, { color: style.text }]}>{style.icon}</Text>
+      <View style={[styles.iconWrap, { backgroundColor: '#ffffff90' }]}>
+        <Ionicons color={style.text} name={style.icon as any} size={16} />
+      </View>
       <View style={styles.content}>
         {title ? (
           <Text style={[styles.title, { color: style.text }]}>{title}</Text>

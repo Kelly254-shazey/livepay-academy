@@ -41,11 +41,7 @@ export function AssistantScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="A built-in concierge for role guidance, monetization hints, dashboard orientation, and demo support."
-        eyebrow="AI concierge"
-        title="LiveGate assistant"
-      />
+      <Heading title="LiveGate assistant" />
 
       <Surface>
         <TextField

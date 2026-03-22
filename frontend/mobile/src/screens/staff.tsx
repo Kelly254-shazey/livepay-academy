@@ -26,11 +26,7 @@ export function StaffDashboardScreen() {
 
   return (
     <Screen>
-      <Heading
-        body="A restricted oversight surface for moderators and admins with platform health, approvals, payouts, and flagged content context."
-        eyebrow="Staff portal"
-        title="Platform control room"
-      />
+      <Heading title="Platform control room" />
       {query.isLoading ? <LoadingState label="Loading staff dashboard..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Staff dashboard unavailable" /> : null}
       {query.data ? (
@@ -38,7 +34,7 @@ export function StaffDashboardScreen() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             {[
               { label: 'Users', value: query.data.totalUsers },
-              { label: 'Creators', value: query.data.totalCreators },
+              { label: 'Content Creators', value: query.data.totalCreators },
               { label: 'Active lives', value: query.data.activeLiveSessions },
               { label: 'Pending payouts', value: query.data.pendingPayouts },
             ].map((stat) => (
@@ -53,7 +49,7 @@ export function StaffDashboardScreen() {
               Risk and moderation
             </Text>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
-              Flagged content: {query.data.flaggedContent} | Suspicious payments: {query.data.suspiciousPayments} | Approvals pending: {query.data.creatorApprovals}
+              Flagged content: {query.data.flaggedContent} | Suspicious payments: {query.data.suspiciousPayments} | Content creator approvals pending: {query.data.creatorApprovals}
             </Text>
           </Surface>
           <Surface>
