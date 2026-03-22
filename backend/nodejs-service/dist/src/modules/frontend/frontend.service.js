@@ -653,14 +653,15 @@ class FrontendService {
         if (!user?.creatorProfile) {
             throw new app_error_1.AppError("Creator profile not found.", 404);
         }
-        const [wallet, ledger] = await Promise.all([
+        const [wallet, ledger, managedContent] = await Promise.all([
             this.javaFinanceClient.getWalletSummary(actor.userId).catch(() => ({
                 currency: env_1.env.DEFAULT_CURRENCY,
                 pendingBalance: 0,
                 availableBalance: 0,
                 lifetimeCreatorEarnings: 0
             })),
-            this.javaFinanceClient.getWalletLedger(actor.userId).catch(() => [])
+            this.javaFinanceClient.getWalletLedger(actor.userId).catch(() => []),
+            this.getManagedContent({ creatorId: actor.userId })
         ]);
         return {
             wallet: {
@@ -679,7 +680,8 @@ class FrontendService {
                 currency: env_1.env.DEFAULT_CURRENCY,
                 status: "paid",
                 createdAt: String(entry.createdAt ?? new Date().toISOString())
-            })))
+            }))),
+            managedContent
         };
     }
     async getAdminDashboard() {
@@ -687,7 +689,7 @@ class FrontendService {
         const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         const fromDate = from.toISOString().slice(0, 10);
         const toDate = to.toISOString().slice(0, 10);
-        const [totalUsers, totalCreators, activeLiveSessions, revenue, commission, creatorApprovals, flaggedContent, suspiciousPayments] = await Promise.all([
+        const [totalUsers, totalCreators, activeLiveSessions, revenue, commission, creatorApprovals, flaggedContent, suspiciousPayments, managedContent] = await Promise.all([
             this.db.user.count(),
             this.db.creatorProfile.count(),
             this.db.liveSession.count({
@@ -708,7 +710,8 @@ class FrontendService {
                 where: {
                     riskScore: { gte: 70 }
                 }
-            })
+            }),
+            this.getManagedContent()
         ]);
         return {
             totalUsers,
@@ -719,7 +722,8 @@ class FrontendService {
             pendingPayouts: 0,
             creatorApprovals,
             flaggedContent,
-            suspiciousPayments
+            suspiciousPayments,
+            managedContent
         };
     }
     async getNotifications(actor) {
@@ -997,6 +1001,88 @@ class FrontendService {
         ]);
         return new Map(grants.map((item) => [item.id, titleByTargetId.get(item.targetId) ?? "Access purchase"]));
     }
+    async getManagedContent(options = {}) {
+        const limit = options.limit ?? 12;
+        const creatorFilter = options.creatorId ? { creatorId: options.creatorId } : {};
+        const [lives, content, classes] = await Promise.all([
+            this.db.liveSession.findMany({
+                where: creatorFilter,
+                include: {
+                    creator: {
+                        include: { creatorProfile: true }
+                    },
+                    category: true
+                },
+                orderBy: { createdAt: "desc" },
+                take: limit
+            }),
+            this.db.premiumContent.findMany({
+                where: creatorFilter,
+                include: {
+                    creator: {
+                        include: { creatorProfile: true }
+                    },
+                    category: true
+                },
+                orderBy: { createdAt: "desc" },
+                take: limit
+            }),
+            this.db.learningClass.findMany({
+                where: creatorFilter,
+                include: {
+                    creator: {
+                        include: { creatorProfile: true }
+                    },
+                    category: true
+                },
+                orderBy: { createdAt: "desc" },
+                take: limit
+            })
+        ]);
+        const items = [
+            ...lives.map((item) => ({
+                id: item.id,
+                kind: "live",
+                title: item.title,
+                price: toNumber(item.price),
+                currency: item.currency,
+                status: item.status,
+                category: normalizeCategorySlug(item.category?.slug ?? item.category?.name),
+                creatorName: this.getCreatorDisplayName(item.creator),
+                createdAt: item.createdAt.toISOString(),
+                scheduleLabel: item.scheduledFor ? formatScheduleLabel(item.scheduledFor) : undefined,
+                deliveryLabel: this.getLiveDeliveryLabel(item.roomMetadata)
+            })),
+            ...content.map((item) => ({
+                id: item.id,
+                kind: "content",
+                title: item.title,
+                price: toNumber(item.price),
+                currency: item.currency,
+                status: item.status,
+                category: normalizeCategorySlug(item.category?.slug ?? item.category?.name),
+                creatorName: this.getCreatorDisplayName(item.creator),
+                createdAt: item.createdAt.toISOString(),
+                deliveryLabel: "Premium content"
+            })),
+            ...classes.map((item) => ({
+                id: item.id,
+                kind: "class",
+                title: item.title,
+                price: toNumber(item.price),
+                currency: item.currency,
+                status: item.status,
+                category: normalizeCategorySlug(item.category?.slug ?? item.category?.name),
+                creatorName: this.getCreatorDisplayName(item.creator),
+                createdAt: item.createdAt.toISOString(),
+                scheduleLabel: formatScheduleLabel(item.startsAt, item.endsAt),
+                deliveryLabel: "Structured class"
+            }))
+        ]
+            .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
+            .slice(0, limit);
+        return listResponse(items);
+    }
     async loadCreatorReviewStats(creatorIds) {
         if (!creatorIds.length) {
             return new Map();
@@ -1023,6 +1109,20 @@ class FrontendService {
                 reviewCount: item._count._all
             }
         ]));
+    }
+    getCreatorDisplayName(user) {
+        return user.creatorProfile?.displayName ?? `${user.firstName} ${user.lastName}`.trim();
+    }
+    getLiveDeliveryLabel(roomMetadata) {
+        const metadata = roomMetadata ?? {};
+        const sessionType = typeof metadata.sessionType === "string" ? metadata.sessionType : "video";
+        if (sessionType === "audio") {
+            return "Audio live";
+        }
+        if (sessionType === "both") {
+            return "Audio + video live";
+        }
+        return "Video live";
     }
     async toLiveSummaries(lives, actorUserId) {
         const liveIds = lives.map((item) => item.id);

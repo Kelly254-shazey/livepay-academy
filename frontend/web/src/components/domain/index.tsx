@@ -2,6 +2,7 @@ import type {
   ClassSummary,
   CreatorSummary,
   LiveSessionSummary,
+  ManagedContentRecord,
   NotificationRecord,
   PremiumContentSummary,
   TransactionRecord,
@@ -127,6 +128,50 @@ export function WalletSummaryCards({ wallet }: { wallet: WalletSummary }) {
         <p className="text-xs uppercase tracking-[0.18em] text-muted">Lifetime</p>
         <p className="mt-2 text-3xl font-semibold">{formatCurrency(wallet.lifetimeEarnings, wallet.currency)}</p>
       </Card>
+    </div>
+  );
+}
+
+export function ManagedContentGrid({
+  items,
+  emptyTitle,
+  emptyBody,
+  showCreator = false,
+}: {
+  items: ManagedContentRecord[];
+  emptyTitle: string;
+  emptyBody: string;
+  showCreator?: boolean;
+}) {
+  if (!items.length) {
+    return <EmptyState body={emptyBody} title={emptyTitle} />;
+  }
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {items.map((item) => (
+        <Card className="space-y-4" key={`${item.kind}-${item.id}`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={item.kind === 'live' ? 'accent' : item.kind === 'class' ? 'warning' : 'success'}>
+                {item.kind}
+              </Badge>
+              <Badge>{item.status.replace(/_/g, ' ')}</Badge>
+            </div>
+            <span className="text-sm font-medium text-text">{formatCurrency(item.price, item.currency)}</span>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold tracking-[-0.03em]">{item.title}</h3>
+            <p className="text-sm text-muted">{item.deliveryLabel ?? item.category.replace(/-/g, ' ')}</p>
+          </div>
+          <div className="space-y-1 text-sm text-muted">
+            <p>Category: {item.category.replace(/-/g, ' ')}</p>
+            {item.scheduleLabel ? <p>{item.scheduleLabel}</p> : null}
+            {showCreator ? <p>Creator: {item.creatorName}</p> : null}
+            <p>Created: {formatDateTime(item.createdAt)}</p>
+          </div>
+        </Card>
+      ))}
     </div>
   );
 }

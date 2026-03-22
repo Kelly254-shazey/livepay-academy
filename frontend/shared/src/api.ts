@@ -13,6 +13,7 @@ export const apiRoutes = {
   creatorDetail: (id: string) => `/creators/${id}`,
   lives: '/lives',
   liveDetail: (id: string) => `/lives/${id}`,
+  livePublish: (id: string) => `/lives/${id}/publish`,
   liveRoom: (id: string) => `/lives/${id}/room`,
   premiumContent: '/premium-content',
   premiumContentDetail: (id: string) => `/premium-content/${id}`,

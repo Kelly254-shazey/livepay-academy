@@ -17,6 +17,7 @@ const footerLinks = [
 
 export function Navbar() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>(categories[0]?.slug ?? 'education');
   const navigate = useNavigate();
   const session = useSessionStore((state) => state.session);
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
@@ -158,47 +159,49 @@ export function Navbar() {
           </div>
         </div>
 
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1 md:hidden">
-          {session && sessionRoles.length > 1 ? (
-            <div className="flex gap-2 pr-2">
-              {sessionRoles.map((role) => (
-                <button
-                  key={role}
-                  className={cx(
-                    'whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] backdrop-blur-xl transition',
-                    session.user.role === role
-                      ? 'border-white/55 bg-white/45 text-text'
-                      : 'border-white/35 bg-white/25 text-muted',
-                  )}
-                  onClick={() => switchRole(role)}
-                  type="button"
-                >
-                  {roleLabel(role)}
-                </button>
-              ))}
+        <div className="mt-4 rounded-[24px] border border-white/25 bg-white/18 px-4 py-3 backdrop-blur-xl">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-muted">Browse categories</p>
+              <p className="text-sm text-muted">Choose a category from one menu instead of scanning a long list.</p>
             </div>
-          ) : null}
-          {categories.map((category) => (
-            <Link
-              key={category.slug}
-              className="whitespace-nowrap rounded-full border border-white/35 bg-white/25 px-3 py-1.5 text-xs font-medium text-muted backdrop-blur-xl transition hover:border-white/50 hover:bg-white/35 hover:text-text"
-              to={`/categories/${category.slug}`}
-            >
-              {category.title}
-            </Link>
-          ))}
-        </div>
-
-        <div className="mt-4 hidden gap-2 overflow-x-auto pb-1 md:flex">
-          {categories.map((category) => (
-            <Link
-              key={category.slug}
-              className="whitespace-nowrap rounded-full border border-white/35 bg-white/25 px-3 py-1.5 text-xs font-medium text-muted backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/50 hover:bg-white/35 hover:text-text"
-              to={`/categories/${category.slug}`}
-            >
-              {category.title}
-            </Link>
-          ))}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {session && sessionRoles.length > 1 ? (
+                <div className="flex gap-2 overflow-x-auto">
+                  {sessionRoles.map((role) => (
+                    <button
+                      key={role}
+                      className={cx(
+                        'whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] backdrop-blur-xl transition',
+                        session.user.role === role
+                          ? 'border-white/55 bg-white/45 text-text'
+                          : 'border-white/35 bg-white/25 text-muted',
+                      )}
+                      onClick={() => switchRole(role)}
+                      type="button"
+                    >
+                      {roleLabel(role)}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <select
+                aria-label="Choose category"
+                className="min-w-[220px] rounded-full border border-white/35 bg-white/25 px-4 py-2.5 text-sm text-text shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] outline-none backdrop-blur-xl transition focus:border-white/55 focus:bg-white/35"
+                onChange={(event) => setSelectedCategory(event.target.value)}
+                value={selectedCategory}
+              >
+                {categories.map((category) => (
+                  <option key={category.slug} value={category.slug}>
+                    {category.title}
+                  </option>
+                ))}
+              </select>
+              <Button onClick={() => navigate(`/categories/${selectedCategory}`)} size="sm">
+                Open category
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </header>

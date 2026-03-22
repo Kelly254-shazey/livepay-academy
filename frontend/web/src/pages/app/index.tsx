@@ -1,12 +1,13 @@
 import { calculateCommission, categories, formatCurrency, platformCommissionRate } from '@livegate/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { AppShell, PageFrame } from '@/components/layout';
 import {
+  ManagedContentGrid,
   NotificationsPanel,
   TransactionTable,
   WalletSummaryCards,
@@ -301,18 +302,80 @@ function ProfileSettingsPanel({ mode }: { mode: 'viewer' | 'creator' }) {
 }
 
 function CreatorLiveStudioPanel() {
+  const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [schedule, setSchedule] = useState('');
   const [category, setCategory] = useState<string>(categories[0]?.slug ?? 'education');
+  const [sessionType, setSessionType] = useState<'audio' | 'video' | 'both'>('video');
   const [accessMode, setAccessMode] = useState<'paid' | 'free'>('paid');
   const [visibility, setVisibility] = useState<'public' | 'followers' | 'private'>('public');
   const [price, setPrice] = useState('45');
+  const [hostNotes, setHostNotes] = useState('');
   const [message, setMessage] = useState<{ tone: 'default' | 'danger'; title: string; body: string } | null>(null);
+  const [createdSession, setCreatedSession] = useState<{
+    status: 'draft' | 'published';
+    title: string;
+    scheduleLabel: string;
+    accessPolicy: string;
+    deliveryLabel: string;
+  } | null>(null);
 
   const normalizedPrice = accessMode === 'paid' ? Number(price || 0) : 0;
   const commission = normalizedPrice > 0 ? calculateCommission(normalizedPrice) : 0;
   const creatorNet = normalizedPrice > 0 ? normalizedPrice - commission : 0;
+  const sessionTypeLabel =
+    sessionType === 'audio' ? 'Audio live' : sessionType === 'both' ? 'Audio + video live' : 'Video live';
+  const accessPolicy =
+    accessMode === 'paid'
+      ? 'Users must pay before LiveGate grants room access.'
+      : visibility === 'private'
+        ? 'Private sessions still require invite-driven access.'
+        : 'This session is free to join once visible.';
+  const createLiveMutation = useMutation({
+    mutationFn: (status: 'draft' | 'published') =>
+      webApi.createLiveSession({
+        categorySlug: category,
+        title: title.trim(),
+        description: description.trim(),
+        price: normalizedPrice,
+        currency: 'USD',
+        isPaid: accessMode === 'paid',
+        visibility,
+        scheduledFor: schedule ? new Date(schedule).toISOString() : undefined,
+        sessionType,
+        hostNotes: hostNotes.trim() || undefined,
+        status,
+      }),
+    onSuccess: async (_result, status) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['creator-dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ['home-feed'] }),
+      ]);
+      setMessage({
+        tone: 'default',
+        title: status === 'published' ? 'Live saved and published' : 'Live saved as draft',
+        body:
+          status === 'published'
+            ? 'The live session is now stored with pricing, format, and access settings.'
+            : 'The live session is now stored for later review and publishing.',
+      });
+      setCreatedSession({
+        status,
+        title: title.trim(),
+        scheduleLabel: schedule || 'No schedule entered yet',
+        accessPolicy,
+        deliveryLabel: sessionTypeLabel,
+      });
+    },
+    onError: (error) => {
+      setMessage({
+        tone: 'danger',
+        title: 'Live save failed',
+        body: (error as Error).message,
+      });
+    },
+  });
 
   const save = (status: 'draft' | 'published') => {
     if (title.trim().length < 5) {
@@ -329,7 +392,7 @@ function CreatorLiveStudioPanel() {
       return;
     }
 
-    if (schedule.trim().length < 6) {
+    if (!schedule) {
       setMessage({ tone: 'danger', title: 'Schedule missing', body: 'Add a visible start time or schedule label.' });
       return;
     }
@@ -343,20 +406,13 @@ function CreatorLiveStudioPanel() {
       return;
     }
 
-    setMessage({
-      tone: 'default',
-      title: status === 'published' ? 'Live prepared for publishing' : 'Live saved as draft',
-      body:
-        status === 'published'
-          ? 'This preview confirms the session structure, pricing, and access posture.'
-          : 'The live configuration is ready for further review before publishing.',
-    });
+    createLiveMutation.mutate(status);
   };
 
   return (
     <Card className="space-y-5">
       <SectionTitle
-        body="Plan the session structure, pricing, and access model before viewers see it. This keeps paid access and live visibility clear on web too."
+        body="Create a real live session with audio, video, or both, then store the title, pricing, access rules, and host notes in the studio inventory."
         title="Live studio"
       />
       <div className="grid gap-4 md:grid-cols-2">
@@ -374,7 +430,7 @@ function CreatorLiveStudioPanel() {
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Schedule</label>
-          <Input onChange={(event) => setSchedule(event.target.value)} placeholder="March 29, 7:00 PM EAT" value={schedule} />
+          <Input onChange={(event) => setSchedule(event.target.value)} type="datetime-local" value={schedule} />
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Category</label>
@@ -390,6 +446,20 @@ function CreatorLiveStudioPanel() {
               </option>
             ))}
           </select>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Broadcast format</label>
+          <div className="flex flex-wrap gap-2">
+            {([
+              ['video', 'Video live'],
+              ['audio', 'Audio live'],
+              ['both', 'Audio + video'],
+            ] as const).map(([value, label]) => (
+              <Button key={value} onClick={() => setSessionType(value)} type="button" variant={sessionType === value ? 'primary' : 'secondary'}>
+                {label}
+              </Button>
+            ))}
+          </div>
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Access model</label>
@@ -417,6 +487,14 @@ function CreatorLiveStudioPanel() {
             <Input onChange={(event) => setPrice(event.target.value)} placeholder="45" type="number" value={price} />
           </div>
         ) : null}
+        <div className="space-y-2 md:col-span-2">
+          <label className="text-sm font-medium">Host notes</label>
+          <Textarea
+            onChange={(event) => setHostNotes(event.target.value)}
+            placeholder="Optional notes for co-hosts, moderators, or production setup."
+            value={hostNotes}
+          />
+        </div>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard detail="Total shown to buyers at checkout." label="Price" value={formatCurrency(normalizedPrice || 0)} />
@@ -430,21 +508,28 @@ function CreatorLiveStudioPanel() {
           {description || 'Add a fuller description so buyers understand what they are joining.'}
         </p>
         <p className="mt-3 text-sm text-muted">Category: {categories.find((item) => item.slug === category)?.title ?? category}</p>
+        <p className="mt-1 text-sm text-muted">Format: {sessionTypeLabel}</p>
         <p className="mt-1 text-sm text-muted">Schedule: {schedule || 'No schedule entered yet'}</p>
-        <p className="mt-1 text-sm text-muted">
-          {accessMode === 'paid'
-            ? 'Users must pay before LiveGate grants room access.'
-            : visibility === 'private'
-              ? 'Private sessions still require invite-driven access.'
-              : 'This session is free to join once visible.'}
-        </p>
+        <p className="mt-1 text-sm text-muted">{accessPolicy}</p>
+        {hostNotes.trim() ? <p className="mt-1 text-sm text-muted">Host note: {hostNotes.trim()}</p> : null}
       </div>
       {message ? <InlineNotice body={message.body} title={message.title} tone={message.tone} /> : null}
+      {createdSession ? (
+        <div className="rounded-[24px] border border-white/35 bg-white/18 p-4 backdrop-blur-xl">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted">
+            {createdSession.status === 'published' ? 'Published live' : 'Draft live'}
+          </p>
+          <p className="mt-2 text-lg font-semibold">{createdSession.title}</p>
+          <p className="mt-1 text-sm text-muted">{createdSession.deliveryLabel}</p>
+          <p className="mt-1 text-sm text-muted">{createdSession.scheduleLabel}</p>
+          <p className="mt-1 text-sm text-muted">{createdSession.accessPolicy}</p>
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-3">
-        <Button onClick={() => save('published')} type="button">
-          Publish preview
+        <Button disabled={createLiveMutation.isPending} onClick={() => save('published')} type="button">
+          {createLiveMutation.isPending ? 'Saving...' : 'Publish live'}
         </Button>
-        <Button onClick={() => save('draft')} type="button" variant="secondary">
+        <Button disabled={createLiveMutation.isPending} onClick={() => save('draft')} type="button" variant="secondary">
           Save draft
         </Button>
       </div>
@@ -620,6 +705,17 @@ export function CreatorDashboardPage() {
               value={formatCurrency(calculateCommission(query.data.wallet.lifetimeEarnings), query.data.wallet.currency)}
             />
           </div>
+          <Card className="space-y-4">
+            <SectionTitle
+              body="Every live, premium content item, and class created in the studio stays visible here with pricing and current status."
+              title="Studio inventory"
+            />
+            <ManagedContentGrid
+              emptyBody="Create your first live, premium content item, or class to populate the studio inventory."
+              emptyTitle="No studio inventory yet"
+              items={query.data.managedContent.items}
+            />
+          </Card>
           <TransactionTable items={query.data.recentTransactions.items} />
           <Card className="space-y-4">
             <SectionTitle
@@ -787,6 +883,18 @@ export function AdminDashboardPage() {
                 </Card>
               </div>
             </div>
+            <Card className="space-y-4">
+              <SectionTitle
+                body="Every created live, premium content item, and class appears here with the creator-set price so admins and moderators can review it after creation."
+                title="Created content and pricing"
+              />
+              <ManagedContentGrid
+                emptyBody="Created lives, premium content, and classes will appear here once creators begin publishing."
+                emptyTitle="No managed content yet"
+                items={query.data.managedContent.items}
+                showCreator
+              />
+            </Card>
           </>
         ) : null}
       </div>

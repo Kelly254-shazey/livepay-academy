@@ -18,6 +18,7 @@ import type {
   LiveSessionDetailPayload,
   LiveSessionSummary,
   NotificationRecord,
+  ManagedContentRecord,
   ProfileSettingsPayload,
   PremiumContentDetailPayload,
   PremiumContentSummary,
@@ -280,6 +281,72 @@ const creatorWallet: WalletSummary = {
   lifetimeEarnings: 12940,
   currency: 'USD',
 };
+
+const managedContent: ManagedContentRecord[] = [
+  {
+    id: liveSessions[0].id,
+    kind: 'live',
+    title: liveSessions[0].title,
+    price: liveSessions[0].price,
+    currency: 'USD',
+    status: liveSessions[0].isLive ? 'live' : 'scheduled',
+    category: liveSessions[0].category,
+    creatorName: liveSessions[0].creator.displayName,
+    createdAt: '2026-03-20T09:30:00.000Z',
+    scheduleLabel: 'Starts Mar 22, 2026',
+    deliveryLabel: 'Video live',
+  },
+  {
+    id: liveSessions[1].id,
+    kind: 'live',
+    title: liveSessions[1].title,
+    price: liveSessions[1].price,
+    currency: 'USD',
+    status: 'scheduled',
+    category: liveSessions[1].category,
+    creatorName: liveSessions[1].creator.displayName,
+    createdAt: '2026-03-19T14:00:00.000Z',
+    scheduleLabel: 'Starts Mar 24, 2026',
+    deliveryLabel: 'Audio live',
+  },
+  {
+    id: premiumContent[0].id,
+    kind: 'content',
+    title: premiumContent[0].title,
+    price: premiumContent[0].price,
+    currency: 'USD',
+    status: 'published',
+    category: premiumContent[0].category,
+    creatorName: premiumContent[0].creator.displayName,
+    createdAt: '2026-03-18T11:00:00.000Z',
+    deliveryLabel: 'Video content',
+  },
+  {
+    id: premiumContent[2].id,
+    kind: 'content',
+    title: premiumContent[2].title,
+    price: premiumContent[2].price,
+    currency: 'USD',
+    status: 'published',
+    category: premiumContent[2].category,
+    creatorName: premiumContent[2].creator.displayName,
+    createdAt: '2026-03-17T08:45:00.000Z',
+    deliveryLabel: 'Audio content',
+  },
+  {
+    id: classes[0].id,
+    kind: 'class',
+    title: classes[0].title,
+    price: classes[0].price,
+    currency: 'USD',
+    status: 'published',
+    category: classes[0].category,
+    creatorName: classes[0].creator.displayName,
+    createdAt: '2026-03-16T10:15:00.000Z',
+    scheduleLabel: classes[0].scheduleLabel,
+    deliveryLabel: 'Structured class',
+  },
+];
 
 export const demoParticipants: DemoParticipant[] = [
   {
@@ -566,6 +633,7 @@ export function getDemoCreatorDashboard(): CreatorDashboardPayload {
     followers: 12880,
     verificationStatus: 'verified',
     recentTransactions: listResponse(creatorTransactions),
+    managedContent: listResponse(managedContent.filter((item) => item.creatorName === creators[0].displayName)),
   };
 }
 
@@ -580,6 +648,7 @@ export function getDemoAdminDashboard(): AdminDashboardPayload {
     creatorApprovals: 24,
     flaggedContent: 7,
     suspiciousPayments: 3,
+    managedContent: listResponse(managedContent),
   };
 }
 

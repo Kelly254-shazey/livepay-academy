@@ -2,6 +2,7 @@ import type {
   AdminDashboardPayload,
   ApiListResponse,
   AuthSession,
+  CategoryRecord,
   CategoryDetailPayload,
   CheckoutSummary,
   ClassDetailPayload,
@@ -21,6 +22,7 @@ import type {
 } from '@livegate/shared';
 import {
   apiRoutes,
+  categories,
   createDemoCheckout,
   forgotPasswordDemo,
   getDemoAdminDashboard,
@@ -45,6 +47,31 @@ import {
 } from '@livegate/shared';
 import { http } from './http';
 import { useSessionStore } from '@/store/session-store';
+
+type CreateLiveSessionInput = {
+  categorySlug: string;
+  title: string;
+  description?: string;
+  price: number;
+  currency?: string;
+  isPaid: boolean;
+  visibility: 'public' | 'followers' | 'private';
+  scheduledFor?: string;
+  sessionType: 'audio' | 'video' | 'both';
+  hostNotes?: string;
+  status: 'draft' | 'published';
+};
+
+async function resolveCategoryId(categorySlug: string) {
+  const catalog = await http<CategoryRecord[]>(apiRoutes.categories, { authenticated: false });
+  const category = catalog.find((item) => item.slug === categorySlug);
+
+  if (!category) {
+    throw new Error('Selected category is unavailable. Refresh the page and try again.');
+  }
+
+  return category.id;
+}
 
 async function withDemoFallback<T>(run: () => Promise<T>, fallback: () => T | Promise<T>) {
   try {
@@ -85,6 +112,18 @@ export const webApi = {
     }), resetPasswordDemo),
   getHomeFeed: () =>
     withDemoFallback(() => http<HomeFeedPayload>(apiRoutes.home, { authenticated: false }), getDemoHomeFeed),
+  getCategoryCatalog: () =>
+    withDemoFallback(
+      () => http<CategoryRecord[]>(apiRoutes.categories, { authenticated: false }),
+      () =>
+        categories.map((item) => ({
+          id: item.slug,
+          slug: item.slug,
+          name: item.title,
+          description: item.shortDescription,
+          status: 'active' as const,
+        })),
+    ),
   getCategoryDetail: (slug: string) =>
     withDemoFallback(
       () => http<CategoryDetailPayload>(apiRoutes.categoryDetail(slug), { authenticated: false }),
@@ -156,6 +195,34 @@ export const webApi = {
       () => http<{ message: string }>(apiRoutes.creatorPayouts, { method: 'POST', body }),
       () => requestDemoPayout(body),
     ),
+  createLiveSession: async (body: CreateLiveSessionInput) => {
+    const categoryId = await resolveCategoryId(body.categorySlug);
+    const created = await http<{ id: string; title: string; status: string }>(apiRoutes.lives, {
+      method: 'POST',
+      body: {
+        categoryId,
+        title: body.title,
+        description: body.description,
+        price: body.isPaid ? body.price : 0,
+        currency: body.currency ?? 'USD',
+        isPaid: body.isPaid,
+        visibility: body.visibility === 'followers' ? 'followers_only' : body.visibility,
+        scheduledFor: body.scheduledFor,
+        roomMetadata: {
+          sessionType: body.sessionType,
+          hostNotes: body.hostNotes ? [body.hostNotes] : [],
+        },
+      },
+    });
+
+    if (body.status === 'published') {
+      return http<{ id: string; title: string; status: string }>(apiRoutes.livePublish(created.id), {
+        method: 'POST',
+      });
+    }
+
+    return created;
+  },
   getProfileSettings: () =>
     withDemoFallback(
       () => http<ProfileSettingsPayload>(apiRoutes.profileSettings),

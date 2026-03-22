@@ -207,6 +207,30 @@ export interface WalletSummary {
   currency: string;
 }
 
+export type ManagedContentKind = 'live' | 'content' | 'class';
+
+export interface ManagedContentRecord {
+  id: string;
+  kind: ManagedContentKind;
+  title: string;
+  price: number;
+  currency: string;
+  status: string;
+  category: CategorySlug;
+  creatorName: string;
+  createdAt: string;
+  scheduleLabel?: string;
+  deliveryLabel?: string;
+}
+
+export interface CategoryRecord {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  status?: 'active' | 'archived';
+}
+
 export interface ViewerDashboardPayload {
   purchasedLives: ApiListResponse<LiveSessionSummary>;
   purchasedContent: ApiListResponse<PremiumContentSummary>;
@@ -220,6 +244,7 @@ export interface CreatorDashboardPayload {
   followers: number;
   verificationStatus: VerificationStatus;
   recentTransactions: ApiListResponse<TransactionRecord>;
+  managedContent: ApiListResponse<ManagedContentRecord>;
 }
 
 export interface AdminDashboardPayload {
@@ -232,6 +257,7 @@ export interface AdminDashboardPayload {
   creatorApprovals: number;
   flaggedContent: number;
   suspiciousPayments: number;
+  managedContent: ApiListResponse<ManagedContentRecord>;
 }
 
 export interface NotificationRecord {

@@ -769,14 +769,15 @@ export class FrontendService {
       throw new AppError("Creator profile not found.", 404);
     }
 
-    const [wallet, ledger] = await Promise.all([
+    const [wallet, ledger, managedContent] = await Promise.all([
       this.javaFinanceClient.getWalletSummary(actor.userId).catch(() => ({
         currency: env.DEFAULT_CURRENCY,
         pendingBalance: 0,
         availableBalance: 0,
         lifetimeCreatorEarnings: 0
       })),
-      this.javaFinanceClient.getWalletLedger(actor.userId).catch(() => [])
+      this.javaFinanceClient.getWalletLedger(actor.userId).catch(() => []),
+      this.getManagedContent({ creatorId: actor.userId })
     ]);
 
     return {
@@ -798,7 +799,8 @@ export class FrontendService {
           status: "paid",
           createdAt: String(entry.createdAt ?? new Date().toISOString())
         }))
-      )
+      ),
+      managedContent
     };
   }
 
@@ -808,7 +810,7 @@ export class FrontendService {
     const fromDate = from.toISOString().slice(0, 10);
     const toDate = to.toISOString().slice(0, 10);
 
-    const [totalUsers, totalCreators, activeLiveSessions, revenue, commission, creatorApprovals, flaggedContent, suspiciousPayments] = await Promise.all([
+    const [totalUsers, totalCreators, activeLiveSessions, revenue, commission, creatorApprovals, flaggedContent, suspiciousPayments, managedContent] = await Promise.all([
       this.db.user.count(),
       this.db.creatorProfile.count(),
       this.db.liveSession.count({
@@ -829,7 +831,8 @@ export class FrontendService {
         where: {
           riskScore: { gte: 70 }
         }
-      })
+      }),
+      this.getManagedContent()
     ]);
 
     return {
@@ -841,7 +844,8 @@ export class FrontendService {
       pendingPayouts: 0,
       creatorApprovals,
       flaggedContent,
-      suspiciousPayments
+      suspiciousPayments,
+      managedContent
     };
   }
 
@@ -1149,6 +1153,92 @@ export class FrontendService {
     return new Map(grants.map((item) => [item.id, titleByTargetId.get(item.targetId) ?? "Access purchase"]));
   }
 
+  private async getManagedContent(options: { creatorId?: string; limit?: number } = {}) {
+    const limit = options.limit ?? 12;
+    const creatorFilter = options.creatorId ? { creatorId: options.creatorId } : {};
+
+    const [lives, content, classes] = await Promise.all([
+      this.db.liveSession.findMany({
+        where: creatorFilter,
+        include: {
+          creator: {
+            include: { creatorProfile: true }
+          },
+          category: true
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit
+      }),
+      this.db.premiumContent.findMany({
+        where: creatorFilter,
+        include: {
+          creator: {
+            include: { creatorProfile: true }
+          },
+          category: true
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit
+      }),
+      this.db.learningClass.findMany({
+        where: creatorFilter,
+        include: {
+          creator: {
+            include: { creatorProfile: true }
+          },
+          category: true
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit
+      })
+    ]);
+
+    const items = [
+      ...lives.map((item) => ({
+        id: item.id,
+        kind: "live" as const,
+        title: item.title,
+        price: toNumber(item.price),
+        currency: item.currency,
+        status: item.status,
+        category: normalizeCategorySlug(item.category?.slug ?? item.category?.name),
+        creatorName: this.getCreatorDisplayName(item.creator),
+        createdAt: item.createdAt.toISOString(),
+        scheduleLabel: item.scheduledFor ? formatScheduleLabel(item.scheduledFor) : undefined,
+        deliveryLabel: this.getLiveDeliveryLabel(item.roomMetadata)
+      })),
+      ...content.map((item) => ({
+        id: item.id,
+        kind: "content" as const,
+        title: item.title,
+        price: toNumber(item.price),
+        currency: item.currency,
+        status: item.status,
+        category: normalizeCategorySlug(item.category?.slug ?? item.category?.name),
+        creatorName: this.getCreatorDisplayName(item.creator),
+        createdAt: item.createdAt.toISOString(),
+        deliveryLabel: "Premium content"
+      })),
+      ...classes.map((item) => ({
+        id: item.id,
+        kind: "class" as const,
+        title: item.title,
+        price: toNumber(item.price),
+        currency: item.currency,
+        status: item.status,
+        category: normalizeCategorySlug(item.category?.slug ?? item.category?.name),
+        creatorName: this.getCreatorDisplayName(item.creator),
+        createdAt: item.createdAt.toISOString(),
+        scheduleLabel: formatScheduleLabel(item.startsAt, item.endsAt),
+        deliveryLabel: "Structured class"
+      }))
+    ]
+      .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
+      .slice(0, limit);
+
+    return listResponse(items);
+  }
+
   private async loadCreatorReviewStats(creatorIds: string[]) {
     if (!creatorIds.length) {
       return new Map<string, CreatorReviewStats>();
@@ -1179,6 +1269,25 @@ export class FrontendService {
         }
       ])
     );
+  }
+
+  private getCreatorDisplayName(user: { firstName: string; lastName: string; creatorProfile?: { displayName?: string | null } | null }) {
+    return user.creatorProfile?.displayName ?? `${user.firstName} ${user.lastName}`.trim();
+  }
+
+  private getLiveDeliveryLabel(roomMetadata: unknown) {
+    const metadata = (roomMetadata as Record<string, unknown> | null) ?? {};
+    const sessionType = typeof metadata.sessionType === "string" ? metadata.sessionType : "video";
+
+    if (sessionType === "audio") {
+      return "Audio live";
+    }
+
+    if (sessionType === "both") {
+      return "Audio + video live";
+    }
+
+    return "Video live";
   }
 
   private async toLiveSummaries(lives: LiveRecord[], actorUserId?: string) {

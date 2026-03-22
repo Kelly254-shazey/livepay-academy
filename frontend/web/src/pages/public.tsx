@@ -10,7 +10,6 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { HeroPanel, PageFrame } from '@/components/layout';
 import {
-  CategoryPill,
   ClassCard,
   ContentCard,
   CreatorCard,
@@ -49,7 +48,7 @@ const publicModes = [
 const launchFlow = [
   {
     title: 'Discover with intention',
-    body: 'Browse by category, creator, or recommendation with pricing and access state visible early.',
+    body: 'Choose a category from the menu, compare creators cleanly, and see pricing before you commit.',
   },
   {
     title: 'Pay before access',
@@ -58,21 +57,6 @@ const launchFlow = [
   {
     title: 'Switch roles cleanly',
     body: 'One account can act as viewer and creator, while staff access stays off the public path.',
-  },
-] as const;
-
-const appHighlights = [
-  {
-    title: 'Join paid lives on the move',
-    body: 'Live reminders, room access, and wallet history stay easier to act on from the app.',
-  },
-  {
-    title: 'Run creator operations from your pocket',
-    body: 'Create live sessions, check payouts, and review library inventory without waiting for a desktop session.',
-  },
-  {
-    title: 'Keep the full product synced',
-    body: 'Web stays excellent for browsing and depth, while the app keeps time-sensitive actions within reach.',
   },
 ] as const;
 
@@ -162,22 +146,19 @@ export function LandingPage() {
                     </Button>
                   </Link>
                 </div>
-                <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-[0.12em] text-muted">📱 Also available on mobile</p>
-                  <div className="flex flex-wrap gap-2">
+                <div className="rounded-[24px] border border-white/35 bg-white/18 p-4 backdrop-blur-xl">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted">Mobile access</p>
+                  <p className="mt-2 text-sm leading-6 text-muted">
+                    Live reminders, room entry, and creator controls stay visible on mobile, so the app awareness remains in the hero where it belongs.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
                     <a href="https://apps.apple.com/app/livegate" target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="secondary" className="gap-2">
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M17.05 13.5c-.02-2.22 1.82-3.28 1.84-3.3-1-1.46-2.54-1.66-3.09-1.68-1.31-.14-2.56.78-3.22.78-.64 0-1.63-.76-2.68-.73-1.38.03-2.65.8-3.36 2.03-.143.247-.267.505-.37.77-.752 2.289-.204 5.258 1.4 6.982.94 1.37 2.07 2.85 3.56 2.8 1.44-.05 1.99-.94 3.74-.94 1.74 0 2.26.94 3.76.91 1.55-.03 2.53-1.39 3.46-2.76.966-1.436 1.41-2.94 1.44-3.02-.03-.02-3.03-1.17-3.06-4.63z"/>
-                        </svg>
+                      <Button size="sm" variant="secondary">
                         App Store
                       </Button>
                     </a>
                     <a href="https://play.google.com/store/apps/details?id=com.livegate" target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="secondary" className="gap-2">
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M3 13.5v8.5c0 1.1.9 2 2 2h4v-6h3v6h4c1.1 0 2-.9 2-2v-8.5M6.5 1.5h11c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2h-11c-1.1 0-2-.9-2-2v-4c0-1.1.9-2 2-2z"/>
-                        </svg>
+                      <Button size="sm" variant="secondary">
                         Play Store
                       </Button>
                     </a>
@@ -186,7 +167,7 @@ export function LandingPage() {
               </div>
             }
             body="LiveGate is a premium product for paid live sessions, locked content, structured classes, and serious creator monetization across education, business, trading, mentorship, wellness, and entertainment. Available on web and mobile for seamless access anywhere."
-            eyebrow="Premium live learning • Web & Mobile"
+            eyebrow="Premium live learning | Web and Mobile"
             title="A calmer way to sell expertise, join live sessions, and unlock paid knowledge."
           />
 
@@ -249,9 +230,8 @@ export function LandingPage() {
               <Badge tone="success">AI concierge</Badge>
               <h2 className="text-3xl font-semibold tracking-[-0.05em]">A built-in assistant for orientation, dashboards, and monetization flow.</h2>
               <p className="max-w-3xl text-sm leading-7 text-muted">
-                Both web and mobile now include an AI concierge surface that helps users navigate
-                roles, understand payouts, find dashboards, and orient themselves without adding
-                noisy UI chrome.
+                Both web and mobile include an AI concierge surface that helps users navigate roles,
+                understand payouts, find dashboards, and orient themselves without adding noisy UI chrome.
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
@@ -283,66 +263,6 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
-          <Card className="relative overflow-hidden">
-            <div className="pointer-events-none absolute inset-x-10 top-6 h-28 rounded-full bg-accent/20 blur-3xl" />
-            <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-              <div className="mx-auto flex w-full max-w-[220px] items-center justify-center">
-                <div className="relative h-[430px] w-[220px] rounded-[40px] border border-white/40 bg-[#0f1d1a] p-3 shadow-[0_28px_80px_rgba(7,24,21,0.28)]">
-                  <div className="absolute left-1/2 top-3 h-1.5 w-16 -translate-x-1/2 rounded-full bg-white/20" />
-                  <div className="flex h-full flex-col gap-3 rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(234,252,246,0.98),rgba(216,239,232,0.92))] p-4">
-                    <div className="rounded-[22px] border border-white/60 bg-white/60 p-3 backdrop-blur-xl">
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-muted">LiveGate app</p>
-                      <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-text">Session-ready everywhere</p>
-                      <p className="mt-2 text-xs leading-5 text-muted">Live reminders, checkout clarity, and creator controls built for mobile rhythm.</p>
-                    </div>
-                    <div className="grid gap-3">
-                      <div className="rounded-[22px] border border-white/50 bg-white/55 p-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Upcoming live</p>
-                        <p className="mt-1 font-semibold">Market Breakdown</p>
-                        <p className="text-xs text-muted">$45 access • starts in 45 min</p>
-                      </div>
-                      <div className="rounded-[22px] border border-white/40 bg-white/40 p-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Creator wallet</p>
-                        <p className="mt-1 font-semibold">$1,840 available</p>
-                        <p className="text-xs text-muted">Payouts and pending balance stay visible.</p>
-                      </div>
-                      <div className="rounded-[22px] border border-white/40 bg-accent/12 p-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-accent">AI concierge</p>
-                        <p className="mt-1 text-sm font-semibold text-text">Find the fastest route to your next action.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-5">
-                <SectionTitle
-                  eyebrow="Mobile-first moments"
-                  body="The web experience handles discovery and depth well, but the app is where LiveGate feels fastest for reminders, checkout follow-through, creator operations, and room access."
-                  title="Use the app when timing matters"
-                />
-                <div className="grid gap-3">
-                  {appHighlights.map((item) => (
-                    <div className="rounded-[24px] border border-white/35 bg-white/22 p-4 backdrop-blur-xl" key={item.title}>
-                      <p className="font-semibold tracking-[-0.02em]">{item.title}</p>
-                      <p className="mt-2 text-sm leading-6 text-muted">{item.body}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Link to="/auth/sign-in?demo=demo-hybrid">
-                    <Button>Open the app-ready demo flow</Button>
-                  </Link>
-                  <Link to="/auth/sign-up">
-                    <Button variant="secondary">Create an account for mobile</Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </section>
-
         <section className="space-y-6">
           <SectionTitle
             eyebrow="Demo access"
@@ -352,19 +272,6 @@ export function LandingPage() {
           <div className="grid gap-4 lg:grid-cols-3">
             {publicDemoAccounts.map((participant) => (
               <DemoAccountCard key={participant.id} participant={participant} />
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-6">
-          <SectionTitle
-            eyebrow="Browse"
-            body="Every category stays explicit, so discovery remains legible even as the product grows."
-            title="Built around clear category navigation"
-          />
-          <div className="flex flex-wrap gap-3">
-            {categories.map((category) => (
-              <CategoryPill href={`/categories/${category.slug}`} key={category.slug} title={category.title} />
             ))}
           </div>
         </section>
