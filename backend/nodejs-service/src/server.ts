@@ -8,7 +8,11 @@ import { prisma } from "./infrastructure/db/prisma";
 import { initializeSocket } from "./infrastructure/realtime/socket";
 
 async function start() {
-  await prisma.$connect();
+  try {
+    await prisma.$connect();
+  } catch (error) {
+    logger.warn({ error }, "Database unavailable. Starting LiveGate Node.js service in degraded mode.");
+  }
   await connectRedis();
 
   const app = createApp();
@@ -21,7 +25,7 @@ async function start() {
 
   const shutdown = async () => {
     server.close(async () => {
-      await prisma.$disconnect();
+      await prisma.$disconnect().catch(() => undefined);
       if (redis.isOpen) {
         await redis.quit();
       }

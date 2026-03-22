@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
     environment: str = "development"
     service_name: str = "livegate-python-service"
@@ -14,9 +14,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     internal_api_key: str = "livegate-internal-key"
     cache_ttl_seconds: int = 300
+    log_level: str = "INFO"
 
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

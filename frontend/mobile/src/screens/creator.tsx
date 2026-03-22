@@ -1,5 +1,5 @@
 import type { ProfileSettingsPayload } from '@livegate/shared';
-import { getSessionRoles } from '@livegate/shared';
+import { categories, formatCurrency, getSessionRoles } from '@livegate/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -8,8 +8,24 @@ import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { z } from 'zod';
 import { mobileApi } from '@/api/client';
-import { CategoryChip, NotificationRow, TransactionRow, WalletCards } from '@/components/cards';
-import { Button, EmptyState, Heading, LoadingState, Screen, Surface, TextField } from '@/components/ui';
+import {
+  CategoryChip,
+  ClassCard,
+  ContentCard,
+  LiveCard,
+  NotificationRow,
+  TransactionRow,
+  WalletCards,
+} from '@/components/cards';
+import {
+  Button,
+  EmptyState,
+  Heading,
+  LoadingState,
+  Screen,
+  Surface,
+  TextField,
+} from '@/components/ui';
 import { useSessionStore } from '@/store/session-store';
 
 const payoutSchema = z.object({
@@ -17,6 +33,40 @@ const payoutSchema = z.object({
   method: z.string().min(2),
   note: z.string().optional(),
 });
+
+const appearanceModes = ['system', 'light', 'dark'] as const;
+const visibilityModes = [
+  {
+    value: 'public',
+    title: 'Public',
+    body: 'Visible in discovery and category browse surfaces.',
+  },
+  {
+    value: 'followers',
+    title: 'Followers',
+    body: 'Focused on your existing audience and community.',
+  },
+  {
+    value: 'private',
+    title: 'Private',
+    body: 'Invite-only access with tighter entry control.',
+  },
+] as const;
+const accessModes = [
+  {
+    value: 'paid',
+    title: 'Paid',
+    body: 'Users must pay before LiveGate issues access.',
+  },
+  {
+    value: 'free',
+    title: 'Free',
+    body: 'Open entry while still enforcing room visibility rules.',
+  },
+] as const;
+
+type VisibilityMode = (typeof visibilityModes)[number]['value'];
+type AccessMode = (typeof accessModes)[number]['value'];
 
 function SettingsToggle({
   title,
@@ -33,9 +83,35 @@ function SettingsToggle({
     <Surface style={{ flexBasis: '47%', flexGrow: 1 }}>
       <Text style={{ fontSize: 15, fontWeight: '700', color: '#10211D' }}>{title}</Text>
       <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>{body}</Text>
-      <Button onPress={() => onChange(!value)} title={value ? 'Enabled' : 'Disabled'} variant={value ? 'primary' : 'secondary'} />
+      <Button
+        onPress={() => onChange(!value)}
+        title={value ? 'Enabled' : 'Disabled'}
+        variant={value ? 'primary' : 'secondary'}
+      />
     </Surface>
   );
+}
+
+function SummaryTile({
+  label,
+  value,
+  body,
+}: {
+  label: string;
+  value: string;
+  body: string;
+}) {
+  return (
+    <Surface style={{ flexBasis: '47%', flexGrow: 1 }}>
+      <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>{label}</Text>
+      <Text style={{ fontSize: 24, fontWeight: '700', color: '#10211D' }}>{value}</Text>
+      <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>{body}</Text>
+    </Surface>
+  );
+}
+
+function getCategoryTitle(slug: string) {
+  return categories.find((item) => item.slug === slug)?.title ?? slug.replace(/-/g, ' ');
 }
 
 export function CreatorDashboardScreen() {
@@ -46,6 +122,12 @@ export function CreatorDashboardScreen() {
     queryKey: ['mobile-creator-dashboard'],
     queryFn: mobileApi.getCreatorDashboard,
   });
+  const studioQuery = useQuery({
+    queryKey: ['mobile-creator-studio-feed'],
+    queryFn: mobileApi.getHomeFeed,
+  });
+  const liveCount = studioQuery.data?.trendingLives.length ?? 0;
+  const contentCount = studioQuery.data?.premiumContent.length ?? 0;
 
   return (
     <Screen>
@@ -60,7 +142,7 @@ export function CreatorDashboardScreen() {
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           <Button onPress={() => router.push('/(creator)/create-live')} title="Create live" />
-          <Button onPress={() => router.push('/(creator)/payouts')} title="Request payout" variant="secondary" />
+          <Button onPress={() => router.push('/(creator)/(tabs)/library')} title="Open library" variant="secondary" />
           <Button onPress={() => router.push('/(creator)/(tabs)/assistant')} title="Ask AI concierge" variant="ghost" />
         </View>
         {roles.includes('viewer') ? (
@@ -78,15 +160,27 @@ export function CreatorDashboardScreen() {
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Creator dashboard unavailable" /> : null}
       {query.data ? (
         <>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SummaryTile body="Monetized followers connected to your studio." label="Followers" value={String(query.data.followers)} />
+            <SummaryTile body="Scheduled or live sessions currently in your surface." label="Live inventory" value={String(liveCount)} />
+            <SummaryTile body="Premium content and classes visible in your library." label="Library items" value={String(contentCount + (studioQuery.data?.recommendedClasses.length ?? 0))} />
+            <SummaryTile body="Verification is visible before buyers commit." label="Verification" value={query.data.verificationStatus} />
+          </View>
           <WalletCards wallet={query.data.wallet} />
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Verification</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{query.data.verificationStatus}</Text>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Studio posture</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+              Your creator workspace keeps lives, library items, earnings, and payout actions on one surface so
+              pricing and access remain legible.
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              <Button onPress={() => router.push('/(creator)/create-live')} title="Open live builder" />
+              <Button onPress={() => router.push('/(creator)/payouts')} title="Request payout" variant="secondary" />
+            </View>
           </Surface>
           {query.data.recentTransactions.items.map((item) => (
             <TransactionRow item={item} key={item.id} />
           ))}
-          <Button onPress={() => router.push('/(creator)/payouts')} title="Request payout" />
         </>
       ) : null}
     </Screen>
@@ -94,6 +188,11 @@ export function CreatorDashboardScreen() {
 }
 
 export function CreatorLivesScreen() {
+  const query = useQuery({
+    queryKey: ['mobile-creator-lives'],
+    queryFn: mobileApi.getHomeFeed,
+  });
+
   return (
     <Screen>
       <Heading
@@ -103,15 +202,58 @@ export function CreatorLivesScreen() {
       />
       <Surface>
         <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-          Live creation, scheduling, pricing, and moderation controls can expand here on top of the existing API contracts.
+          Use the live builder to set pricing, visibility, and timing before viewers receive access.
         </Text>
-        <Button onPress={() => router.push('/(creator)/create-live')} title="Create live session" />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          <Button onPress={() => router.push('/(creator)/create-live')} title="Create live session" />
+          <Button onPress={() => router.push('/(creator)/(tabs)/assistant')} title="Plan with AI" variant="secondary" />
+        </View>
       </Surface>
+      {query.isLoading ? <LoadingState label="Loading live inventory..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Lives unavailable" /> : null}
+      {query.data ? (
+        <>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SummaryTile
+              body="Sessions visible in the current creator view."
+              label="Inventory"
+              value={String(query.data.trendingLives.length)}
+            />
+            <SummaryTile
+              body="Already running or actively drawing viewers."
+              label="Live now"
+              value={String(query.data.trendingLives.filter((item) => item.isLive).length)}
+            />
+            <SummaryTile
+              body="Sessions with payment gating or active monetization."
+              label="Paid access"
+              value={String(query.data.trendingLives.filter((item) => item.price > 0).length)}
+            />
+          </View>
+          {query.data.trendingLives.length ? (
+            query.data.trendingLives.map((item) => <LiveCard key={item.id} live={item} />)
+          ) : (
+            <EmptyState body="Created lives will surface here once inventory exists." title="No live sessions yet" />
+          )}
+          <Surface>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Creator guardrails</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+              Paid sessions must resolve payment before room access. Private sessions should use invite-driven access
+              and clear host notes so moderators and viewers know what to expect.
+            </Text>
+          </Surface>
+        </>
+      ) : null}
     </Screen>
   );
 }
 
 export function CreatorLibraryScreen() {
+  const query = useQuery({
+    queryKey: ['mobile-creator-library'],
+    queryFn: mobileApi.getHomeFeed,
+  });
+
   return (
     <Screen>
       <Heading
@@ -119,11 +261,56 @@ export function CreatorLibraryScreen() {
         eyebrow="Library"
         title="Creator library"
       />
-      <Surface>
-        <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-          Premium content management, class management, and publishing workflows can mount here when those endpoints are connected.
-        </Text>
-      </Surface>
+      {query.isLoading ? <LoadingState label="Loading library..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Library unavailable" /> : null}
+      {query.data ? (
+        <>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SummaryTile
+              body="Download packs, replays, and premium lessons in your inventory."
+              label="Premium content"
+              value={String(query.data.premiumContent.length)}
+            />
+            <SummaryTile
+              body="Structured learning programs currently visible to buyers."
+              label="Classes"
+              value={String(query.data.recommendedClasses.length)}
+            />
+            <SummaryTile
+              body="All monetized items across your creator surface."
+              label="Total items"
+              value={String(query.data.premiumContent.length + query.data.recommendedClasses.length)}
+            />
+          </View>
+          <Surface>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Publishing flow</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+              Keep previews clean, access states intentional, and pricing explicit so users understand what unlocks
+              after payment.
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              <Button onPress={() => router.push('/(creator)/create-live')} title="Create companion live" />
+              <Button onPress={() => router.push('/(creator)/settings')} title="Review creator settings" variant="secondary" />
+            </View>
+          </Surface>
+          <View style={{ gap: 12 }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: '#171512' }}>Premium content</Text>
+            {query.data.premiumContent.length ? (
+              query.data.premiumContent.map((item) => <ContentCard content={item} key={item.id} />)
+            ) : (
+              <EmptyState body="Premium content will appear here after you publish it." title="No premium content yet" />
+            )}
+          </View>
+          <View style={{ gap: 12 }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: '#171512' }}>Classes and workshops</Text>
+            {query.data.recommendedClasses.length ? (
+              query.data.recommendedClasses.map((item) => <ClassCard classItem={item} key={item.id} />)
+            ) : (
+              <EmptyState body="Classes and workshops will appear here after you schedule them." title="No classes yet" />
+            )}
+          </View>
+        </>
+      ) : null}
     </Screen>
   );
 }
@@ -134,12 +321,51 @@ export function CreatorWalletScreen() {
     queryFn: mobileApi.getCreatorDashboard,
   });
 
+  const lastPayout = query.data?.recentTransactions.items.find((item) => item.type === 'payout');
+
   return (
     <Screen>
       <Heading body="Available balance, pending balance, and creator earnings." eyebrow="Wallet" title="Earnings" />
       {query.isLoading ? <LoadingState label="Loading wallet..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Wallet unavailable" /> : null}
-      {query.data ? <WalletCards wallet={query.data.wallet} /> : null}
+      {query.data ? (
+        <>
+          <WalletCards wallet={query.data.wallet} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SummaryTile
+              body="Creator share already settled into your balance."
+              label="Available now"
+              value={formatCurrency(query.data.wallet.availableBalance, query.data.wallet.currency)}
+            />
+            <SummaryTile
+              body="Awaiting settlement before payout eligibility."
+              label="Pending"
+              value={formatCurrency(query.data.wallet.pendingBalance, query.data.wallet.currency)}
+            />
+            <SummaryTile
+              body="Total creator earnings tracked across successful purchases."
+              label="Lifetime"
+              value={formatCurrency(query.data.wallet.lifetimeEarnings, query.data.wallet.currency)}
+            />
+            <SummaryTile
+              body="Most recent payout action visible in your ledger."
+              label="Last payout"
+              value={lastPayout ? formatCurrency(lastPayout.amount, lastPayout.currency) : 'No payout yet'}
+            />
+          </View>
+          <Surface>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>How money moves</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+              LiveGate keeps 20% of successful transactions while 80% settles to creator balances. Pending funds stay
+              separate until they are eligible for payout.
+            </Text>
+            <Button onPress={() => router.push('/(creator)/payouts')} title="Request payout" />
+          </Surface>
+          {query.data.recentTransactions.items.map((item) => (
+            <TransactionRow item={item} key={item.id} />
+          ))}
+        </>
+      ) : null}
     </Screen>
   );
 }
@@ -241,18 +467,210 @@ export function PayoutsScreen() {
 }
 
 export function CreateLiveScreen() {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [scheduleLabel, setScheduleLabel] = useState('');
+  const [category, setCategory] = useState<string>(categories[0]?.slug ?? 'education');
+  const [price, setPrice] = useState('45');
+  const [visibility, setVisibility] = useState<VisibilityMode>('public');
+  const [accessMode, setAccessMode] = useState<AccessMode>('paid');
+  const [hostNotes, setHostNotes] = useState('');
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
+  const [createdSession, setCreatedSession] = useState<{
+    status: 'draft' | 'published';
+    title: string;
+    scheduleLabel: string;
+    accessPolicy: string;
+  } | null>(null);
+
+  const numericPrice = Number(price || 0);
+  const normalizedPrice = accessMode === 'paid' ? numericPrice : 0;
+  const platformCommission = normalizedPrice * 0.2;
+  const creatorNet = normalizedPrice * 0.8;
+  const accessPolicy =
+    accessMode === 'paid'
+      ? 'Users must pay before joining this session.'
+      : visibility === 'private'
+        ? 'Invite-only access is required before viewers can join.'
+        : 'This session can be joined without payment once it is visible.';
+
+  const saveSession = (status: 'draft' | 'published') => {
+    if (title.trim().length < 5) {
+      setFeedback({ tone: 'danger', text: 'Add a clear live title before saving.' });
+      return;
+    }
+
+    if (description.trim().length < 16) {
+      setFeedback({ tone: 'danger', text: 'Add a fuller description so viewers know what they are paying for.' });
+      return;
+    }
+
+    if (scheduleLabel.trim().length < 6) {
+      setFeedback({ tone: 'danger', text: 'Add a schedule or start-time label before continuing.' });
+      return;
+    }
+
+    if (accessMode === 'paid' && (!Number.isFinite(numericPrice) || numericPrice <= 0)) {
+      setFeedback({ tone: 'danger', text: 'Paid lives need a valid price greater than zero.' });
+      return;
+    }
+
+    setFeedback({
+      tone: 'success',
+      text:
+        status === 'published'
+          ? 'Live session prepared and marked as published in preview mode.'
+          : 'Live draft saved in preview mode.',
+    });
+    setCreatedSession({
+      status,
+      title: title.trim(),
+      scheduleLabel: scheduleLabel.trim(),
+      accessPolicy,
+    });
+  };
+
   return (
     <Screen>
       <Heading
-        body="Use this flow for live titles, pricing, schedules, and host-facing setup once your live creation endpoint is connected."
+        body="Set the session title, category, pricing, visibility, and host notes before viewers see the live."
         eyebrow="Create live"
         title="New live session"
       />
       <Surface>
-        <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-          This route is reserved for the creator live-builder workflow and intentionally left free of fake session records.
+        <TextField label="Session title" onChangeText={setTitle} placeholder="New York open breakdown" value={title} />
+        <TextField
+          label="Description"
+          onChangeText={setDescription}
+          placeholder="What will viewers learn, receive, or experience?"
+          value={description}
+        />
+        <TextField
+          label="Schedule"
+          onChangeText={setScheduleLabel}
+          placeholder="March 29, 7:00 PM EAT"
+          value={scheduleLabel}
+        />
+        <Text style={{ fontSize: 13, color: '#60726C' }}>Category</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {categories.map((item) => (
+            <CategoryChip
+              active={category === item.slug}
+              key={item.slug}
+              onPress={() => setCategory(item.slug)}
+              title={item.title}
+            />
+          ))}
+        </View>
+        <Text style={{ fontSize: 13, color: '#60726C' }}>Access model</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {accessModes.map((item) => (
+            <CategoryChip
+              active={accessMode === item.value}
+              key={item.value}
+              onPress={() => setAccessMode(item.value)}
+              title={item.title}
+            />
+          ))}
+        </View>
+        <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>
+          {accessModes.find((item) => item.value === accessMode)?.body}
         </Text>
+        <Text style={{ fontSize: 13, color: '#60726C' }}>Visibility</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {visibilityModes.map((item) => (
+            <CategoryChip
+              active={visibility === item.value}
+              key={item.value}
+              onPress={() => setVisibility(item.value)}
+              title={item.title}
+            />
+          ))}
+        </View>
+        <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>
+          {visibilityModes.find((item) => item.value === visibility)?.body}
+        </Text>
+        {accessMode === 'paid' ? (
+          <TextField label="Viewer price" onChangeText={setPrice} placeholder="45" value={price} />
+        ) : null}
+        <TextField
+          label="Host notes"
+          onChangeText={setHostNotes}
+          placeholder="Optional notes for moderators, co-hosts, or reminders."
+          value={hostNotes}
+        />
       </Surface>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <SummaryTile
+          body={accessMode === 'paid' ? 'Price shown to viewers before checkout.' : 'This live can be joined without payment.'}
+          label="Viewer price"
+          value={formatCurrency(normalizedPrice)}
+        />
+        <SummaryTile
+          body="Platform share retained after a successful paid checkout."
+          label="Platform share"
+          value={formatCurrency(platformCommission)}
+        />
+        <SummaryTile
+          body="Creator share after LiveGate commission."
+          label="Creator share"
+          value={formatCurrency(creatorNet)}
+        />
+        <SummaryTile
+          body="Where the live will appear when it is available."
+          label="Visibility"
+          value={visibilityModes.find((item) => item.value === visibility)?.title ?? 'Public'}
+        />
+      </View>
+
+      <Surface>
+        <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Preview</Text>
+        <Text style={{ fontSize: 18, fontWeight: '700', color: '#10211D' }}>
+          {title.trim() || 'Untitled live session'}
+        </Text>
+        <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+          {description.trim() || 'Add a session description to clarify what viewers unlock.'}
+        </Text>
+        <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+          Category: {getCategoryTitle(category)}
+        </Text>
+        <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+          Schedule: {scheduleLabel.trim() || 'No schedule entered yet'}
+        </Text>
+        <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{accessPolicy}</Text>
+        {hostNotes.trim() ? (
+          <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>Host note: {hostNotes.trim()}</Text>
+        ) : null}
+      </Surface>
+
+      {feedback ? (
+        <Surface>
+          <Text style={{ fontSize: 14, color: feedback.tone === 'success' ? '#196B59' : '#A64B40' }}>
+            {feedback.text}
+          </Text>
+        </Surface>
+      ) : null}
+
+      {createdSession ? (
+        <Surface>
+          <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
+            {createdSession.status === 'published' ? 'Published preview' : 'Draft preview'}
+          </Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#10211D' }}>{createdSession.title}</Text>
+          <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{createdSession.scheduleLabel}</Text>
+          <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{createdSession.accessPolicy}</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            <Button onPress={() => router.replace('/(creator)/(tabs)/lives')} title="Return to live sessions" />
+            <Button onPress={() => router.push('/(creator)/(tabs)/library')} title="Open library" variant="secondary" />
+          </View>
+        </Surface>
+      ) : null}
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+        <Button onPress={() => saveSession('published')} title="Publish live session" />
+        <Button onPress={() => saveSession('draft')} title="Save draft" variant="secondary" />
+      </View>
     </Screen>
   );
 }
@@ -371,10 +789,31 @@ export function CreatorSettingsScreen() {
                 <CategoryChip
                   active={settings.defaultRole === role}
                   key={role}
-                  onPress={() =>
-                    setSettings((current) => (current ? { ...current, defaultRole: role } : current))
-                  }
+                  onPress={() => setSettings((current) => (current ? { ...current, defaultRole: role } : current))}
                   title={role}
+                />
+              ))}
+            </View>
+            <Text style={{ fontSize: 13, color: '#60726C' }}>Appearance</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {appearanceModes.map((mode) => (
+                <CategoryChip
+                  active={settings.appearancePreferences.theme === mode}
+                  key={mode}
+                  onPress={() =>
+                    setSettings((current) =>
+                      current
+                        ? {
+                            ...current,
+                            appearancePreferences: {
+                              ...current.appearancePreferences,
+                              theme: mode,
+                            },
+                          }
+                        : current,
+                    )
+                  }
+                  title={mode}
                 />
               ))}
             </View>
@@ -426,6 +865,53 @@ export function CreatorSettingsScreen() {
               value={settings.notificationPreferences.creatorAnnouncements}
             />
             <SettingsToggle
+              body="Keep security and system notices turned on."
+              onChange={(value) =>
+                setSettings((current) =>
+                  current
+                    ? {
+                        ...current,
+                        notificationPreferences: { ...current.notificationPreferences, systemAlerts: value },
+                      }
+                    : current,
+                )
+              }
+              title="System alerts"
+              value={settings.notificationPreferences.systemAlerts}
+            />
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SettingsToggle
+              body="Use tighter spacing in dashboard-heavy surfaces."
+              onChange={(value) =>
+                setSettings((current) =>
+                  current
+                    ? {
+                        ...current,
+                        appearancePreferences: { ...current.appearancePreferences, compactMode: value },
+                      }
+                    : current,
+                )
+              }
+              title="Compact mode"
+              value={settings.appearancePreferences.compactMode}
+            />
+            <SettingsToggle
+              body="Keep your creator profile visible to the wider learning community."
+              onChange={(value) =>
+                setSettings((current) =>
+                  current
+                    ? {
+                        ...current,
+                        privacyPreferences: { ...current.privacyPreferences, communityVisibility: value },
+                      }
+                    : current,
+                )
+              }
+              title="Community visibility"
+              value={settings.privacyPreferences.communityVisibility}
+            />
+            <SettingsToggle
               body="Keep your creator profile visible in public discovery."
               onChange={(value) =>
                 setSettings((current) =>
@@ -441,6 +927,13 @@ export function CreatorSettingsScreen() {
               value={settings.privacyPreferences.publicCreatorProfile}
             />
           </View>
+          <Surface>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Current profile posture</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+              Default role: {settings.defaultRole}. Theme: {settings.appearancePreferences.theme}. Public creator
+              profile: {settings.privacyPreferences.publicCreatorProfile ? 'enabled' : 'disabled'}.
+            </Text>
+          </Surface>
           {saveMutation.isSuccess ? (
             <Surface>
               <Text style={{ fontSize: 14, color: '#196B59' }}>{saveMutation.data.message}</Text>

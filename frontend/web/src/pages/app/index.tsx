@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { AppShell, PageFrame } from '@/components/layout';
 import {
@@ -21,6 +21,7 @@ import {
   LoadingBlock,
   SectionTitle,
   StatCard,
+  Textarea,
   Tabs,
 } from '@/components/ui';
 import { useSessionStore } from '@/store/session-store';
@@ -200,6 +201,7 @@ function ProfileSettingsPanel({ mode }: { mode: 'viewer' | 'creator' }) {
           <div className="space-y-2">
             <label className="text-sm font-medium">Default role</label>
             <select
+              aria-label="Default role"
               className="w-full rounded-[22px] border border-white/40 bg-white/28 px-4 py-3.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] outline-none backdrop-blur-xl transition focus:border-white/60 focus:bg-white/40"
               {...settingsForm.register('defaultRole')}
             >
@@ -213,6 +215,7 @@ function ProfileSettingsPanel({ mode }: { mode: 'viewer' | 'creator' }) {
           <div className="space-y-2">
             <label className="text-sm font-medium">Theme preference</label>
             <select
+              aria-label="Theme preference"
               className="w-full rounded-[22px] border border-white/40 bg-white/28 px-4 py-3.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] outline-none backdrop-blur-xl transition focus:border-white/60 focus:bg-white/40"
               {...settingsForm.register('theme')}
             >
@@ -297,6 +300,158 @@ function ProfileSettingsPanel({ mode }: { mode: 'viewer' | 'creator' }) {
   );
 }
 
+function CreatorLiveStudioPanel() {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [schedule, setSchedule] = useState('');
+  const [category, setCategory] = useState<string>(categories[0]?.slug ?? 'education');
+  const [accessMode, setAccessMode] = useState<'paid' | 'free'>('paid');
+  const [visibility, setVisibility] = useState<'public' | 'followers' | 'private'>('public');
+  const [price, setPrice] = useState('45');
+  const [message, setMessage] = useState<{ tone: 'default' | 'danger'; title: string; body: string } | null>(null);
+
+  const normalizedPrice = accessMode === 'paid' ? Number(price || 0) : 0;
+  const commission = normalizedPrice > 0 ? calculateCommission(normalizedPrice) : 0;
+  const creatorNet = normalizedPrice > 0 ? normalizedPrice - commission : 0;
+
+  const save = (status: 'draft' | 'published') => {
+    if (title.trim().length < 5) {
+      setMessage({ tone: 'danger', title: 'Live title missing', body: 'Add a clearer live title before continuing.' });
+      return;
+    }
+
+    if (description.trim().length < 16) {
+      setMessage({
+        tone: 'danger',
+        title: 'Description too short',
+        body: 'Give viewers enough detail to understand what the live unlocks.',
+      });
+      return;
+    }
+
+    if (schedule.trim().length < 6) {
+      setMessage({ tone: 'danger', title: 'Schedule missing', body: 'Add a visible start time or schedule label.' });
+      return;
+    }
+
+    if (accessMode === 'paid' && (!Number.isFinite(normalizedPrice) || normalizedPrice <= 0)) {
+      setMessage({
+        tone: 'danger',
+        title: 'Invalid pricing',
+        body: 'Paid lives need a valid checkout amount greater than zero.',
+      });
+      return;
+    }
+
+    setMessage({
+      tone: 'default',
+      title: status === 'published' ? 'Live prepared for publishing' : 'Live saved as draft',
+      body:
+        status === 'published'
+          ? 'This preview confirms the session structure, pricing, and access posture.'
+          : 'The live configuration is ready for further review before publishing.',
+    });
+  };
+
+  return (
+    <Card className="space-y-5">
+      <SectionTitle
+        body="Plan the session structure, pricing, and access model before viewers see it. This keeps paid access and live visibility clear on web too."
+        title="Live studio"
+      />
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2 md:col-span-2">
+          <label className="text-sm font-medium">Session title</label>
+          <Input onChange={(event) => setTitle(event.target.value)} placeholder="New York open breakdown" value={title} />
+        </div>
+        <div className="space-y-2 md:col-span-2">
+          <label className="text-sm font-medium">Description</label>
+          <Textarea
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="What will buyers get from this live session?"
+            value={description}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Schedule</label>
+          <Input onChange={(event) => setSchedule(event.target.value)} placeholder="March 29, 7:00 PM EAT" value={schedule} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Category</label>
+          <select
+            aria-label="Category"
+            className="w-full rounded-[22px] border border-white/40 bg-white/28 px-4 py-3.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] outline-none backdrop-blur-xl transition focus:border-white/60 focus:bg-white/40"
+            onChange={(event) => setCategory(event.target.value)}
+            value={category}
+          >
+            {categories.map((item) => (
+              <option key={item.slug} value={item.slug}>
+                {item.title}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Access model</label>
+          <div className="flex flex-wrap gap-2">
+            {(['paid', 'free'] as const).map((item) => (
+              <Button key={item} onClick={() => setAccessMode(item)} type="button" variant={accessMode === item ? 'primary' : 'secondary'}>
+                {item}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Visibility</label>
+          <div className="flex flex-wrap gap-2">
+            {(['public', 'followers', 'private'] as const).map((item) => (
+              <Button key={item} onClick={() => setVisibility(item)} type="button" variant={visibility === item ? 'primary' : 'secondary'}>
+                {item}
+              </Button>
+            ))}
+          </div>
+        </div>
+        {accessMode === 'paid' ? (
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Viewer price</label>
+            <Input onChange={(event) => setPrice(event.target.value)} placeholder="45" type="number" value={price} />
+          </div>
+        ) : null}
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard detail="Total shown to buyers at checkout." label="Price" value={formatCurrency(normalizedPrice || 0)} />
+        <StatCard detail="Platform share retained by LiveGate." label="Commission" value={formatCurrency(commission)} />
+        <StatCard detail="Creator share after commission." label="Creator net" value={formatCurrency(creatorNet)} />
+      </div>
+      <div className="rounded-[24px] border border-white/35 bg-white/20 p-4 backdrop-blur-xl">
+        <p className="text-xs uppercase tracking-[0.18em] text-muted">Preview</p>
+        <p className="mt-2 text-xl font-semibold">{title || 'Untitled live session'}</p>
+        <p className="mt-2 text-sm leading-6 text-muted">
+          {description || 'Add a fuller description so buyers understand what they are joining.'}
+        </p>
+        <p className="mt-3 text-sm text-muted">Category: {categories.find((item) => item.slug === category)?.title ?? category}</p>
+        <p className="mt-1 text-sm text-muted">Schedule: {schedule || 'No schedule entered yet'}</p>
+        <p className="mt-1 text-sm text-muted">
+          {accessMode === 'paid'
+            ? 'Users must pay before LiveGate grants room access.'
+            : visibility === 'private'
+              ? 'Private sessions still require invite-driven access.'
+              : 'This session is free to join once visible.'}
+        </p>
+      </div>
+      {message ? <InlineNotice body={message.body} title={message.title} tone={message.tone} /> : null}
+      <div className="flex flex-wrap gap-3">
+        <Button onClick={() => save('published')} type="button">
+          Publish preview
+        </Button>
+        <Button onClick={() => save('draft')} type="button" variant="secondary">
+          Save draft
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 export function UserDashboardPage() {
   const [tab, setTab] = useState('purchases');
   const dashboardQuery = useQuery({
@@ -335,25 +490,57 @@ export function UserDashboardPage() {
       ) : dashboardQuery.data ? (
         <>
           {tab === 'purchases' ? (
-            <div className="grid gap-4 lg:grid-cols-3">
-              {dashboardQuery.data.purchasedLives.items.map((item) => (
-                <Card key={item.id}>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="mt-2 text-sm text-muted">Paid live session</p>
-                </Card>
-              ))}
-              {dashboardQuery.data.purchasedContent.items.map((item) => (
-                <Card key={item.id}>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="mt-2 text-sm text-muted">Premium content</p>
-                </Card>
-              ))}
-              {dashboardQuery.data.enrolledClasses.items.map((item) => (
-                <Card key={item.id}>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="mt-2 text-sm text-muted">Enrolled class</p>
-                </Card>
-              ))}
+            <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-3">
+                <StatCard
+                  detail="Live sessions, premium content, and classes already in your library."
+                  label="Owned items"
+                  value={String(
+                    dashboardQuery.data.purchasedLives.items.length +
+                      dashboardQuery.data.purchasedContent.items.length +
+                      dashboardQuery.data.enrolledClasses.items.length,
+                  )}
+                />
+                <StatCard
+                  detail="Creators you already follow and can revisit quickly."
+                  label="Following"
+                  value={String(dashboardQuery.data.followedCreators.items.length)}
+                />
+                <StatCard
+                  detail="Completed purchase records tied to access."
+                  label="Transactions"
+                  value={String(dashboardQuery.data.transactions.items.length)}
+                />
+              </div>
+              <Card className="space-y-4">
+                <SectionTitle
+                  body="The library keeps purchases organized by live sessions, locked content, and classes so returning users can continue quickly."
+                  title="Library overview"
+                />
+                <div className="grid gap-4 lg:grid-cols-3">
+                  {dashboardQuery.data.purchasedLives.items.map((item) => (
+                    <div className="rounded-[24px] border border-white/35 bg-white/20 p-4 backdrop-blur-xl" key={item.id}>
+                      <p className="font-medium">{item.title}</p>
+                      <p className="mt-2 text-sm text-muted">Paid live session</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted">{formatCurrency(item.price)}</p>
+                    </div>
+                  ))}
+                  {dashboardQuery.data.purchasedContent.items.map((item) => (
+                    <div className="rounded-[24px] border border-white/35 bg-white/20 p-4 backdrop-blur-xl" key={item.id}>
+                      <p className="font-medium">{item.title}</p>
+                      <p className="mt-2 text-sm text-muted">Premium content</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted">{formatCurrency(item.price)}</p>
+                    </div>
+                  ))}
+                  {dashboardQuery.data.enrolledClasses.items.map((item) => (
+                    <div className="rounded-[24px] border border-white/35 bg-white/20 p-4 backdrop-blur-xl" key={item.id}>
+                      <p className="font-medium">{item.title}</p>
+                      <p className="mt-2 text-sm text-muted">Enrolled class</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted">{formatCurrency(item.price)}</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
             </div>
           ) : null}
 
@@ -467,6 +654,7 @@ export function CreatorDashboardPage() {
               </div>
             </form>
           </Card>
+          <CreatorLiveStudioPanel />
           <ProfileSettingsPanel mode="creator" />
         </>
       ) : null}
@@ -475,6 +663,9 @@ export function CreatorDashboardPage() {
 }
 
 export function AdminDashboardPage() {
+  const session = useSessionStore((state) => state.session);
+  const isAdmin = session?.user.roles?.includes('admin');
+  const isModerator = session?.user.roles?.includes('moderator');
   const query = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: webApi.getAdminDashboard,
@@ -483,47 +674,130 @@ export function AdminDashboardPage() {
   return (
     <AppShell
       sidebarItems={[
-        { label: 'Admin Dashboard', href: '/dashboard/admin' },
+        { label: isAdmin ? 'Admin Dashboard' : 'Moderator Dashboard', href: '/dashboard/admin' },
         { label: 'Notifications', href: '/notifications' },
+        { label: 'Settings', href: '/settings' },
       ]}
-      sidebarTitle="Admin"
+      sidebarTitle={isAdmin ? 'Admin Panel' : 'Moderation'}
     >
-      <Card className="space-y-4">
-        <SectionTitle
-          body="Monitor platform health, live session activity, payouts, creator approvals, flagged content, suspicious payments, and category management."
-          title="Admin dashboard"
-        />
-      </Card>
-      {query.isLoading ? (
-        <LoadingBlock lines={8} />
-      ) : query.isError ? (
-        <EmptyState title="Admin dashboard unavailable" body={(query.error as Error).message} />
-      ) : query.data ? (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Users" value={String(query.data.totalUsers)} />
-            <StatCard label="Creators" value={String(query.data.totalCreators)} />
-            <StatCard label="Active lives" value={String(query.data.activeLiveSessions)} />
-            <StatCard label="Revenue" value={formatCurrency(query.data.totalRevenue)} />
-            <StatCard label="Commission" value={formatCurrency(query.data.platformCommission)} />
-            <StatCard label="Pending payouts" value={String(query.data.pendingPayouts)} />
-            <StatCard label="Approvals" value={String(query.data.creatorApprovals)} />
-            <StatCard label="Flagged content" value={String(query.data.flaggedContent)} />
+      <div className="space-y-8">
+        {/* Role-Specific Header */}
+        <Card className={`space-y-4 border-2 ${isAdmin ? 'border-accent/30 bg-accent/5' : 'border-warning/30 bg-warning/5'}`}>
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{isAdmin ? '⚙️' : '🛡️'}</span>
+                <h1 className="text-3xl font-bold text-text">{isAdmin ? 'Admin Control Center' : 'Moderation Dashboard'}</h1>
+              </div>
+              <SectionTitle
+                body={
+                  isAdmin
+                    ? 'Monitor platform health, revenue, creator approvals, payments, and category management.'
+                    : 'Review flagged content, monitor community safety, and manage creator violations.'
+                }
+                title=""
+              />
+            </div>
+            <div className="rounded-lg bg-accent/20 px-4 py-2">
+              <p className="text-xs uppercase tracking-wider text-accent">{isAdmin ? 'Full Access' : 'Content Moderation'}</p>
+            </div>
           </div>
-          <Card>
-            <p className="text-sm leading-7 text-muted">
-              Suspicious payments currently tracked: {query.data.suspiciousPayments}. Category
-              catalog contains {categories.length} canonical product categories.
-            </p>
-          </Card>
-        </>
-      ) : null}
+        </Card>
+
+        {query.isLoading ? (
+          <LoadingBlock lines={8} />
+        ) : query.isError ? (
+          <EmptyState title="Dashboard unavailable" body={(query.error as Error).message} />
+        ) : query.data ? (
+          <>
+            {/* Admin-Specific Section */}
+            {isAdmin && (
+              <>
+                <div>
+                  <h2 className="mb-4 text-xl font-semibold text-text">Financial Metrics</h2>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <Card className="border-l-4 border-success p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted">Total Revenue</p>
+                      <p className="mt-2 text-2xl font-bold text-success">${query.data.totalRevenue.toFixed(2)}</p>
+                    </Card>
+                    <Card className="border-l-4 border-accent p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted">Platform Commission</p>
+                      <p className="mt-2 text-2xl font-bold text-accent">${query.data.platformCommission.toFixed(2)}</p>
+                    </Card>
+                    <Card className="border-l-4 border-warning p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted">Creator Payouts</p>
+                      <p className="mt-2 text-2xl font-bold text-warning">${query.data.pendingPayouts.toFixed(2)}</p>
+                    </Card>
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="mb-4 text-xl font-semibold text-text">Platform Growth</h2>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <StatCard label="Total Users" value={String(query.data.totalUsers)} />
+                    <StatCard label="Creators" value={String(query.data.totalCreators)} />
+                    <StatCard label="Active Lives" value={String(query.data.activeLiveSessions)} />
+                    <Card className="border-l-4 border-warning p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted">Pending Approvals</p>
+                      <p className="mt-2 text-2xl font-bold text-warning">{query.data.creatorApprovals}</p>
+                    </Card>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Moderator-Specific Section */}
+            {isModerator && (
+              <>
+                <div>
+                  <h2 className="mb-4 text-xl font-semibold text-text">Community Safety</h2>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <Card className="border-l-4 border-danger p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted">Flagged Content</p>
+                      <p className="mt-2 text-2xl font-bold text-danger">{query.data.flaggedContent}</p>
+                    </Card>
+                    <Card className="border-l-4 border-warning p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted">Suspicious Payments</p>
+                      <p className="mt-2 text-2xl font-bold text-warning">{query.data.suspiciousPayments}</p>
+                    </Card>
+                    <Card className="border-l-4 border-accent p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted">Pending Reviews</p>
+                      <p className="mt-2 text-2xl font-bold text-accent">{Math.max(query.data.creatorApprovals, 0)}</p>
+                    </Card>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Shared Metrics */}
+            <div>
+              <h2 className="mb-4 text-xl font-semibold text-text">Platform Overview</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Card className="border-l-4 border-accent p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted">Active Categories</p>
+                  <p className="mt-2 text-2xl font-bold text-text">{categories.length}</p>
+                </Card>
+                <Card className="border-l-4 border-success p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted">Live Sessions Running</p>
+                  <p className="mt-2 text-2xl font-bold text-success">{query.data.activeLiveSessions}</p>
+                </Card>
+                <Card className="border-l-4 border-warning p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted">Action Items</p>
+                  <p className="mt-2 text-2xl font-bold text-warning">{query.data.creatorApprovals + query.data.flaggedContent}</p>
+                </Card>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </div>
     </AppShell>
   );
 }
 
 export function CheckoutPage() {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const session = useSessionStore((state) => state.session);
   const productId = params.get('productId');
   const productType = params.get('productType') as 'live' | 'content' | 'class' | null;
   const hasProduct = Boolean(productId && productType);
@@ -535,29 +809,78 @@ export function CheckoutPage() {
       }),
   });
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/dashboard/user');
+    }
+  };
+
   return (
     <PageFrame>
       <div className="mx-auto max-w-4xl space-y-8 px-6 py-10">
+        {/* Back Button & Header */}
+        <div className="flex items-center justify-between gap-4">
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-2 rounded-lg border border-stroke/30 bg-surface/50 px-3 py-2 text-sm font-medium text-muted transition-all hover:bg-surface hover:text-text"
+          >
+            ← Back
+          </button>
+          <div className="rounded-lg bg-accent/10 px-3 py-1">
+            <p className="text-xs uppercase tracking-wider text-accent">Checkout</p>
+          </div>
+        </div>
+
         <Card className="space-y-5">
-          <SectionTitle
-            body="Create a secure checkout session, review the purchase summary, and confirm the platform-versus-creator breakdown before payment."
-            title="Checkout session"
-          />
+          <div>
+            <h1 className="text-3xl font-bold text-text">Checkout Session</h1>
+            <p className="mt-2 text-muted">Review your purchase and complete payment securely</p>
+          </div>
           {hasProduct ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-[24px] border border-white/35 bg-white/20 p-4 backdrop-blur-xl">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted">Product type</p>
-                <p className="mt-2 text-lg font-semibold capitalize">{productType}</p>
+            <>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-[24px] border border-white/35 bg-white/20 p-4 backdrop-blur-xl">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted">Product type</p>
+                  <p className="mt-2 text-lg font-semibold capitalize">{productType}</p>
+                </div>
+                <div className="rounded-[24px] border border-white/35 bg-white/20 p-4 backdrop-blur-xl">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted">Product id</p>
+                  <p className="mt-2 text-lg font-semibold">{productId}</p>
+                </div>
               </div>
-              <div className="rounded-[24px] border border-white/35 bg-white/20 p-4 backdrop-blur-xl">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted">Product id</p>
-                <p className="mt-2 text-lg font-semibold">{productId}</p>
-              </div>
-            </div>
+
+              {/* Role-Specific Benefits */}
+              {session?.user && (
+                <div className="rounded-lg border-l-4 border-accent/30 bg-accent/5 p-4">
+                  <p className="text-sm font-semibold text-text">Your Purchase Includes:</p>
+                  <ul className="mt-3 space-y-2">
+                    <li className="flex items-center gap-2 text-sm text-muted">
+                      <span className="text-accent">✓</span>
+                      Lifetime access to content
+                    </li>
+                    <li className="flex items-center gap-2 text-sm text-muted">
+                      <span className="text-accent">✓</span>
+                      Download for offline viewing
+                    </li>
+                    <li className="flex items-center gap-2 text-sm text-muted">
+                      <span className="text-accent">✓</span>
+                      HD quality streaming
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </>
           ) : (
             <EmptyState
               body="Open checkout from a live session, premium content card, or class details page so the route has a valid product context."
               title="No checkout target selected"
+              action={
+                <Button onClick={handleBack} variant="secondary">
+                  Go Back
+                </Button>
+              }
             />
           )}
           <div className="flex flex-wrap gap-3">

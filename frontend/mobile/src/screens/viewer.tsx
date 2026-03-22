@@ -27,6 +27,7 @@ const searchFilters = [
   { title: 'Content', value: 'content' },
   { title: 'Classes', value: 'class' },
 ] as const;
+const appearanceModes = ['system', 'light', 'dark'] as const;
 const heroCardStyle = {
   borderRadius: 28,
   borderWidth: 1,
@@ -58,6 +59,24 @@ function SettingsToggle({
 
 function getCategoryTitle(slug: string) {
   return categories.find((item) => item.slug === slug)?.title ?? slug.replace(/-/g, ' ');
+}
+
+function SummaryTile({
+  label,
+  value,
+  body,
+}: {
+  label: string;
+  value: string;
+  body: string;
+}) {
+  return (
+    <View style={[heroCardStyle, { flexBasis: '47%', flexGrow: 1 }]}>
+      <Text style={metaLabelStyle}>{label}</Text>
+      <Text style={{ fontSize: 22, fontWeight: '700', color: '#10211D' }}>{value}</Text>
+      <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>{body}</Text>
+    </View>
+  );
 }
 
 export function HomeScreen() {
@@ -266,6 +285,11 @@ export function ViewerLibraryScreen() {
     queryFn: mobileApi.getViewerDashboard,
   });
 
+  const libraryItemCount =
+    (query.data?.purchasedLives.items.length ?? 0) +
+    (query.data?.purchasedContent.items.length ?? 0) +
+    (query.data?.enrolledClasses.items.length ?? 0);
+
   return (
     <Screen>
       <Heading
@@ -277,6 +301,39 @@ export function ViewerLibraryScreen() {
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Viewer dashboard unavailable" /> : null}
       {query.data ? (
         <>
+          <Surface>
+            <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
+              Library actions
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              <Button onPress={() => router.push('/(viewer)/(tabs)/search')} title="Find something new" />
+              <Button onPress={() => router.push('/(viewer)/(tabs)/assistant')} title="Ask AI concierge" variant="secondary" />
+            </View>
+          </Surface>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SummaryTile
+              body="Lives, content, and classes already in your library."
+              label="Owned items"
+              value={String(libraryItemCount)}
+            />
+            <SummaryTile
+              body="Creators you can return to without searching again."
+              label="Following"
+              value={String(query.data.followedCreators.items.length)}
+            />
+            <SummaryTile
+              body="Completed or ready purchase records tied to access."
+              label="Transactions"
+              value={String(query.data.transactions.items.length)}
+            />
+          </View>
+          <Surface>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Continue where you left off</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+              Your library is organized around what you have already paid for, so live joins, content unlocks, and
+              enrolled classes stay one tap away.
+            </Text>
+          </Surface>
           <View style={{ gap: 12 }}>
             <Text style={sectionTitleStyle}>Purchased lives</Text>
             {query.data.purchasedLives.items.length ? (
@@ -790,6 +847,10 @@ export function ViewerWalletScreen() {
     queryFn: mobileApi.getViewerDashboard,
   });
 
+  const totalSpend =
+    query.data?.transactions.items.reduce((sum, item) => sum + (item.status === 'paid' ? item.amount : 0), 0) ?? 0;
+  const latestPurchase = query.data?.transactions.items[0];
+
   return (
     <Screen>
       <Heading body="Purchases and transaction history remain visible without clutter." eyebrow="Wallet" title="Transactions" />
@@ -797,7 +858,39 @@ export function ViewerWalletScreen() {
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Wallet unavailable" /> : null}
       {query.data ? (
         query.data.transactions.items.length ? (
-          query.data.transactions.items.map((item) => <TransactionRow item={item} key={item.id} />)
+          <>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              <SummaryTile
+                body="Total paid value connected to lives, content, and classes."
+                label="Total spend"
+                value={formatCurrency(totalSpend)}
+              />
+              <SummaryTile
+                body="Successful purchase records in your history."
+                label="Purchases"
+                value={String(query.data.transactions.items.length)}
+              />
+              <SummaryTile
+                body="Most recent item in your checkout history."
+                label="Latest"
+                value={latestPurchase ? latestPurchase.title : 'No purchases yet'}
+              />
+            </View>
+            <Surface>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Checkout confidence</Text>
+              <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+                LiveGate keeps payment, unlocks, and access grants connected so your wallet history explains why an
+                item appears in the library.
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                <Button onPress={() => router.push('/(viewer)/(tabs)/library')} title="Open library" />
+                <Button onPress={() => router.push('/(viewer)/(tabs)/search')} title="Find more content" variant="secondary" />
+              </View>
+            </Surface>
+            {query.data.transactions.items.map((item) => (
+              <TransactionRow item={item} key={item.id} />
+            ))}
+          </>
         ) : (
           <EmptyState body="Transactions appear here after purchases are completed." title="No transactions yet" />
         )
@@ -811,6 +904,7 @@ export function CheckoutScreen() {
     productId: string;
     productType: 'live' | 'content' | 'class';
   }>();
+  const [confirmed, setConfirmed] = useState(false);
   const mutation = useQuery({
     queryKey: ['mobile-checkout', productId, productType],
     queryFn: () =>
@@ -844,30 +938,26 @@ export function CheckoutScreen() {
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{mutation.data.accessPolicy}</Text>
           </Surface>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            <View style={[heroCardStyle, { flexBasis: '47%', flexGrow: 1 }]}>
-              <Text style={metaLabelStyle}>Total</Text>
-              <Text style={{ fontSize: 22, fontWeight: '700', color: '#10211D' }}>
-                {formatCurrency(mutation.data.totalAmount ?? mutation.data.amount, mutation.data.currency)}
-              </Text>
-            </View>
-            <View style={[heroCardStyle, { flexBasis: '47%', flexGrow: 1 }]}>
-              <Text style={metaLabelStyle}>Platform commission</Text>
-              <Text style={{ fontSize: 22, fontWeight: '700', color: '#10211D' }}>
-                {formatCurrency(mutation.data.platformCommissionAmount ?? 0, mutation.data.currency)}
-              </Text>
-            </View>
-            <View style={[heroCardStyle, { flexBasis: '47%', flexGrow: 1 }]}>
-              <Text style={metaLabelStyle}>Creator earnings</Text>
-              <Text style={{ fontSize: 22, fontWeight: '700', color: '#10211D' }}>
-                {formatCurrency(mutation.data.creatorEarningsAmount ?? 0, mutation.data.currency)}
-              </Text>
-            </View>
-            <View style={[heroCardStyle, { flexBasis: '47%', flexGrow: 1 }]}>
-              <Text style={metaLabelStyle}>Category</Text>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>
-                {mutation.data.category ? getCategoryTitle(mutation.data.category) : 'General'}
-              </Text>
-            </View>
+            <SummaryTile
+              body="What the buyer is charged at checkout."
+              label="Total"
+              value={formatCurrency(mutation.data.totalAmount ?? mutation.data.amount, mutation.data.currency)}
+            />
+            <SummaryTile
+              body="Platform share retained after successful payment."
+              label="Platform commission"
+              value={formatCurrency(mutation.data.platformCommissionAmount ?? 0, mutation.data.currency)}
+            />
+            <SummaryTile
+              body="Creator share after LiveGate commission."
+              label="Creator earnings"
+              value={formatCurrency(mutation.data.creatorEarningsAmount ?? 0, mutation.data.currency)}
+            />
+            <SummaryTile
+              body="Category connected to the item being unlocked."
+              label="Category"
+              value={mutation.data.category ? getCategoryTitle(mutation.data.category) : 'General'}
+            />
           </View>
           <Surface>
             <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>{mutation.data.title}</Text>
@@ -877,9 +967,28 @@ export function CheckoutScreen() {
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
               Product type: {productType}
             </Text>
-            <Button onPress={() => router.replace('/(viewer)/(tabs)/library')} title="Return to library" />
-            <Button onPress={() => router.back()} title="Back" variant="ghost" />
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+              Once payment succeeds, LiveGate verifies access before the item appears in your library.
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              <Button onPress={() => setConfirmed(true)} title="Confirm payment preview" />
+              <Button onPress={() => router.replace('/(viewer)/(tabs)/library')} title="Return to library" variant="secondary" />
+              <Button onPress={() => router.back()} title="Back" variant="ghost" />
+            </View>
           </Surface>
+          {confirmed ? (
+            <Surface>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#196B59' }}>Payment preview completed</Text>
+              <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+                This demo flow simulates a successful payment state. In production, the backend verifies the transaction
+                before room join, content unlock, or class enrollment becomes active.
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                <Button onPress={() => router.replace('/(viewer)/(tabs)/library')} title="Go to library" />
+                <Button onPress={() => router.push('/(viewer)/notifications')} title="Open notifications" variant="secondary" />
+              </View>
+            </Surface>
+          ) : null}
         </>
       ) : null}
     </Screen>
@@ -950,6 +1059,29 @@ export function SettingsScreen() {
                     setSettings((current) => (current ? { ...current, defaultRole: role } : current))
                   }
                   title={role}
+                />
+              ))}
+            </View>
+            <Text style={{ fontSize: 13, color: '#60726C' }}>Appearance</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {appearanceModes.map((mode) => (
+                <CategoryChip
+                  active={settings.appearancePreferences.theme === mode}
+                  key={mode}
+                  onPress={() =>
+                    setSettings((current) =>
+                      current
+                        ? {
+                            ...current,
+                            appearancePreferences: {
+                              ...current.appearancePreferences,
+                              theme: mode,
+                            },
+                          }
+                        : current,
+                    )
+                  }
+                  title={mode}
                 />
               ))}
             </View>
@@ -1048,6 +1180,13 @@ export function SettingsScreen() {
               value={settings.privacyPreferences.communityVisibility}
             />
           </View>
+          <Surface>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Current profile posture</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+              Default role: {settings.defaultRole}. Theme: {settings.appearancePreferences.theme}. Compact mode:{' '}
+              {settings.appearancePreferences.compactMode ? 'enabled' : 'disabled'}.
+            </Text>
+          </Surface>
           {saveMutation.isSuccess ? (
             <Surface>
               <Text style={{ fontSize: 14, color: '#196B59' }}>{saveMutation.data.message}</Text>

@@ -18,6 +18,11 @@ export default defineConfig(({ mode }) => {
       __LIVEGATE_SOCKET_URL__: JSON.stringify(socketUrl),
     },
     server: {
+      hmr: {
+        host: 'localhost',
+        port: 5173,
+        protocol: 'ws',
+      },
       proxy: {
         '/api': {
           target: apiProxyTarget,

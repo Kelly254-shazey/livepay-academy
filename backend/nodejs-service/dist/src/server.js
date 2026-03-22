@@ -8,7 +8,12 @@ const redis_1 = require("./infrastructure/cache/redis");
 const prisma_1 = require("./infrastructure/db/prisma");
 const socket_1 = require("./infrastructure/realtime/socket");
 async function start() {
-    await prisma_1.prisma.$connect();
+    try {
+        await prisma_1.prisma.$connect();
+    }
+    catch (error) {
+        logger_1.logger.warn({ error }, "Database unavailable. Starting LiveGate Node.js service in degraded mode.");
+    }
     await (0, redis_1.connectRedis)();
     const app = (0, app_1.createApp)();
     const server = (0, http_1.createServer)(app);
@@ -18,7 +23,7 @@ async function start() {
     });
     const shutdown = async () => {
         server.close(async () => {
-            await prisma_1.prisma.$disconnect();
+            await prisma_1.prisma.$disconnect().catch(() => undefined);
             if (redis_1.redis.isOpen) {
                 await redis_1.redis.quit();
             }

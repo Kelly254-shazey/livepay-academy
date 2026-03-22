@@ -17,6 +17,14 @@ interface SessionState {
   signOut: () => void;
 }
 
+function normalizeRoles(roles: UserRole[]) {
+  return Array.from(new Set(roles));
+}
+
+function rolesMatch(left: UserRole[], right: UserRole[]) {
+  return left.length === right.length && left.every((role, index) => role === right[index]);
+}
+
 export const useSessionStore = create<SessionState>()(
   persist(
     (set) => ({
@@ -32,22 +40,45 @@ export const useSessionStore = create<SessionState>()(
               : normalizeAuthSession(session, state.preferredRoles, state.preferredRole),
         })),
       setPreferredRole: (preferredRole) =>
-        set((state) => ({
-          preferredRole,
-          preferredRoles: state.preferredRoles.includes(preferredRole)
+        set((state) => {
+          const preferredRoles = state.preferredRoles.includes(preferredRole)
             ? state.preferredRoles
-            : [preferredRole],
-        })),
+            : [preferredRole];
+
+          if (state.preferredRole === preferredRole && rolesMatch(state.preferredRoles, preferredRoles)) {
+            return state;
+          }
+
+          return {
+            preferredRole,
+            preferredRoles,
+          };
+        }),
       setPreferredRoles: (roles, activeRole) =>
-        set({
-          preferredRoles: Array.from(new Set(roles)),
-          preferredRole: activeRole ?? roles[0] ?? 'viewer',
+        set((state) => {
+          const preferredRoles = normalizeRoles(roles);
+          const preferredRole = activeRole ?? preferredRoles[0] ?? 'viewer';
+
+          if (state.preferredRole === preferredRole && rolesMatch(state.preferredRoles, preferredRoles)) {
+            return state;
+          }
+
+          return {
+            preferredRoles,
+            preferredRole,
+          };
         }),
       setActiveRole: (role) =>
-        set((state) => ({
-          preferredRole: role,
-          session: switchSessionRole(state.session, role),
-        })),
+        set((state) => {
+          if (state.preferredRole === role) {
+            return state;
+          }
+
+          return {
+            preferredRole: role,
+            session: switchSessionRole(state.session, role),
+          };
+        }),
       toggleTheme: () =>
         set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
       signOut: () => set({ session: null, preferredRole: 'viewer', preferredRoles: ['viewer'] }),

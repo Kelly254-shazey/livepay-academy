@@ -162,6 +162,11 @@ export function WalletCards({ wallet }: { wallet: WalletSummary }) {
         <Text style={uiStyles.title}>{formatCurrency(wallet.pendingBalance, wallet.currency)}</Text>
         <Text style={uiStyles.metaText}>Awaiting settlement</Text>
       </Surface>
+      <Surface>
+        <Text style={uiStyles.body}>Lifetime earnings</Text>
+        <Text style={uiStyles.title}>{formatCurrency(wallet.lifetimeEarnings, wallet.currency)}</Text>
+        <Text style={uiStyles.metaText}>Total creator earnings recorded</Text>
+      </Surface>
     </View>
   );
 }
@@ -184,7 +189,10 @@ export function TransactionRow({ item }: { item: TransactionRecord }) {
         <Text style={uiStyles.metaText}>{item.type}</Text>
         <Text style={uiStyles.metaText}>{formatCurrency(item.amount, item.currency)}</Text>
       </View>
-      <Text style={uiStyles.metaText}>{item.status}</Text>
+      <View style={uiStyles.metaRow}>
+        <Text style={uiStyles.metaText}>{item.counterparty ?? item.status}</Text>
+        <Text style={uiStyles.metaText}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+      </View>
     </Surface>
   );
 }

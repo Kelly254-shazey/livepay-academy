@@ -254,3 +254,54 @@ export function SectionTitle({
     </div>
   );
 }
+
+type SelectOption = { value: string; label: string };
+
+export function Select({
+  label,
+  placeholder,
+  options,
+  ...props
+}: InputHTMLAttributes<HTMLSelectElement> & {
+  label?: string;
+  placeholder?: string;
+  options: SelectOption[];
+}) {
+  return (
+    <div className="space-y-2">
+      {label ? <label className="text-sm font-medium block">{label}</label> : null}
+      <select
+        className="w-full rounded-[22px] border border-white/40 bg-white/28 px-4 py-3.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] outline-none backdrop-blur-xl transition placeholder:text-muted/80 focus:border-white/60 focus:bg-white/40 focus:shadow-[0_0_0_4px_rgba(16,33,29,0.08)]"
+        {...props}
+      >
+        {placeholder ? <option value="">{placeholder}</option> : null}
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+export function Checkbox({
+  label,
+  description,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & {
+  label?: string;
+  description?: string;
+}) {
+  return (
+    <label className="flex items-start gap-3 rounded-[24px] border border-white/35 bg-white/20 p-4 backdrop-blur-xl cursor-pointer transition hover:bg-white/25 hover:border-white/45">
+      <input type="checkbox" className="mt-1 h-4 w-4 accent-accent rounded" {...props} />
+      {label ? (
+        <div className="flex-1">
+          <p className="text-sm font-medium">{label}</p>
+          {description ? <p className="text-sm leading-6 text-muted mt-1">{description}</p> : null}
+        </div>
+      ) : null}
+    </label>
+  );
+}

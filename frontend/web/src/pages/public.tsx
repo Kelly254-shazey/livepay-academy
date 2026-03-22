@@ -61,6 +61,21 @@ const launchFlow = [
   },
 ] as const;
 
+const appHighlights = [
+  {
+    title: 'Join paid lives on the move',
+    body: 'Live reminders, room access, and wallet history stay easier to act on from the app.',
+  },
+  {
+    title: 'Run creator operations from your pocket',
+    body: 'Create live sessions, check payouts, and review library inventory without waiting for a desktop session.',
+  },
+  {
+    title: 'Keep the full product synced',
+    body: 'Web stays excellent for browsing and depth, while the app keeps time-sensitive actions within reach.',
+  },
+] as const;
+
 function QuerySection<T>({
   title,
   body,
@@ -243,6 +258,66 @@ export function LandingPage() {
               value="Strict"
             />
           </div>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
+          <Card className="relative overflow-hidden">
+            <div className="pointer-events-none absolute inset-x-10 top-6 h-28 rounded-full bg-accent/20 blur-3xl" />
+            <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+              <div className="mx-auto flex w-full max-w-[220px] items-center justify-center">
+                <div className="relative h-[430px] w-[220px] rounded-[40px] border border-white/40 bg-[#0f1d1a] p-3 shadow-[0_28px_80px_rgba(7,24,21,0.28)]">
+                  <div className="absolute left-1/2 top-3 h-1.5 w-16 -translate-x-1/2 rounded-full bg-white/20" />
+                  <div className="flex h-full flex-col gap-3 rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(234,252,246,0.98),rgba(216,239,232,0.92))] p-4">
+                    <div className="rounded-[22px] border border-white/60 bg-white/60 p-3 backdrop-blur-xl">
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-muted">LiveGate app</p>
+                      <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-text">Session-ready everywhere</p>
+                      <p className="mt-2 text-xs leading-5 text-muted">Live reminders, checkout clarity, and creator controls built for mobile rhythm.</p>
+                    </div>
+                    <div className="grid gap-3">
+                      <div className="rounded-[22px] border border-white/50 bg-white/55 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Upcoming live</p>
+                        <p className="mt-1 font-semibold">Market Breakdown</p>
+                        <p className="text-xs text-muted">$45 access • starts in 45 min</p>
+                      </div>
+                      <div className="rounded-[22px] border border-white/40 bg-white/40 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Creator wallet</p>
+                        <p className="mt-1 font-semibold">$1,840 available</p>
+                        <p className="text-xs text-muted">Payouts and pending balance stay visible.</p>
+                      </div>
+                      <div className="rounded-[22px] border border-white/40 bg-accent/12 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-accent">AI concierge</p>
+                        <p className="mt-1 text-sm font-semibold text-text">Find the fastest route to your next action.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                <SectionTitle
+                  eyebrow="Mobile-first moments"
+                  body="The web experience handles discovery and depth well, but the app is where LiveGate feels fastest for reminders, checkout follow-through, creator operations, and room access."
+                  title="Use the app when timing matters"
+                />
+                <div className="grid gap-3">
+                  {appHighlights.map((item) => (
+                    <div className="rounded-[24px] border border-white/35 bg-white/22 p-4 backdrop-blur-xl" key={item.title}>
+                      <p className="font-semibold tracking-[-0.02em]">{item.title}</p>
+                      <p className="mt-2 text-sm leading-6 text-muted">{item.body}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Link to="/auth/sign-in?demo=demo-hybrid">
+                    <Button>Open the app-ready demo flow</Button>
+                  </Link>
+                  <Link to="/auth/sign-up">
+                    <Button variant="secondary">Create an account for mobile</Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </Card>
         </section>
 
         <section className="space-y-6">

@@ -39,6 +39,9 @@ const publicRoleModes = [
   },
 ] as const;
 
+const publicParticipants = demoParticipants.filter((participant) => participant.audience === 'public');
+const staffParticipants = demoParticipants.filter((participant) => participant.audience === 'staff');
+
 function AuthShell({
   eyebrow,
   title,
@@ -220,10 +223,9 @@ export function SignInPage() {
     },
   });
 
-  const publicParticipants = demoParticipants.filter((participant) => participant.audience === 'public');
+  const demoId = searchParams.get('demo');
 
   useEffect(() => {
-    const demoId = searchParams.get('demo');
     if (!demoId) return;
 
     const participant = publicParticipants.find((item) => item.id === demoId);
@@ -232,7 +234,7 @@ export function SignInPage() {
     setPreferredRoles(participant.roles, participant.defaultRole);
     form.setValue('email', participant.email);
     form.setValue('password', participant.password);
-  }, [form, publicParticipants, searchParams, setPreferredRoles]);
+  }, [demoId, form, setPreferredRoles]);
 
   return (
     <AuthShell
@@ -377,10 +379,9 @@ export function StaffAccessPage() {
     defaultValues: { email: '', password: '' },
   });
 
-  const staffParticipants = demoParticipants.filter((participant) => participant.audience === 'staff');
+  const demoId = searchParams.get('demo');
 
   useEffect(() => {
-    const demoId = searchParams.get('demo');
     if (!demoId) return;
 
     const participant = staffParticipants.find((item) => item.id === demoId);
@@ -389,7 +390,7 @@ export function StaffAccessPage() {
     setPreferredRoles(participant.roles, participant.defaultRole);
     form.setValue('email', participant.email);
     form.setValue('password', participant.password);
-  }, [form, searchParams, setPreferredRoles, staffParticipants]);
+  }, [demoId, form, setPreferredRoles]);
 
   const mutation = useMutation({
     mutationFn: (values: z.infer<typeof signInSchema>) => {

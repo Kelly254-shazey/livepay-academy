@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
   "aiomysql>=0.2.0",
   "apscheduler>=3.10.4",
+  "cryptography>=44.0.0",
   "fastapi>=0.115.11",
   "pydantic-settings>=2.8.1",
   "redis>=5.2.1",

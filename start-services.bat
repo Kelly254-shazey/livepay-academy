@@ -41,7 +41,7 @@ echo   Node.js API:          http://localhost:3000
 echo   Swagger Docs:         http://localhost:3000/docs
 echo   Python Service:       http://localhost:8000
 echo   Java Service:         http://localhost:8080
-echo   MySQL:                localhost:3306
+echo   MySQL:                localhost:3307
 echo   Redis:                localhost:6379
 echo.
 echo [INFO] Next steps in separate terminals:
