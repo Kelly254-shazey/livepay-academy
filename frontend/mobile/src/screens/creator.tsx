@@ -570,138 +570,140 @@ export function CreateLiveScreen() {
 
   return (
     <Screen>
-      <Heading title="New live session" />
-      <Surface>
-        <TextField label="Session title" onChangeText={setTitle} placeholder="New York open breakdown" value={title} />
-        <TextField
-          label="Description"
-          onChangeText={setDescription}
-          placeholder="What will viewers learn, receive, or experience?"
-          value={description}
-        />
-        <TextField
-          label="Schedule"
-          onChangeText={setScheduleLabel}
-          placeholder="March 29, 7:00 PM EAT"
-          value={scheduleLabel}
-        />
-        <Text style={{ fontSize: 13, color: '#60726C' }}>Category</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {categories.map((item) => (
-            <CategoryChip
-              active={category === item.slug}
-              key={item.slug}
-              onPress={() => setCategory(item.slug)}
-              title={item.title}
+      {!isLive ? (
+        <>
+          <Heading title="New live session" />
+          <Surface>
+            <TextField label="Session title" onChangeText={setTitle} placeholder="New York open breakdown" value={title} />
+            <TextField
+              label="Description"
+              onChangeText={setDescription}
+              placeholder="What will viewers learn, receive, or experience?"
+              value={description}
             />
-          ))}
-        </View>
-        <Text style={{ fontSize: 13, color: '#60726C' }}>Access model</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {accessModes.map((item) => (
-            <CategoryChip
-              active={accessMode === item.value}
-              key={item.value}
-              onPress={() => setAccessMode(item.value)}
-              title={item.title}
+            <TextField
+              label="Schedule"
+              onChangeText={setScheduleLabel}
+              placeholder="March 29, 7:00 PM EAT"
+              value={scheduleLabel}
             />
-          ))}
-        </View>
-        <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>
-          {accessModes.find((item) => item.value === accessMode)?.body}
-        </Text>
-        <Text style={{ fontSize: 13, color: '#60726C' }}>Visibility</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {visibilityModes.map((item) => (
-            <CategoryChip
-              active={visibility === item.value}
-              key={item.value}
-              onPress={() => setVisibility(item.value)}
-              title={item.title}
+            <Text style={{ fontSize: 13, color: '#60726C' }}>Category</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {categories.map((item) => (
+                <CategoryChip
+                  active={category === item.slug}
+                  key={item.slug}
+                  onPress={() => setCategory(item.slug)}
+                  title={item.title}
+                />
+              ))}
+            </View>
+            <Text style={{ fontSize: 13, color: '#60726C' }}>Access model</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {accessModes.map((item) => (
+                <CategoryChip
+                  active={accessMode === item.value}
+                  key={item.value}
+                  onPress={() => setAccessMode(item.value)}
+                  title={item.title}
+                />
+              ))}
+            </View>
+            <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>
+              {accessModes.find((item) => item.value === accessMode)?.body}
+            </Text>
+            <Text style={{ fontSize: 13, color: '#60726C' }}>Visibility</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {visibilityModes.map((item) => (
+                <CategoryChip
+                  active={visibility === item.value}
+                  key={item.value}
+                  onPress={() => setVisibility(item.value)}
+                  title={item.title}
+                />
+              ))}
+            </View>
+            <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>
+              {visibilityModes.find((item) => item.value === visibility)?.body}
+            </Text>
+            {accessMode === 'paid' ? (
+              <TextField label="Viewer price" onChangeText={setPrice} placeholder="45" value={price} />
+            ) : null}
+            <TextField
+              label="Host notes"
+              onChangeText={setHostNotes}
+              placeholder="Optional notes for moderators, co-hosts, or reminders."
+              value={hostNotes}
             />
-          ))}
-        </View>
-        <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>
-          {visibilityModes.find((item) => item.value === visibility)?.body}
-        </Text>
-        {accessMode === 'paid' ? (
-          <TextField label="Viewer price" onChangeText={setPrice} placeholder="45" value={price} />
-        ) : null}
-        <TextField
-          label="Host notes"
-          onChangeText={setHostNotes}
-          placeholder="Optional notes for moderators, co-hosts, or reminders."
-          value={hostNotes}
-        />
-      </Surface>
+          </Surface>
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-        <SummaryTile
-          body={accessMode === 'paid' ? 'Price shown to viewers before checkout.' : 'This live can be joined without payment.'}
-          label="Viewer price"
-          value={formatCurrency(normalizedPrice)}
-        />
-        <SummaryTile
-          body="Platform share retained after a successful paid checkout."
-          label="Platform share"
-          value={formatCurrency(platformCommission)}
-        />
-        <SummaryTile
-          body="Content creator share after LiveGate commission."
-          label="Content creator share"
-          value={formatCurrency(creatorNet)}
-        />
-        <SummaryTile
-          body="Where the live will appear when it is available."
-          label="Visibility"
-          value={visibilityModes.find((item) => item.value === visibility)?.title ?? 'Public'}
-        />
-      </View>
-
-      <Surface>
-        <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Preview</Text>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: '#10211D' }}>
-          {title.trim() || 'Untitled live session'}
-        </Text>
-        <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
-          {description.trim() || 'Add a session description to clarify what viewers unlock.'}
-        </Text>
-        <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
-          Category: {getCategoryTitle(category)}
-        </Text>
-        <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
-          Schedule: {scheduleLabel.trim() || 'No schedule entered yet'}
-        </Text>
-        <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{accessPolicy}</Text>
-        {hostNotes.trim() ? (
-          <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>Host note: {hostNotes.trim()}</Text>
-        ) : null}
-      </Surface>
-
-      {feedback ? (
-        <Surface>
-          <Text style={{ fontSize: 14, color: feedback.tone === 'success' ? '#196B59' : '#A64B40' }}>
-            {feedback.text}
-          </Text>
-        </Surface>
-      ) : null}
-
-      {createdSession ? (
-        <Surface>
-          <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
-            {createdSession.status === 'published' ? 'Published preview' : 'Draft preview'}
-          </Text>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#10211D' }}>{createdSession.title}</Text>
-          <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{createdSession.scheduleLabel}</Text>
-          <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{createdSession.accessPolicy}</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-            <Button onPress={() => router.replace('/(creator)/(tabs)/lives')} title="Return to live sessions" />
-            <Button onPress={() => router.push('/(creator)/(tabs)/library')} title="Open library" variant="secondary" />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SummaryTile
+              body={accessMode === 'paid' ? 'Price shown to viewers before checkout.' : 'This live can be joined without payment.'}
+              label="Viewer price"
+              value={formatCurrency(normalizedPrice)}
+            />
+            <SummaryTile
+              body="Platform share retained after a successful paid checkout."
+              label="Platform share"
+              value={formatCurrency(platformCommission)}
+            />
+            <SummaryTile
+              body="Content creator share after LiveGate commission."
+              label="Content creator share"
+              value={formatCurrency(creatorNet)}
+            />
+            <SummaryTile
+              body="Where the live will appear when it is available."
+              label="Visibility"
+              value={visibilityModes.find((item) => item.value === visibility)?.title ?? 'Public'}
+            />
           </View>
-        </Surface>
-      ) : null}
 
-      {liveSetupVisible && createdSession?.status === 'published' && !isLive ? (
+          <Surface>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Preview</Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#10211D' }}>
+              {title.trim() || 'Untitled live session'}
+            </Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+              {description.trim() || 'Add a session description to clarify what viewers unlock.'}
+            </Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+              Category: {getCategoryTitle(category)}
+            </Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+              Schedule: {scheduleLabel.trim() || 'No schedule entered yet'}
+            </Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{accessPolicy}</Text>
+            {hostNotes.trim() ? (
+              <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>Host note: {hostNotes.trim()}</Text>
+            ) : null}
+          </Surface>
+
+          {feedback ? (
+            <Surface>
+              <Text style={{ fontSize: 14, color: feedback.tone === 'success' ? '#196B59' : '#A64B40' }}>
+                {feedback.text}
+              </Text>
+            </Surface>
+          ) : null}
+
+          {createdSession ? (
+            <Surface>
+              <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
+                {createdSession.status === 'published' ? 'Published preview' : 'Draft preview'}
+              </Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#10211D' }}>{createdSession.title}</Text>
+              <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{createdSession.scheduleLabel}</Text>
+              <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{createdSession.accessPolicy}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                <Button onPress={() => router.replace('/(creator)/(tabs)/lives')} title="Return to live sessions" />
+                <Button onPress={() => router.push('/(creator)/(tabs)/library')} title="Open library" variant="secondary" />
+              </View>
+            </Surface>
+          ) : null}
+
+          {liveSetupVisible && createdSession?.status === 'published' ? (
         <Surface padding={0} style={{ overflow: 'hidden' }}>
           <View style={{ paddingHorizontal: 20, paddingTop: 20, gap: 8 }}>
             <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
@@ -843,6 +845,13 @@ export function CreateLiveScreen() {
             />
           </View>
         </Surface>
+          ) : null}
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            <Button onPress={() => saveSession('published')} title="Publish live session" />
+            <Button onPress={() => saveSession('draft')} title="Save draft" variant="secondary" />
+          </View>
+        </>
       ) : null}
 
       {isLive && createdSession?.status === 'published' ? (
@@ -1059,11 +1068,6 @@ export function CreateLiveScreen() {
           </Surface>
         </View>
       ) : null}
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-        <Button onPress={() => saveSession('published')} title="Publish live session" />
-        <Button onPress={() => saveSession('draft')} title="Save draft" variant="secondary" />
-      </View>
     </Screen>
   );
 }
