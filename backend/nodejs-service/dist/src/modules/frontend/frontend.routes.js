@@ -13,19 +13,51 @@ function createFrontendRouter(service) {
     router.post("/auth/sign-in", (0, validate_1.validate)(frontend_schemas_1.frontendSignInSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
         const result = await service.signIn({
             ...req.body,
-            ipAddress: req.ip
+            ipAddress: req.ip,
+            userAgent: req.get("user-agent")
         });
         res.json(result);
     }));
     router.post("/auth/sign-up", (0, validate_1.validate)(frontend_schemas_1.frontendSignUpSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
         const result = await service.signUp({
             ...req.body,
-            ipAddress: req.ip
+            ipAddress: req.ip,
+            userAgent: req.get("user-agent")
         });
         res.status(201).json(result);
     }));
+    router.post("/auth/google", (0, validate_1.validate)(frontend_schemas_1.frontendGoogleAuthSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.signInWithGoogle({
+            ...req.body,
+            ipAddress: req.ip,
+            userAgent: req.get("user-agent")
+        });
+        res.json(result);
+    }));
     router.get("/auth/session", authenticate_1.authenticate, (0, async_handler_1.asyncHandler)(async (req, res) => {
         const result = await service.getSession(req.auth);
+        res.json(result);
+    }));
+    router.post("/auth/refresh", (0, validate_1.validate)(frontend_schemas_1.frontendRefreshSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.refreshSession(req.body.refreshToken, {
+            ipAddress: req.ip,
+            userAgent: req.get("user-agent")
+        });
+        res.json(result);
+    }));
+    router.post("/auth/logout", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.frontendRefreshSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.logout(req.body.refreshToken, {
+            ...req.auth,
+            ipAddress: req.ip
+        });
+        res.json(result);
+    }));
+    router.post("/auth/verify-email", (0, validate_1.validate)(frontend_schemas_1.frontendVerifyEmailSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.verifyEmail(req.body);
+        res.json(result);
+    }));
+    router.post("/auth/verify-email/resend", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.emptyBodySchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.resendEmailVerification(req.auth);
         res.json(result);
     }));
     router.post("/auth/forgot-password", (0, validate_1.validate)(frontend_schemas_1.frontendForgotPasswordSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
@@ -33,7 +65,19 @@ function createFrontendRouter(service) {
         res.json(result);
     }));
     router.post("/auth/reset-password", (0, validate_1.validate)(frontend_schemas_1.frontendResetPasswordSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
-        const result = await service.resetPassword(req.body.token, req.body.password);
+        const result = await service.resetPassword(req.body);
+        res.json(result);
+    }));
+    router.post("/auth/complete-profile", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.frontendCompleteProfileSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.completeProfile(req.auth, req.body);
+        res.json(result);
+    }));
+    router.post("/auth/link/google", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.frontendGoogleAuthSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.linkGoogleAccount(req.auth, req.body.idToken);
+        res.json(result);
+    }));
+    router.post("/auth/link/password", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.frontendLinkPasswordSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.linkPasswordAccount(req.auth, req.body.password);
         res.json(result);
     }));
     router.get("/home", (0, async_handler_1.asyncHandler)(async (_req, res) => res.json(await service.getHomeFeed())));

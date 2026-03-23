@@ -9,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
+import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { z } from 'zod';
 import { mobileApi } from '@/api/client';
@@ -69,6 +70,9 @@ function formatRoleLabel(role: UserRole) {
   return role;
 }
 
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD format.");
+const genderSchema = z.enum(["male", "female", "prefer_not_to_say", "custom"]);
+
 const signInSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
@@ -78,6 +82,23 @@ const signUpSchema = z.object({
   fullName: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
+  username: z.string().trim().min(3).max(32),
+  dateOfBirth: dateSchema,
+  gender: genderSchema,
+  customGender: z.string().trim().max(80).optional(),
+});
+
+const emailVerificationSchema = z.object({
+  email: z.string().email(),
+  code: z.string().trim().length(6),
+});
+
+const profileCompletionSchema = z.object({
+  fullName: z.string().min(2),
+  username: z.string().trim().min(3).max(32),
+  dateOfBirth: dateSchema,
+  gender: genderSchema,
+  customGender: z.string().trim().max(80).optional(),
 });
 
 const forgotSchema = z.object({
@@ -86,8 +107,12 @@ const forgotSchema = z.object({
 
 const resetSchema = z.object({
   email: z.string().email(),
-  token: z.string().min(4),
+  code: z.string().trim().length(6),
   password: z.string().min(8),
+});
+
+const googleSignInSchema = z.object({
+  idToken: z.string().min(20),
 });
 
 function DemoParticipantsPanel({
@@ -244,12 +269,33 @@ export function SignInScreen() {
     },
   });
 
+  const googleMutation = useMutation({
+    mutationFn: async () => {
+      // TODO: Integrate with actual Google Sign-In provider
+      alert('Google sign-in requires @react-native-google-signin/google-signin package.\nInstall it with: npm install @react-native-google-signin/google-signin');
+      throw new Error('Google sign-in not configured');
+    },
+    onSuccess: (session) => {
+      const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
+      setSession(normalized);
+      router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
+    },
+  });
+
   const publicParticipants = demoParticipants.filter((participant) => participant.audience === 'public');
 
   return (
     <Screen>
       <Heading title="Sign in" />
       <Surface>
+        <Text style={styles.sectionEyebrow}>Quick sign-in</Text>
+        <Button 
+          onPress={() => googleMutation.mutate()} 
+          title={googleMutation.isPending ? 'Signing in with Google...' : 'Continue with Google'} 
+          variant="secondary"
+        />
+        <Text style={styles.dividerText}>or</Text>
+        
         <Controller
           control={form.control}
           name="email"
@@ -268,6 +314,7 @@ export function SignInScreen() {
           Selected mode: {preferredRoles.map(formatRoleLabel).join(' + ')}
         </Text>
         {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
+        {googleMutation.isError ? <Text style={styles.errorText}>{(googleMutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Signing in...' : 'Sign in'} />
       </Surface>
       <DemoParticipantsPanel
@@ -288,14 +335,45 @@ export function SignUpScreen() {
   const preferredRole = useSessionStore((state) => state.preferredRole);
   const preferredRoles = useSessionStore((state) => state.preferredRoles);
   const setSession = useSessionStore((state) => state.setSession);
+  const [showGenderCustom, setShowGenderCustom] = React.useState(false);
+  
   const form = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { fullName: '', email: '', password: '' },
+    defaultValues: { 
+      fullName: '', 
+      email: '', 
+      password: '',
+      username: '',
+      dateOfBirth: '',
+      gender: 'prefer_not_to_say',
+      customGender: '',
+    },
   });
 
   const mutation = useMutation({
     mutationFn: (values: z.infer<typeof signUpSchema>) =>
-      mobileApi.signUp({ ...values, role: preferredRole, roles: preferredRoles }),
+      mobileApi.signUp({ 
+        ...values, 
+        role: preferredRole, 
+        roles: preferredRoles 
+      }),
+    onSuccess: (session) => {
+      const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
+      setSession(normalized);
+      if (normalized.user.emailVerifiedAt) {
+        router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
+      } else {
+        router.replace('/(public)/email-verification');
+      }
+    },
+  });
+
+  const googleMutation = useMutation({
+    mutationFn: async () => {
+      // TODO: Integrate with actual Google Sign-In provider (@react-native-google-signin/google-signin)
+      alert('Google sign-in requires @react-native-google-signin/google-signin package.\nInstall it with: npm install @react-native-google-signin/google-signin');
+      throw new Error('Google sign-in not configured');
+    },
     onSuccess: (session) => {
       const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
       setSession(normalized);
@@ -307,11 +385,27 @@ export function SignUpScreen() {
     <Screen>
       <Heading title="Create account" />
       <Surface>
+        <Text style={styles.sectionEyebrow}>Quick sign-up</Text>
+        <Button 
+          onPress={() => googleMutation.mutate()} 
+          title={googleMutation.isPending ? 'Signing up with Google...' : 'Continue with Google'} 
+          variant="secondary"
+        />
+        <Text style={styles.dividerText}>or</Text>
+        <Text style={styles.sectionEyebrow}>Standard registration</Text>
+        
         <Controller
           control={form.control}
           name="fullName"
           render={({ field }) => (
             <TextField label="Full name" onChangeText={field.onChange} placeholder="Your full name" value={field.value} />
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="username"
+          render={({ field }) => (
+            <TextField label="Username" onChangeText={field.onChange} placeholder="Unique username" value={field.value} />
           )}
         />
         <Controller
@@ -328,10 +422,49 @@ export function SignUpScreen() {
             <TextField label="Password" onChangeText={field.onChange} placeholder="Create password" secureTextEntry value={field.value} />
           )}
         />
+        <Controller
+          control={form.control}
+          name="dateOfBirth"
+          render={({ field }) => (
+            <TextField label="Date of birth" onChangeText={field.onChange} placeholder="YYYY-MM-DD" value={field.value} />
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="gender"
+          render={({ field }) => (
+            <View style={{ gap: 8 }}>
+              <Text style={styles.statusText}>Gender</Text>
+              <View style={{ gap: 8 }}>
+                {(['male', 'female', 'prefer_not_to_say', 'custom'] as const).map((option) => (
+                  <Button
+                    key={option}
+                    onPress={() => {
+                      field.onChange(option);
+                      setShowGenderCustom(option === 'custom');
+                    }}
+                    title={option === 'male' ? 'Male' : option === 'female' ? 'Female' : option === 'prefer_not_to_say' ? 'Prefer not to say' : 'Custom'}
+                    variant={field.value === option ? 'primary' : 'secondary'}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+        />
+        {showGenderCustom && (
+          <Controller
+            control={form.control}
+            name="customGender"
+            render={({ field }) => (
+              <TextField label="Please specify" onChangeText={field.onChange} placeholder="Your gender identity" value={field.value} />
+            )}
+          />
+        )}
         <Text style={styles.statusText}>
           Account mode: {preferredRoles.map(formatRoleLabel).join(' + ')}
         </Text>
         {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
+        {googleMutation.isError ? <Text style={styles.errorText}>{(googleMutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Creating...' : 'Create account'} />
       </Surface>
     </Screen>
@@ -430,7 +563,7 @@ export function ForgotPasswordScreen() {
 export function ResetPasswordScreen() {
   const form = useForm<z.infer<typeof resetSchema>>({
     resolver: zodResolver(resetSchema),
-    defaultValues: { email: '', token: '', password: '' },
+    defaultValues: { email: '', code: '', password: '' },
   });
 
   const mutation = useMutation({
@@ -450,9 +583,9 @@ export function ResetPasswordScreen() {
         />
         <Controller
           control={form.control}
-          name="token"
+          name="code"
           render={({ field }) => (
-            <TextField label="Token" onChangeText={field.onChange} placeholder="Reset token" value={field.value} />
+            <TextField label="Verification code" onChangeText={field.onChange} placeholder="000000" value={field.value} />
           )}
         />
         <Controller
@@ -465,6 +598,140 @@ export function ResetPasswordScreen() {
         {mutation.isSuccess ? <Text style={styles.successText}>{mutation.data.message}</Text> : null}
         {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title="Update password" />
+      </Surface>
+    </Screen>
+  );
+}
+
+export function EmailVerificationScreen() {
+  const { session } = useSessionStore();
+  const form = useForm<z.infer<typeof emailVerificationSchema>>({
+    resolver: zodResolver(emailVerificationSchema),
+    defaultValues: { email: session?.user.email || '', code: '' },
+  });
+
+  const mutation = useMutation({
+    mutationFn: mobileApi.confirmEmailVerification,
+    onSuccess: () => {
+      router.replace('/(viewer)/(tabs)/home');
+    },
+  });
+
+  return (
+    <Screen>
+      <Heading title="Verify email" />
+      <Surface>
+        <Text style={styles.statusText}>
+          We sent a 6-digit code to {form.getValues('email')}
+        </Text>
+        <Controller
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <TextField label="Email" editable={false} value={field.value} />
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="code"
+          render={({ field }) => (
+            <TextField label="Verification code" onChangeText={field.onChange} placeholder="000000" maxLength={6} value={field.value} />
+          )}
+        />
+        {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
+        <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Verifying...' : 'Verify email'} />
+      </Surface>
+    </Screen>
+  );
+}
+
+export function ProfileCompletionScreen() {
+  const { session } = useSessionStore();
+  const setSession = useSessionStore((state) => state.setSession);
+  const [showGenderCustom, setShowGenderCustom] = React.useState(false);
+  
+  const form = useForm<z.infer<typeof profileCompletionSchema>>({
+    resolver: zodResolver(profileCompletionSchema),
+    defaultValues: {
+      fullName: session?.user.fullName || '',
+      username: session?.user.username || '',
+      dateOfBirth: '',
+      gender: 'prefer_not_to_say',
+      customGender: '',
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: mobileApi.completeProfile,
+    onSuccess: (updatedSession) => {
+      const normalized = normalizeAuthSession(updatedSession, session?.user.roles || [], session?.user.role);
+      setSession(normalized);
+      if (session?.user.role === 'creator') {
+        router.replace('/(creator)/(tabs)/dashboard');
+      } else {
+        router.replace('/(viewer)/(tabs)/home');
+      }
+    },
+  });
+
+  return (
+    <Screen>
+      <Heading title="Complete your profile" />
+      <Surface>
+        <Controller
+          control={form.control}
+          name="fullName"
+          render={({ field }) => (
+            <TextField label="Full name" onChangeText={field.onChange} placeholder="Your full name" value={field.value} />
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="username"
+          render={({ field }) => (
+            <TextField label="Username" onChangeText={field.onChange} placeholder="Unique username" value={field.value} />
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="dateOfBirth"
+          render={({ field }) => (
+            <TextField label="Date of birth" onChangeText={field.onChange} placeholder="YYYY-MM-DD" value={field.value} />
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="gender"
+          render={({ field }) => (
+            <View style={{ gap: 8 }}>
+              <Text style={styles.statusText}>Gender</Text>
+              <View style={{ gap: 8 }}>
+                {(['male', 'female', 'prefer_not_to_say', 'custom'] as const).map((option) => (
+                  <Button
+                    key={option}
+                    onPress={() => {
+                      field.onChange(option);
+                      setShowGenderCustom(option === 'custom');
+                    }}
+                    title={option === 'male' ? 'Male' : option === 'female' ? 'Female' : option === 'prefer_not_to_say' ? 'Prefer not to say' : 'Custom'}
+                    variant={field.value === option ? 'primary' : 'secondary'}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+        />
+        {showGenderCustom && (
+          <Controller
+            control={form.control}
+            name="customGender"
+            render={({ field }) => (
+              <TextField label="Please specify" onChangeText={field.onChange} placeholder="Your gender identity" value={field.value} />
+            )}
+          />
+        )}
+        {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
+        <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Saving...' : 'Complete profile'} />
       </Surface>
     </Screen>
   );
@@ -674,6 +941,13 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: theme.typography.sizes.sm,
     color: theme.colors.danger,
+    fontWeight: theme.typography.weights.medium,
+  },
+  dividerText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    marginVertical: theme.spacing.md,
     fontWeight: theme.typography.weights.medium,
   },
 });

@@ -1,22 +1,37 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.passwordResetConfirmSchema = exports.passwordResetRequestSchema = exports.refreshTokenSchema = exports.loginSchema = exports.registerSchema = void 0;
+exports.emptyBodySchema = exports.linkPasswordSchema = exports.completeProfileSchema = exports.emailVerificationConfirmSchema = exports.passwordResetConfirmSchema = exports.passwordResetRequestSchema = exports.refreshTokenSchema = exports.googleSignInSchema = exports.loginSchema = exports.registerSchema = void 0;
 const zod_1 = require("zod");
+const usernameSchema = zod_1.z.string().trim().min(3).max(32);
+const dateSchema = zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD format.");
+const genderSchema = zod_1.z.enum(["male", "female", "prefer_not_to_say", "custom"]);
+const passwordSchema = zod_1.z.string().min(8).max(72);
 exports.registerSchema = zod_1.z.object({
     body: zod_1.z.object({
         email: zod_1.z.string().email(),
-        password: zod_1.z.string().min(8).max(72),
-        firstName: zod_1.z.string().min(1).max(80),
-        lastName: zod_1.z.string().min(1).max(80),
-        role: zod_1.z.enum(["viewer", "creator"]).default("viewer")
+        password: passwordSchema,
+        fullName: zod_1.z.string().min(2).max(160),
+        username: usernameSchema,
+        role: zod_1.z.enum(["viewer", "creator"]).default("viewer"),
+        dateOfBirth: dateSchema,
+        gender: genderSchema,
+        customGender: zod_1.z.string().trim().max(80).optional()
     }),
     params: zod_1.z.object({}).default({}),
     query: zod_1.z.object({}).default({})
 });
 exports.loginSchema = zod_1.z.object({
     body: zod_1.z.object({
-        email: zod_1.z.string().email(),
-        password: zod_1.z.string().min(8).max(72)
+        identifier: zod_1.z.string().trim().min(3).max(160),
+        password: passwordSchema
+    }),
+    params: zod_1.z.object({}).default({}),
+    query: zod_1.z.object({}).default({})
+});
+exports.googleSignInSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        idToken: zod_1.z.string().min(20),
+        role: zod_1.z.enum(["viewer", "creator"]).default("viewer")
     }),
     params: zod_1.z.object({}).default({}),
     query: zod_1.z.object({}).default({})
@@ -37,9 +52,41 @@ exports.passwordResetRequestSchema = zod_1.z.object({
 });
 exports.passwordResetConfirmSchema = zod_1.z.object({
     body: zod_1.z.object({
-        token: zod_1.z.string().min(12),
-        password: zod_1.z.string().min(8).max(72)
+        email: zod_1.z.string().email(),
+        code: zod_1.z.string().trim().length(6),
+        password: passwordSchema
     }),
+    params: zod_1.z.object({}).default({}),
+    query: zod_1.z.object({}).default({})
+});
+exports.emailVerificationConfirmSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        email: zod_1.z.string().email(),
+        code: zod_1.z.string().trim().length(6)
+    }),
+    params: zod_1.z.object({}).default({}),
+    query: zod_1.z.object({}).default({})
+});
+exports.completeProfileSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        fullName: zod_1.z.string().min(2).max(160),
+        username: usernameSchema,
+        dateOfBirth: dateSchema,
+        gender: genderSchema,
+        customGender: zod_1.z.string().trim().max(80).optional()
+    }),
+    params: zod_1.z.object({}).default({}),
+    query: zod_1.z.object({}).default({})
+});
+exports.linkPasswordSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        password: passwordSchema
+    }),
+    params: zod_1.z.object({}).default({}),
+    query: zod_1.z.object({}).default({})
+});
+exports.emptyBodySchema = zod_1.z.object({
+    body: zod_1.z.object({}).default({}),
     params: zod_1.z.object({}).default({}),
     query: zod_1.z.object({}).default({})
 });

@@ -11,7 +11,13 @@ import {
   classIdParamsSchema,
   contentIdParamsSchema,
   creatorIdParamsSchema,
+  emptyBodySchema,
   frontendForgotPasswordSchema,
+  frontendGoogleAuthSchema,
+  frontendLinkPasswordSchema,
+  frontendRefreshSchema,
+  frontendVerifyEmailSchema,
+  frontendCompleteProfileSchema,
   frontendResetPasswordSchema,
   frontendSignInSchema,
   frontendSignUpSchema,
@@ -30,7 +36,8 @@ export function createFrontendRouter(service: FrontendService) {
     asyncHandler(async (req, res) => {
       const result = await service.signIn({
         ...req.body,
-        ipAddress: req.ip
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent")
       });
       res.json(result);
     })
@@ -42,9 +49,23 @@ export function createFrontendRouter(service: FrontendService) {
     asyncHandler(async (req, res) => {
       const result = await service.signUp({
         ...req.body,
-        ipAddress: req.ip
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent")
       });
       res.status(201).json(result);
+    })
+  );
+
+  router.post(
+    "/auth/google",
+    validate(frontendGoogleAuthSchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.signInWithGoogle({
+        ...req.body,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent")
+      });
+      res.json(result);
     })
   );
 
@@ -53,6 +74,50 @@ export function createFrontendRouter(service: FrontendService) {
     authenticate,
     asyncHandler(async (req, res) => {
       const result = await service.getSession(req.auth!);
+      res.json(result);
+    })
+  );
+
+  router.post(
+    "/auth/refresh",
+    validate(frontendRefreshSchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.refreshSession(req.body.refreshToken, {
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent")
+      });
+      res.json(result);
+    })
+  );
+
+  router.post(
+    "/auth/logout",
+    authenticate,
+    validate(frontendRefreshSchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.logout(req.body.refreshToken, {
+        ...req.auth!,
+        ipAddress: req.ip
+      });
+      res.json(result);
+    })
+  );
+
+  router.post(
+    "/auth/verify-email",
+    validate(frontendVerifyEmailSchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.verifyEmail(req.body);
+      res.json(result);
+    })
+  );
+
+  router.post(
+    "/auth/verify-email/resend",
+    authenticate,
+    validate(emptyBodySchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.resendEmailVerification(req.auth!);
       res.json(result);
     })
   );
@@ -70,7 +135,37 @@ export function createFrontendRouter(service: FrontendService) {
     "/auth/reset-password",
     validate(frontendResetPasswordSchema),
     asyncHandler(async (req, res) => {
-      const result = await service.resetPassword(req.body.token, req.body.password);
+      const result = await service.resetPassword(req.body);
+      res.json(result);
+    })
+  );
+
+  router.post(
+    "/auth/complete-profile",
+    authenticate,
+    validate(frontendCompleteProfileSchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.completeProfile(req.auth!, req.body);
+      res.json(result);
+    })
+  );
+
+  router.post(
+    "/auth/link/google",
+    authenticate,
+    validate(frontendGoogleAuthSchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.linkGoogleAccount(req.auth!, req.body.idToken);
+      res.json(result);
+    })
+  );
+
+  router.post(
+    "/auth/link/password",
+    authenticate,
+    validate(frontendLinkPasswordSchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.linkPasswordAccount(req.auth!, req.body.password);
       res.json(result);
     })
   );

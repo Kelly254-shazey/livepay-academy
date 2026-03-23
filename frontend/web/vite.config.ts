@@ -6,6 +6,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, '');
   const apiBaseUrl = (env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
   const socketUrl = (env.VITE_SOCKET_URL ?? '').replace(/\/$/, '');
+  const googleClientId = env.VITE_GOOGLE_CLIENT_ID ?? '';
   const apiProxyTarget = apiBaseUrl.startsWith('http')
     ? new URL(apiBaseUrl).origin
     : 'http://localhost:3000';
@@ -16,6 +17,7 @@ export default defineConfig(({ mode }) => {
     define: {
       __LIVEGATE_API_BASE_URL__: JSON.stringify(apiBaseUrl),
       __LIVEGATE_SOCKET_URL__: JSON.stringify(socketUrl),
+      __LIVEGATE_GOOGLE_CLIENT_ID__: JSON.stringify(googleClientId),
     },
     server: {
       hmr: {
