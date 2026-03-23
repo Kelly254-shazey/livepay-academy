@@ -3,6 +3,9 @@
     "name": "LiveGate",
     "slug": "livegate-mobile",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "livegate",
@@ -15,7 +18,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.livegate.mobile"
+      "bundleIdentifier": "com.livegate.mobile",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "LiveGate uses the camera when a content creator starts a live session.",
+        "NSMicrophoneUsageDescription": "LiveGate uses the microphone when a content creator goes live with audio enabled."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,14 +32,33 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "package": "com.livegate.mobile"
+      "package": "com.livegate.mobile",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "LiveGate uses the camera when a content creator starts a live session.",
+          "microphonePermission": "LiveGate uses the microphone when a content creator goes live with audio enabled.",
+          "recordAudioAndroid": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "storeListing": {
+        "androidPackage": "com.livegate.mobile",
+        "iosBundleIdentifier": "com.livegate.mobile"
+      }
     }
   }
 }
