@@ -2,6 +2,7 @@ import type { ProfileSettingsPayload } from '@livegate/shared';
 import { categories, formatCurrency, getSessionRoles } from '@livegate/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { CameraView, useCameraPermissions, useMicrophonePermissions, type CameraType } from 'expo-camera';
 import { router } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { useEffect, useState } from 'react';
@@ -471,6 +472,13 @@ export function CreateLiveScreen() {
     scheduleLabel: string;
     accessPolicy: string;
   } | null>(null);
+  const [liveSetupVisible, setLiveSetupVisible] = useState(false);
+  const [isLive, setIsLive] = useState(false);
+  const [cameraEnabled, setCameraEnabled] = useState(true);
+  const [micEnabled, setMicEnabled] = useState(true);
+  const [cameraFacing, setCameraFacing] = useState<CameraType>('front');
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
 
   const numericPrice = Number(price || 0);
   const normalizedPrice = accessMode === 'paid' ? numericPrice : 0;
@@ -517,7 +525,38 @@ export function CreateLiveScreen() {
       scheduleLabel: scheduleLabel.trim(),
       accessPolicy,
     });
+    setIsLive(false);
+    setLiveSetupVisible(status === 'published');
   };
+
+  const handleGoLive = async () => {
+    if (!cameraEnabled && !micEnabled) {
+      setFeedback({ tone: 'danger', text: 'Turn on camera or microphone before going live.' });
+      return;
+    }
+
+    if (cameraEnabled && !cameraPermission?.granted) {
+      const response = await requestCameraPermission();
+      if (!response.granted) {
+        setFeedback({ tone: 'danger', text: 'Camera access is required while camera is turned on.' });
+        return;
+      }
+    }
+
+    if (micEnabled && !microphonePermission?.granted) {
+      const response = await requestMicrophonePermission();
+      if (!response.granted) {
+        setFeedback({ tone: 'danger', text: 'Microphone access is required while audio is turned on.' });
+        return;
+      }
+    }
+
+    setIsLive(true);
+    setFeedback({ tone: 'success', text: 'Live session started in creator preview mode.' });
+  };
+
+  const liveStatusTone = isLive ? '#D9534F' : '#205C47';
+  const canShowCameraPreview = cameraEnabled && cameraPermission?.granted;
 
   return (
     <Screen>
@@ -648,6 +687,150 @@ export function CreateLiveScreen() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
             <Button onPress={() => router.replace('/(creator)/(tabs)/lives')} title="Return to live sessions" />
             <Button onPress={() => router.push('/(creator)/(tabs)/library')} title="Open library" variant="secondary" />
+          </View>
+        </Surface>
+      ) : null}
+
+      {liveSetupVisible && createdSession?.status === 'published' ? (
+        <Surface padding={0} style={{ overflow: 'hidden' }}>
+          <View style={{ paddingHorizontal: 20, paddingTop: 20, gap: 8 }}>
+            <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
+              Live setup
+            </Text>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: '#10211D' }}>
+              {isLive ? 'You are live' : 'Go live now'}
+            </Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+              Switch camera and audio on or off before you start the session.
+            </Text>
+          </View>
+
+          <View
+            style={{
+              height: 420,
+              margin: 20,
+              marginTop: 16,
+              borderRadius: 28,
+              overflow: 'hidden',
+              backgroundColor: '#081513',
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.08)',
+            }}
+          >
+            {canShowCameraPreview ? (
+              <CameraView
+                active={liveSetupVisible}
+                facing={cameraFacing}
+                mirror={cameraFacing === 'front'}
+                mode="video"
+                style={{ flex: 1 }}
+              />
+            ) : (
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 24,
+                  backgroundColor: '#10211D',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 26,
+                    fontWeight: '700',
+                    color: '#F8F1E7',
+                    textAlign: 'center',
+                    fontFamily: theme.typography.displayFontFamily,
+                  }}
+                >
+                  {cameraEnabled ? 'Enable camera access to preview your live' : 'Camera is off'}
+                </Text>
+                <Text style={{ marginTop: 10, fontSize: 14, lineHeight: 22, color: '#BBD2CC', textAlign: 'center' }}>
+                  {cameraEnabled
+                    ? 'Turn on camera access, or continue with audio only.'
+                    : 'Your live can still start with audio only if microphone stays enabled.'}
+                </Text>
+              </View>
+            )}
+
+            <View
+              style={{
+                position: 'absolute',
+                top: 16,
+                left: 16,
+                flexDirection: 'row',
+                gap: 8,
+              }}
+            >
+              <View
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 999,
+                  backgroundColor: liveStatusTone,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
+                  {isLive ? 'LIVE' : 'Preview'}
+                </Text>
+              </View>
+              <View
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 999,
+                  backgroundColor: 'rgba(16,33,29,0.72)',
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
+                  {cameraEnabled ? 'Camera on' : 'Camera off'}
+                </Text>
+              </View>
+              <View
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 999,
+                  backgroundColor: 'rgba(16,33,29,0.72)',
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
+                  {micEnabled ? 'Mic on' : 'Mic off'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={{ paddingHorizontal: 20, paddingBottom: 20, gap: 10 }}>
+            {cameraEnabled && !cameraPermission?.granted ? (
+              <Button onPress={() => void requestCameraPermission()} title="Allow camera access" variant="secondary" />
+            ) : null}
+            {micEnabled && !microphonePermission?.granted ? (
+              <Button onPress={() => void requestMicrophonePermission()} title="Allow microphone access" variant="secondary" />
+            ) : null}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              <Button
+                onPress={() => setCameraEnabled((current) => !current)}
+                title={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
+                variant="secondary"
+              />
+              <Button
+                onPress={() => setMicEnabled((current) => !current)}
+                title={micEnabled ? 'Mute microphone' : 'Turn microphone on'}
+                variant="secondary"
+              />
+              <Button
+                onPress={() => setCameraFacing((current) => (current === 'front' ? 'back' : 'front'))}
+                title={cameraFacing === 'front' ? 'Use back camera' : 'Use front camera'}
+                variant="ghost"
+              />
+            </View>
+            <Button
+              disabled={isLive}
+              onPress={() => void handleGoLive()}
+              title={isLive ? 'Live now' : 'Go live now'}
+            />
           </View>
         </Surface>
       ) : null}

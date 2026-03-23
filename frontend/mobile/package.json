@@ -16,6 +16,7 @@
     "@livegate/shared": "file:../shared",
     "@tanstack/react-query": "^5.0.0",
     "expo": "~55.0.8",
+    "expo-camera": "~55.0.10",
     "expo-constants": "~55.0.9",
     "expo-file-system": "~55.0.11",
     "expo-font": "~55.0.4",
