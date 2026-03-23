@@ -87,24 +87,6 @@ const demoLiveVideoSources: Record<string, string> = {
   'live-coral-reef-window': 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
 };
 
-const demoLiveComments: Record<string, string[]> = {
-  'live-nairobi-city-lights': [
-    'The skyline colors look clean tonight.',
-    'Watching from Kampala, stream quality is good.',
-    'That rooftop angle feels cinematic.',
-  ],
-  'live-tokyo-after-dark': [
-    'The neon reflections are sharp.',
-    'This feels like a real night walk.',
-    'Please keep the camera on this street for a bit longer.',
-  ],
-  'live-coral-reef-window': [
-    'The reef drift is so calming.',
-    'That fish pass was beautiful.',
-    'This is exactly the kind of slow live stream I wanted.',
-  ],
-};
-
 const appearanceModes = ['system', 'light', 'dark'] as const;
 
 function formatRoleLabel(role: string) {
@@ -812,7 +794,11 @@ export function LiveDetailsScreen() {
 export function LiveRoomScreen() {
   const { liveId } = useLocalSearchParams<{ liveId: string }>();
   const unlockedDemoLiveIds = useSessionStore((state) => state.unlockedDemoLiveIds);
+  const session = useSessionStore((state) => state.session);
+  const liveChatMessages = useSessionStore((state) => (liveId ? state.demoLiveChats[liveId] ?? [] : []));
+  const sendDemoLiveChatMessage = useSessionStore((state) => state.sendDemoLiveChatMessage);
   const [showChat, setShowChat] = useState(false);
+  const [chatDraft, setChatDraft] = useState('');
   const query = useQuery({
     queryKey: ['mobile-live-room', liveId],
     queryFn: () => mobileApi.getLiveRoom(liveId),
@@ -849,6 +835,16 @@ export function LiveRoomScreen() {
             }
 
             const scenes = demoStreamScenes[liveId ?? ''] ?? [];
+            const handleSendChatMessage = () => {
+              if (!liveId || !chatDraft.trim()) return;
+
+              sendDemoLiveChatMessage(liveId, {
+                author: session?.user.fullName ?? 'Viewer',
+                body: chatDraft.trim(),
+                role: 'viewer',
+              });
+              setChatDraft('');
+            };
 
             return (
               <>
@@ -889,9 +885,9 @@ export function LiveRoomScreen() {
                           gap: 8,
                         }}
                       >
-                        {(demoLiveComments[liveId ?? ''] ?? []).slice(0, 3).map((message, index) => (
+                        {liveChatMessages.slice(-3).map((message) => (
                           <View
-                            key={`${message}-${index}`}
+                            key={message.id}
                             style={{
                               alignSelf: 'flex-start',
                               maxWidth: '92%',
@@ -902,9 +898,9 @@ export function LiveRoomScreen() {
                             }}
                           >
                             <Text style={{ color: '#b8d8cf', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
-                              viewer_{index + 14}
+                              {message.author}
                             </Text>
-                            <Text style={{ color: '#fffaf2', fontSize: 13, lineHeight: 18 }}>{message}</Text>
+                            <Text style={{ color: '#fffaf2', fontSize: 13, lineHeight: 18 }}>{message.body}</Text>
                           </View>
                         ))}
                       </View>
@@ -945,6 +941,37 @@ export function LiveRoomScreen() {
                       </Text>
                     </View>
                   </View>
+
+                  <Surface style={{ backgroundColor: theme.colors.surface }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <TextField
+                          onChangeText={setChatDraft}
+                          placeholder="Write a live message..."
+                          value={chatDraft}
+                        />
+                      </View>
+                      <Button onPress={handleSendChatMessage} title="Send" size="sm" />
+                    </View>
+                    {liveChatMessages.slice(-5).map((message) => (
+                      <View
+                        key={message.id}
+                        style={{
+                          borderRadius: theme.radius.lg,
+                          backgroundColor: theme.colors.surfaceElevated,
+                          padding: theme.spacing.md,
+                          gap: 4,
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: theme.colors.textMuted }}>
+                          {message.author}
+                        </Text>
+                        <Text style={{ fontSize: 14, lineHeight: 21, color: theme.colors.text }}>
+                          {message.body}
+                        </Text>
+                      </View>
+                    ))}
+                  </Surface>
 
                   {query.data.hostNotes?.length ? (
                     <Surface style={{ backgroundColor: theme.colors.surface }}>

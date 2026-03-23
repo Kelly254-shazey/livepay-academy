@@ -125,13 +125,6 @@ function getCategoryTitle(slug: string) {
   return categories.find((item) => item.slug === slug)?.title ?? slug.replace(/-/g, ' ');
 }
 
-const demoHostMessages = [
-  { id: 'msg-1', author: 'viewer_18', body: 'We can hear you clearly now.' },
-  { id: 'msg-2', author: 'viewer_07', body: 'Please keep the camera steady for a moment.' },
-  { id: 'msg-3', author: 'viewer_26', body: 'This live is smooth. Waiting for the main topic.' },
-  { id: 'msg-4', author: 'viewer_31', body: 'Can you answer the last question from chat?' },
-];
-
 export function CreatorDashboardScreen() {
   const session = useSessionStore((state) => state.session);
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
@@ -486,8 +479,13 @@ export function CreateLiveScreen() {
   const [micEnabled, setMicEnabled] = useState(true);
   const [cameraFacing, setCameraFacing] = useState<CameraType>('front');
   const [showAudienceMessages, setShowAudienceMessages] = useState(true);
+  const [chatDraft, setChatDraft] = useState('');
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
+  const session = useSessionStore((state) => state.session);
+  const liveChatMessages = useSessionStore((state) => state.demoLiveChats['creator-preview-live'] ?? []);
+  const sendDemoLiveChatMessage = useSessionStore((state) => state.sendDemoLiveChatMessage);
+  const resetDemoLiveChat = useSessionStore((state) => state.resetDemoLiveChat);
 
   const numericPrice = Number(price || 0);
   const normalizedPrice = accessMode === 'paid' ? numericPrice : 0;
@@ -567,6 +565,16 @@ export function CreateLiveScreen() {
   const liveStatusTone = isLive ? '#D9534F' : '#205C47';
   const canShowCameraPreview = cameraEnabled && cameraPermission?.granted;
   const liveAudienceCount = 148;
+  const handleSendChatMessage = () => {
+    if (!chatDraft.trim()) return;
+
+    sendDemoLiveChatMessage('creator-preview-live', {
+      author: session?.user.fullName ?? 'Host',
+      body: chatDraft.trim(),
+      role: 'creator',
+    });
+    setChatDraft('');
+  };
 
   return (
     <Screen>
@@ -938,7 +946,7 @@ export function CreateLiveScreen() {
               )}
             </View>
 
-            {showAudienceMessages ? (
+                {showAudienceMessages ? (
               <View
                 style={{
                   position: 'absolute',
@@ -949,7 +957,7 @@ export function CreateLiveScreen() {
                   gap: 8,
                 }}
               >
-                {demoHostMessages.slice(0, 3).map((message) => (
+                {liveChatMessages.slice(-3).map((message) => (
                   <View
                     key={message.id}
                     style={{
@@ -973,15 +981,52 @@ export function CreateLiveScreen() {
             <View
               style={{
                 position: 'absolute',
-                left: 20,
-                right: 20,
+                left: 16,
+                right: 16,
                 bottom: 20,
                 zIndex: 3,
-                flexDirection: 'row',
-                justifyContent: 'center',
                 gap: 12,
               }}
             >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  backgroundColor: 'rgba(11,21,19,0.72)',
+                  borderRadius: 22,
+                  padding: 8,
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <TextField
+                    onChangeText={setChatDraft}
+                    placeholder="Reply to viewers..."
+                    value={chatDraft}
+                  />
+                </View>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleSendChatMessage}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#F0C987',
+                  }}
+                >
+                  <Ionicons color="#10211D" name="paper-plane-outline" size={20} />
+                </TouchableOpacity>
+              </View>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 12,
+                }}
+              >
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => setMicEnabled((current) => !current)}
@@ -1029,6 +1074,7 @@ export function CreateLiveScreen() {
                 onPress={() => {
                   setIsLive(false);
                   setLiveSetupVisible(true);
+                  resetDemoLiveChat('creator-preview-live');
                   setFeedback({ tone: 'success', text: 'Live ended. You can update setup and go live again.' });
                 }}
                 style={{
@@ -1043,29 +1089,8 @@ export function CreateLiveScreen() {
                 <Ionicons color="#fffaf2" name="stop-circle-outline" size={24} />
               </TouchableOpacity>
             </View>
+            </View>
           </View>
-
-          <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Live audience messages</Text>
-            {demoHostMessages.map((message) => (
-              <View
-                key={message.id}
-                style={{
-                  borderRadius: theme.radius.lg,
-                  backgroundColor: theme.colors.surface,
-                  padding: theme.spacing.md,
-                  gap: 4,
-                }}
-              >
-                <Text style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: theme.colors.textMuted }}>
-                  {message.author}
-                </Text>
-                <Text style={{ fontSize: 14, lineHeight: 21, color: theme.colors.text }}>
-                  {message.body}
-                </Text>
-              </View>
-            ))}
-          </Surface>
         </View>
       ) : null}
     </Screen>
