@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ProfileSettingsPayload } from '@livegate/shared';
 import { categories, formatCurrency, getSessionRoles } from '@livegate/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,7 +7,7 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions, type Camera
 import { router } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { z } from 'zod';
 import { mobileApi } from '@/api/client';
 import {
@@ -123,6 +124,13 @@ function SummaryTile({
 function getCategoryTitle(slug: string) {
   return categories.find((item) => item.slug === slug)?.title ?? slug.replace(/-/g, ' ');
 }
+
+const demoHostMessages = [
+  { id: 'msg-1', author: 'viewer_18', body: 'We can hear you clearly now.' },
+  { id: 'msg-2', author: 'viewer_07', body: 'Please keep the camera steady for a moment.' },
+  { id: 'msg-3', author: 'viewer_26', body: 'This live is smooth. Waiting for the main topic.' },
+  { id: 'msg-4', author: 'viewer_31', body: 'Can you answer the last question from chat?' },
+];
 
 export function CreatorDashboardScreen() {
   const session = useSessionStore((state) => state.session);
@@ -477,6 +485,7 @@ export function CreateLiveScreen() {
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [micEnabled, setMicEnabled] = useState(true);
   const [cameraFacing, setCameraFacing] = useState<CameraType>('front');
+  const [showAudienceMessages, setShowAudienceMessages] = useState(true);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
 
@@ -557,6 +566,7 @@ export function CreateLiveScreen() {
 
   const liveStatusTone = isLive ? '#D9534F' : '#205C47';
   const canShowCameraPreview = cameraEnabled && cameraPermission?.granted;
+  const liveAudienceCount = 148;
 
   return (
     <Screen>
@@ -691,7 +701,7 @@ export function CreateLiveScreen() {
         </Surface>
       ) : null}
 
-      {liveSetupVisible && createdSession?.status === 'published' ? (
+      {liveSetupVisible && createdSession?.status === 'published' && !isLive ? (
         <Surface padding={0} style={{ overflow: 'hidden' }}>
           <View style={{ paddingHorizontal: 20, paddingTop: 20, gap: 8 }}>
             <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
@@ -833,6 +843,221 @@ export function CreateLiveScreen() {
             />
           </View>
         </Surface>
+      ) : null}
+
+      {isLive && createdSession?.status === 'published' ? (
+        <View style={{ gap: theme.spacing.md }}>
+          <View
+            style={{
+              overflow: 'hidden',
+              borderRadius: theme.radius.xl,
+              backgroundColor: '#081513',
+              ...theme.shadow.lg,
+            }}
+          >
+            <View style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 3, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: theme.radius.pill,
+                    backgroundColor: '#D9534F',
+                  }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>LIVE</Text>
+                </View>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    backgroundColor: 'rgba(11,21,19,0.62)',
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: theme.radius.pill,
+                  }}
+                >
+                  <Ionicons color="#fffaf2" name="people-outline" size={16} />
+                  <Text style={{ color: '#fffaf2', fontSize: 13, fontWeight: '600' }}>{liveAudienceCount}</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setShowAudienceMessages((current) => !current)}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(11,21,19,0.62)',
+                }}
+              >
+                <Ionicons color="#fffaf2" name={showAudienceMessages ? 'chatbubble' : 'chatbubble-outline'} size={20} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ width: '100%', aspectRatio: 9 / 16, backgroundColor: '#081513' }}>
+              {canShowCameraPreview ? (
+                <CameraView active facing={cameraFacing} mirror={cameraFacing === 'front'} mode="video" style={{ flex: 1 }} />
+              ) : (
+                <View
+                  style={{
+                    flex: 1,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingHorizontal: 24,
+                    backgroundColor: '#10211D',
+                  }}
+                >
+                  <Ionicons color="#fffaf2" name="videocam-off-outline" size={42} />
+                  <Text
+                    style={{
+                      marginTop: 14,
+                      fontSize: 22,
+                      lineHeight: 30,
+                      color: '#F8F1E7',
+                      textAlign: 'center',
+                      fontWeight: '700',
+                      fontFamily: theme.typography.displayFontFamily,
+                    }}
+                  >
+                    Camera is off. You are live on audio.
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {showAudienceMessages ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  left: 16,
+                  right: 88,
+                  bottom: 118,
+                  zIndex: 2,
+                  gap: 8,
+                }}
+              >
+                {demoHostMessages.slice(0, 3).map((message) => (
+                  <View
+                    key={message.id}
+                    style={{
+                      alignSelf: 'flex-start',
+                      maxWidth: '92%',
+                      borderRadius: 18,
+                      backgroundColor: 'rgba(11,21,19,0.62)',
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                    }}
+                  >
+                    <Text style={{ color: '#b8d8cf', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
+                      {message.author}
+                    </Text>
+                    <Text style={{ color: '#fffaf2', fontSize: 13, lineHeight: 18 }}>{message.body}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <View
+              style={{
+                position: 'absolute',
+                left: 20,
+                right: 20,
+                bottom: 20,
+                zIndex: 3,
+                flexDirection: 'row',
+                justifyContent: 'center',
+                gap: 12,
+              }}
+            >
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setMicEnabled((current) => !current)}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: micEnabled ? 'rgba(11,21,19,0.68)' : '#D9534F',
+                }}
+              >
+                <Ionicons color="#fffaf2" name={micEnabled ? 'mic-outline' : 'mic-off-outline'} size={24} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setCameraEnabled((current) => !current)}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: cameraEnabled ? 'rgba(11,21,19,0.68)' : '#D9534F',
+                }}
+              >
+                <Ionicons color="#fffaf2" name={cameraEnabled ? 'videocam-outline' : 'videocam-off-outline'} size={24} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setCameraFacing((current) => (current === 'front' ? 'back' : 'front'))}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(11,21,19,0.68)',
+                }}
+              >
+                <Ionicons color="#fffaf2" name="camera-reverse-outline" size={24} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  setIsLive(false);
+                  setLiveSetupVisible(true);
+                  setFeedback({ tone: 'success', text: 'Live ended. You can update setup and go live again.' });
+                }}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#D9534F',
+                }}
+              >
+                <Ionicons color="#fffaf2" name="stop-circle-outline" size={24} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <Surface>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Live audience messages</Text>
+            {demoHostMessages.map((message) => (
+              <View
+                key={message.id}
+                style={{
+                  borderRadius: theme.radius.lg,
+                  backgroundColor: theme.colors.surface,
+                  padding: theme.spacing.md,
+                  gap: 4,
+                }}
+              >
+                <Text style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: theme.colors.textMuted }}>
+                  {message.author}
+                </Text>
+                <Text style={{ fontSize: 14, lineHeight: 21, color: theme.colors.text }}>
+                  {message.body}
+                </Text>
+              </View>
+            ))}
+          </Surface>
+        </View>
       ) : null}
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
