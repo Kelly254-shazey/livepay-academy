@@ -1,4 +1,4 @@
-import type { PrismaClient, UserRole } from "@prisma/client";
+import type { AuthProvider, OneTimeCodePurpose, PrismaClient, UserRole } from "@prisma/client";
 
 export class AuthRepository {
   constructor(private readonly db: PrismaClient) {}
@@ -6,41 +6,193 @@ export class AuthRepository {
   findUserByEmail(email: string) {
     return this.db.user.findUnique({
       where: { email },
-      include: { creatorProfile: true }
+      include: { identities: true, creatorProfile: true }
+    });
+  }
+
+  findUserByUsername(username: string) {
+    return this.db.user.findUnique({
+      where: { username },
+      include: { identities: true, creatorProfile: true }
     });
   }
 
   findUserById(id: string) {
     return this.db.user.findUnique({
       where: { id },
-      include: { creatorProfile: true }
+      include: { identities: true, creatorProfile: true }
     });
   }
 
-  createUser(data: {
+  findIdentity(provider: AuthProvider, providerUserId: string) {
+    return this.db.authIdentity.findUnique({
+      where: {
+        provider_providerUserId: {
+          provider,
+          providerUserId
+        }
+      },
+      include: {
+        user: {
+          include: { identities: true, creatorProfile: true }
+        }
+      }
+    });
+  }
+
+  findIdentityForUser(userId: string, provider: AuthProvider) {
+    return this.db.authIdentity.findUnique({
+      where: {
+        userId_provider: {
+          userId,
+          provider
+        }
+      }
+    });
+  }
+
+  createUserWithIdentity(input: {
     email: string;
-    passwordHash: string;
+    username: string;
+    passwordHash?: string | null;
     firstName: string;
     lastName: string;
     role: UserRole;
+    avatarUrl?: string | null;
+    dateOfBirth?: Date | null;
+    gender?: string | null;
+    customGender?: string | null;
+    emailVerifiedAt?: Date | null;
+    profileCompletedAt?: Date | null;
+    identity: {
+      provider: AuthProvider;
+      providerUserId: string;
+      email?: string | null;
+    };
   }) {
-    return this.db.user.create({ data });
-  }
+    return this.db.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: input.email,
+          username: input.username,
+          passwordHash: input.passwordHash,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          role: input.role,
+          avatarUrl: input.avatarUrl,
+          dateOfBirth: input.dateOfBirth,
+          gender: input.gender,
+          customGender: input.customGender,
+          emailVerifiedAt: input.emailVerifiedAt,
+          profileCompletedAt: input.profileCompletedAt
+        }
+      });
 
-  createRefreshToken(userId: string, tokenHash: string, expiresAt: Date) {
-    return this.db.refreshToken.create({
-      data: { userId, tokenHash, expiresAt }
+      await tx.authIdentity.create({
+        data: {
+          userId: user.id,
+          provider: input.identity.provider,
+          providerUserId: input.identity.providerUserId,
+          email: input.identity.email
+        }
+      });
+
+      return tx.user.findUniqueOrThrow({
+        where: { id: user.id },
+        include: { identities: true, creatorProfile: true }
+      });
     });
   }
 
-  listActiveRefreshTokens(userId: string) {
-    return this.db.refreshToken.findMany({
-      where: {
+  linkIdentity(userId: string, input: { provider: AuthProvider; providerUserId: string; email?: string | null }) {
+    return this.db.authIdentity.create({
+      data: {
         userId,
+        provider: input.provider,
+        providerUserId: input.providerUserId,
+        email: input.email
+      }
+    });
+  }
+
+  updateLastLogin(userId: string) {
+    return this.db.user.update({
+      where: { id: userId },
+      data: {
+        lastLoginAt: new Date()
+      }
+    });
+  }
+
+  updateEmailVerification(userId: string, verifiedAt: Date) {
+    return this.db.user.update({
+      where: { id: userId },
+      data: {
+        emailVerifiedAt: verifiedAt
+      },
+      include: { identities: true, creatorProfile: true }
+    });
+  }
+
+  updateProfileCompletion(
+    userId: string,
+    data: {
+      username: string;
+      firstName: string;
+      lastName: string;
+      dateOfBirth: Date;
+      gender: string;
+      customGender?: string | null;
+    }
+  ) {
+    return this.db.user.update({
+      where: { id: userId },
+      data: {
+        username: data.username,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender,
+        customGender: data.customGender ?? null,
+        profileCompletedAt: new Date()
+      },
+      include: { identities: true, creatorProfile: true }
+    });
+  }
+
+  updatePassword(userId: string, passwordHash: string) {
+    return this.db.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+      include: { identities: true, creatorProfile: true }
+    });
+  }
+
+  createRefreshToken(input: {
+    userId: string;
+    tokenHash: string;
+    expiresAt: Date;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+  }) {
+    return this.db.refreshToken.create({
+      data: {
+        userId: input.userId,
+        tokenHash: input.tokenHash,
+        expiresAt: input.expiresAt,
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent
+      }
+    });
+  }
+
+  findActiveRefreshTokenByHash(tokenHash: string) {
+    return this.db.refreshToken.findFirst({
+      where: {
+        tokenHash,
         revokedAt: null,
         expiresAt: { gt: new Date() }
-      },
-      orderBy: { createdAt: "desc" }
+      }
     });
   }
 
@@ -51,44 +203,58 @@ export class AuthRepository {
     });
   }
 
-  createPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date) {
-    return this.db.passwordResetToken.create({
-      data: { userId, tokenHash, expiresAt }
-    });
-  }
-
-  listActivePasswordResetTokens(userId: string) {
-    return this.db.passwordResetToken.findMany({
+  revokeAllRefreshTokensForUser(userId: string) {
+    return this.db.refreshToken.updateMany({
       where: {
         userId,
-        expiresAt: { gt: new Date() },
-        usedAt: null
+        revokedAt: null
       },
-      orderBy: { createdAt: "desc" }
-    });
-  }
-
-  findValidPasswordResetTokenByHash(tokenHash: string) {
-    return this.db.passwordResetToken.findFirst({
-      where: {
-        tokenHash,
-        expiresAt: { gt: new Date() },
-        usedAt: null
+      data: {
+        revokedAt: new Date()
       }
     });
   }
 
-  usePasswordResetToken(id: string) {
-    return this.db.passwordResetToken.update({
-      where: { id },
-      data: { usedAt: new Date() }
+  replaceOneTimeCode(userId: string, purpose: OneTimeCodePurpose, codeHash: string, expiresAt: Date) {
+    return this.db.$transaction(async (tx) => {
+      await tx.oneTimeCode.updateMany({
+        where: {
+          userId,
+          purpose,
+          consumedAt: null
+        },
+        data: {
+          consumedAt: new Date()
+        }
+      });
+
+      return tx.oneTimeCode.create({
+        data: {
+          userId,
+          purpose,
+          codeHash,
+          expiresAt
+        }
+      });
     });
   }
 
-  updatePassword(userId: string, passwordHash: string) {
-    return this.db.user.update({
-      where: { id: userId },
-      data: { passwordHash }
+  findValidOneTimeCode(userId: string, purpose: OneTimeCodePurpose, codeHash: string) {
+    return this.db.oneTimeCode.findFirst({
+      where: {
+        userId,
+        purpose,
+        codeHash,
+        consumedAt: null,
+        expiresAt: { gt: new Date() }
+      }
+    });
+  }
+
+  consumeOneTimeCode(id: string) {
+    return this.db.oneTimeCode.update({
+      where: { id },
+      data: { consumedAt: new Date() }
     });
   }
 }

@@ -12,6 +12,8 @@ import { createSwaggerDocument } from "./config/swagger";
 import { requestContext } from "./common/middleware/request-context";
 import { prisma } from "./infrastructure/db/prisma";
 import { redis } from "./infrastructure/cache/redis";
+import { EmailService } from "./infrastructure/communications/email.service";
+import { GoogleAuthService } from "./infrastructure/auth/google-auth.service";
 import { AuditService } from "./common/audit/audit.service";
 import { JavaFinanceClient } from "./infrastructure/integrations/java-finance.client";
 import { PythonIntelligenceClient } from "./infrastructure/integrations/python-intelligence.client";
@@ -61,10 +63,12 @@ export function createApp() {
   const app = express();
 
   const auditService = new AuditService(prisma);
+  const emailService = new EmailService();
+  const googleAuthService = new GoogleAuthService();
   const javaFinanceClient = new JavaFinanceClient();
   const pythonClient = new PythonIntelligenceClient();
   const streamingProviderClient = new StreamingProviderClient();
-  const authService = new AuthService(new AuthRepository(prisma), auditService);
+  const authService = new AuthService(new AuthRepository(prisma), auditService, emailService, googleAuthService);
   const accessService = new AccessService(prisma, auditService, javaFinanceClient, pythonClient);
   const usersService = new UsersService(new UsersRepository(prisma), auditService, pythonClient);
   const creatorsService = new CreatorsService(new CreatorsRepository(prisma), auditService, pythonClient);

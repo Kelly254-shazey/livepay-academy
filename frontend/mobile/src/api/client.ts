@@ -314,6 +314,10 @@ export const mobileApi = {
     fullName: string;
     email: string;
     password: string;
+    username: string;
+    dateOfBirth: string;
+    gender: string;
+    customGender?: string;
     role: string;
     roles?: UserRole[];
   }) =>
@@ -321,17 +325,42 @@ export const mobileApi = {
       () => request<AuthSession>(apiRoutes.auth.signUp, { method: 'POST', body, authenticated: false }),
       () => signUpWithDemo({ ...body, activeRole: body.role as UserRole }),
     ),
+  signInWithGoogle: (body: { idToken: string; role?: string; roles?: UserRole[] }) =>
+    withDemoFallback(
+      () => request<AuthSession>(apiRoutes.auth.signInWithGoogle, { method: 'POST', body, authenticated: false }),
+      () => signInWithDemo({ email: 'google@demo.local', password: 'demo', activeRole: (body.role || 'viewer') as UserRole, roles: body.roles }),
+    ),
+  refresh: (body: { refreshToken: string }) =>
+    withDemoFallback(
+      () => request<AuthSession>(apiRoutes.auth.refresh, { method: 'POST', body, authenticated: false }),
+      () => ({ tokens: { accessToken: 'demo', refreshToken: 'demo' }, user: { id: 'demo', email: 'demo@demo.local', fullName: 'Demo', role: 'viewer' as UserRole, roles: ['viewer'] as UserRole[] } } as never),
+    ),
+  logout: (body: { refreshToken: string }) =>
+    withDemoFallback(
+      () => request<{ message: string }>(apiRoutes.auth.logout, { method: 'POST', body }),
+      async () => ({ message: 'Logged out' }),
+    ),
+  requestEmailVerification: () =>
+    withDemoFallback(
+      () => request<{ message: string; maskedEmail: string }>(apiRoutes.auth.emailVerificationRequest, { method: 'POST', body: {} }),
+      async () => ({ message: 'Code sent', maskedEmail: 'd***@demo.local' }),
+    ),
+  confirmEmailVerification: (body: { email: string; code: string }) =>
+    withDemoFallback(
+      () => request<AuthSession>(apiRoutes.auth.emailVerificationConfirm, { method: 'POST', body, authenticated: false }),
+      () => signInWithDemo({ ...body, activeRole: 'viewer' as UserRole }) as never,
+    ),
   forgotPassword: (body: { email: string }) =>
     withDemoFallback(
       () =>
-        request<{ message: string }>(apiRoutes.auth.forgotPassword, {
+        request<{ message: string; maskedEmail: string }>(apiRoutes.auth.forgotPassword, {
           method: 'POST',
           body,
           authenticated: false,
         }),
       forgotPasswordDemo,
     ),
-  resetPassword: (body: { email: string; token: string; password: string }) =>
+  resetPassword: (body: { email: string; code: string; password: string }) =>
     withDemoFallback(
       () =>
         request<{ message: string }>(apiRoutes.auth.resetPassword, {
@@ -340,6 +369,46 @@ export const mobileApi = {
           authenticated: false,
         }),
       resetPasswordDemo,
+    ),
+  completeProfile: (body: { 
+    fullName: string; 
+    username: string; 
+    dateOfBirth: string; 
+    gender: string; 
+    customGender?: string;
+  }) =>
+    withDemoFallback(
+      () => request<AuthSession>(apiRoutes.auth.completeProfile, { method: 'POST', body }),
+      async () => {
+        const session = useSessionStore.getState().session;
+        return { 
+          tokens: session?.tokens || { accessToken: 'demo', refreshToken: 'demo' }, 
+          user: { 
+            ...session?.user, 
+            ...body, 
+            id: session?.user.id || 'demo',
+            email: session?.user.email || 'demo@demo.local',
+            role: session?.user.role || 'viewer',
+            roles: session?.user.roles || ['viewer']
+          } 
+        } as never;
+      },
+    ),
+  linkGoogleAccount: (body: { idToken: string }) =>
+    withDemoFallback(
+      () => request<AuthSession>(apiRoutes.auth.linkGoogleAccount, { method: 'POST', body }),
+      async () => {
+        const session = useSessionStore.getState().session;
+        return session as never;
+      },
+    ),
+  linkPassword: (body: { password: string }) =>
+    withDemoFallback(
+      () => request<AuthSession>(apiRoutes.auth.linkPassword, { method: 'POST', body }),
+      async () => {
+        const session = useSessionStore.getState().session;
+        return session as never;
+      },
     ),
   getHomeFeed: () =>
     withDemoFallback(() => request<HomeFeedPayload>(apiRoutes.home, { authenticated: false }), getDemoHomeFeed),

@@ -11,5 +11,8 @@
     "dev:mobile": "npm --workspace ./mobile run start",
     "typecheck:web": "npm --workspace ./web run typecheck",
     "typecheck:mobile": "npm --workspace ./mobile run typecheck"
+  },
+  "dependencies": {
+    "react-native-worklets": "^0.8.1"
   }
 }

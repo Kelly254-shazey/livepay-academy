@@ -1,12 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.payoutRequestSchema = exports.checkoutSchema = exports.searchQuerySchema = exports.classIdParamsSchema = exports.contentIdParamsSchema = exports.liveIdParamsSchema = exports.creatorIdParamsSchema = exports.categorySlugParamsSchema = exports.frontendResetPasswordSchema = exports.frontendForgotPasswordSchema = exports.frontendSignUpSchema = exports.frontendSignInSchema = void 0;
+exports.payoutRequestSchema = exports.checkoutSchema = exports.searchQuerySchema = exports.classIdParamsSchema = exports.contentIdParamsSchema = exports.liveIdParamsSchema = exports.creatorIdParamsSchema = exports.categorySlugParamsSchema = exports.emptyBodySchema = exports.frontendLinkPasswordSchema = exports.frontendCompleteProfileSchema = exports.frontendVerifyEmailSchema = exports.frontendResetPasswordSchema = exports.frontendForgotPasswordSchema = exports.frontendRefreshSchema = exports.frontendGoogleAuthSchema = exports.frontendSignUpSchema = exports.frontendSignInSchema = void 0;
 const zod_1 = require("zod");
+const usernameSchema = zod_1.z.string().trim().min(3).max(32);
+const dateSchema = zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD format.");
+const genderSchema = zod_1.z.enum(["male", "female", "prefer_not_to_say", "custom"]);
+const passwordSchema = zod_1.z.string().min(8).max(72);
 exports.frontendSignInSchema = zod_1.z.object({
     body: zod_1.z.object({
-        email: zod_1.z.string().email(),
-        password: zod_1.z.string().min(8).max(72),
-        role: zod_1.z.enum(["viewer", "creator", "moderator", "admin"]).default("viewer")
+        identifier: zod_1.z.string().trim().min(3).max(160),
+        password: passwordSchema
     }),
     params: zod_1.z.object({}).default({}),
     query: zod_1.z.object({}).default({})
@@ -14,9 +17,28 @@ exports.frontendSignInSchema = zod_1.z.object({
 exports.frontendSignUpSchema = zod_1.z.object({
     body: zod_1.z.object({
         fullName: zod_1.z.string().min(2).max(160),
+        username: usernameSchema,
         email: zod_1.z.string().email(),
-        password: zod_1.z.string().min(8).max(72),
+        password: passwordSchema,
+        role: zod_1.z.enum(["viewer", "creator"]).default("viewer"),
+        dateOfBirth: dateSchema,
+        gender: genderSchema,
+        customGender: zod_1.z.string().trim().max(80).optional()
+    }),
+    params: zod_1.z.object({}).default({}),
+    query: zod_1.z.object({}).default({})
+});
+exports.frontendGoogleAuthSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        idToken: zod_1.z.string().min(20),
         role: zod_1.z.enum(["viewer", "creator"]).default("viewer")
+    }),
+    params: zod_1.z.object({}).default({}),
+    query: zod_1.z.object({}).default({})
+});
+exports.frontendRefreshSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        refreshToken: zod_1.z.string().min(1)
     }),
     params: zod_1.z.object({}).default({}),
     query: zod_1.z.object({}).default({})
@@ -31,9 +53,40 @@ exports.frontendForgotPasswordSchema = zod_1.z.object({
 exports.frontendResetPasswordSchema = zod_1.z.object({
     body: zod_1.z.object({
         email: zod_1.z.string().email(),
-        token: zod_1.z.string().min(12),
-        password: zod_1.z.string().min(8).max(72)
+        code: zod_1.z.string().trim().length(6),
+        password: passwordSchema
     }),
+    params: zod_1.z.object({}).default({}),
+    query: zod_1.z.object({}).default({})
+});
+exports.frontendVerifyEmailSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        email: zod_1.z.string().email(),
+        code: zod_1.z.string().trim().length(6)
+    }),
+    params: zod_1.z.object({}).default({}),
+    query: zod_1.z.object({}).default({})
+});
+exports.frontendCompleteProfileSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        fullName: zod_1.z.string().min(2).max(160),
+        username: usernameSchema,
+        dateOfBirth: dateSchema,
+        gender: genderSchema,
+        customGender: zod_1.z.string().trim().max(80).optional()
+    }),
+    params: zod_1.z.object({}).default({}),
+    query: zod_1.z.object({}).default({})
+});
+exports.frontendLinkPasswordSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        password: passwordSchema
+    }),
+    params: zod_1.z.object({}).default({}),
+    query: zod_1.z.object({}).default({})
+});
+exports.emptyBodySchema = zod_1.z.object({
+    body: zod_1.z.object({}).default({}),
     params: zod_1.z.object({}).default({}),
     query: zod_1.z.object({}).default({})
 });

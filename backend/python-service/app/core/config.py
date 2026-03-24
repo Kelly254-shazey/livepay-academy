@@ -12,9 +12,17 @@ class Settings(BaseSettings):
     database_url: str = "mysql+aiomysql://livegate:livegate@mysql:3306/livegate_python"
     source_database_url: str = "mysql+aiomysql://livegate:livegate@mysql:3306/livegate_nodejs"
     redis_url: str = "redis://redis:6379/0"
-    internal_api_key: str = "livegate-internal-key"
+    internal_api_key: str = ""  # Must be set via environment variable
     cache_ttl_seconds: int = 300
     log_level: str = "INFO"
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        if not self.internal_api_key:
+            raise ValueError(
+                "INTERNAL_API_KEY environment variable must be set. "
+                "Do not use hardcoded values in production."
+            )
 
 
 @lru_cache

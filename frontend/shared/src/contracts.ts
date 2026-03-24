@@ -1,6 +1,9 @@
 import type { CategorySlug } from './catalog';
 
 export type UserRole = 'viewer' | 'creator' | 'moderator' | 'admin';
+export type AuthProvider = 'local' | 'google';
+export type AuthNextStep = 'verify-email' | 'complete-profile' | null;
+export type GenderOption = 'male' | 'female' | 'prefer_not_to_say' | 'custom';
 export type DemoAudience = 'public' | 'staff';
 export type VerificationStatus = 'unverified' | 'pending' | 'verified';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
@@ -39,21 +42,30 @@ export interface UserAccount {
   id: string;
   fullName: string;
   email: string;
+  username?: string;
   role: UserRole;
   roles?: UserRole[];
   avatarUrl?: string | null;
+  emailVerified?: boolean;
+  profileCompleted?: boolean;
+  dateOfBirth?: string;
+  gender?: GenderOption;
+  customGender?: string;
+  authProviders?: AuthProvider[];
 }
 
 export interface AuthTokens {
   accessToken: string;
   refreshToken?: string;
   expiresAt?: string;
+  refreshExpiresAt?: string;
 }
 
 export interface AuthSession {
   user: UserAccount;
   tokens: AuthTokens;
   activeRole?: UserRole;
+  nextStep?: AuthNextStep;
   isDemo?: boolean;
 }
 

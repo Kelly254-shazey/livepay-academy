@@ -128,73 +128,61 @@ class FrontendService {
     async getSession(actor) {
         const user = await this.db.user.findUnique({
             where: { id: actor.userId },
-            include: { creatorProfile: true }
+            include: { creatorProfile: true, identities: true }
         });
         if (!user) {
             throw new app_error_1.AppError("Account is unavailable.", 403);
         }
         return {
             user: this.toUserAccount(user),
-            tokens: {}
+            tokens: {},
+            nextStep: !user.emailVerifiedAt ? "verify-email" : !user.profileCompletedAt ? "complete-profile" : null
         };
     }
     async signIn(input) {
-        const result = await this.authService.login({
-            email: input.email,
-            password: input.password,
-            ipAddress: input.ipAddress
-        });
-        const user = await this.db.user.findUnique({
-            where: { id: result.user.id },
-            include: { creatorProfile: true }
-        });
-        if (!user) {
-            throw new app_error_1.AppError("Account is unavailable.", 403);
-        }
-        return {
-            user: this.toUserAccount(user),
-            tokens: {
-                accessToken: result.accessToken,
-                refreshToken: result.refreshToken
-            }
-        };
+        return this.authService.login(input);
     }
     async signUp(input) {
-        const names = splitFullName(input.fullName);
-        const result = await this.authService.register({
-            email: input.email,
-            password: input.password,
-            firstName: names.firstName,
-            lastName: names.lastName,
-            role: input.role,
-            ipAddress: input.ipAddress
+        return this.authService.register(input);
+    }
+    async signInWithGoogle(input) {
+        return this.authService.signInWithGoogle(input);
+    }
+    async refreshSession(refreshToken, input) {
+        return this.authService.refresh(refreshToken, input);
+    }
+    async logout(refreshToken, actor) {
+        await this.authService.logout(refreshToken, {
+            userId: actor.userId,
+            role: actor.role,
+            ipAddress: actor.ipAddress
         });
-        const user = await this.db.user.findUnique({
-            where: { id: result.user.id },
-            include: { creatorProfile: true }
-        });
-        if (!user) {
-            throw new app_error_1.AppError("Account could not be created.", 500);
-        }
+        return { message: "Signed out successfully." };
+    }
+    async resendEmailVerification(actor) {
+        const result = await this.authService.requestEmailVerification(actor.userId);
         return {
-            user: this.toUserAccount(user),
-            tokens: {
-                accessToken: result.accessToken,
-                refreshToken: result.refreshToken
-            }
+            message: result.message,
+            verification: "verification" in result ? result.verification : undefined
         };
+    }
+    async verifyEmail(input) {
+        return this.authService.confirmEmailVerification(input);
     }
     async forgotPassword(email) {
-        const result = await this.authService.requestPasswordReset(email);
-        return {
-            message: result.previewToken
-                ? `Password reset token: ${result.previewToken}`
-                : "Password reset instructions have been prepared."
-        };
+        return this.authService.requestPasswordReset(email);
     }
-    async resetPassword(token, password) {
-        await this.authService.confirmPasswordReset(token, password);
-        return { message: "Password reset successful." };
+    async resetPassword(input) {
+        return this.authService.confirmPasswordReset(input);
+    }
+    async completeProfile(actor, input) {
+        return this.authService.completeProfile(actor.userId, input);
+    }
+    async linkGoogleAccount(actor, idToken) {
+        return this.authService.linkGoogleAccount(actor.userId, idToken);
+    }
+    async linkPasswordAccount(actor, password) {
+        return this.authService.linkPassword(actor.userId, password);
     }
     async getHomeFeed() {
         const [creators, lives, content, classes] = await Promise.all([
@@ -1268,8 +1256,16 @@ class FrontendService {
             id: user.id,
             fullName: `${user.firstName} ${user.lastName}`.trim(),
             email: user.email,
+            username: user.username,
             role: user.role,
-            avatarUrl: null
+            roles: [user.role],
+            avatarUrl: user.avatarUrl ?? null,
+            emailVerified: Boolean(user.emailVerifiedAt),
+            profileCompleted: Boolean(user.profileCompletedAt),
+            dateOfBirth: user.dateOfBirth ? user.dateOfBirth.toISOString().slice(0, 10) : undefined,
+            gender: user.gender ?? undefined,
+            customGender: user.customGender ?? undefined,
+            authProviders: Array.isArray(user.identities) ? user.identities.map((identity) => identity.provider) : []
         };
     }
     toLedgerTransactionType(entryType) {
