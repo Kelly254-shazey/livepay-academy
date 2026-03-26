@@ -8,8 +8,8 @@
     "shared"
   ],
   "devDependencies": {
-    "glob": "^11.0.0",
-    "tar": "^7.6.0"
+    "glob": "^10.3.0",
+    "tar": "^6.2.0"
   },
   "scripts": {
     "dev:web": "npm --workspace ./web run dev",
