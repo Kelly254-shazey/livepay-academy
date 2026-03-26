@@ -1,0 +1,46 @@
+# Railway ignore file - files not needed for backend deployment
+.git
+.gitignore
+.github
+node_modules
+*.log
+.env.local
+.env.*.local
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode
+.idea
+dist
+build
+coverage
+.next
+out
+
+# Frontend files (not needed for backend deployment)
+frontend/
+README.md
+
+# IDE and system files
+.turbo
+.vercel
+.cache
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+venv
+env
+
+# Maven cache (keep local for faster builds)
+# .m2/
+
+# Keep only necessary backend files
+!backend/
