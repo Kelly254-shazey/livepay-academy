@@ -1,0 +1,53 @@
+# EAS Build ignore file - exclude files not needed for the build
+# This reduces upload size and speeds up builds
+
+# Node modules (will be installed fresh)
+node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-lock.yaml
+
+# Git and version control
+.git/
+.gitignore
+.github/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.env.local
+.env.*.local
+
+# Build outputs and caches
+dist/
+build/
+.next/
+.turbo/
+.cache/
+coverage/
+
+# Development files
+*.log
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Expo specific
+.expo/
+.expo-shared/
+eas-build-on-simulator
+
+# TypeScript
+*.tsbuildinfo
+
+# Optional npm cache
+.npm/
+.eslintcache/
+
+# Shared workspace (will be installed as dependency)
+../shared/node_modules/
