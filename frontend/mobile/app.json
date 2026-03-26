@@ -10,11 +10,11 @@
     "icon": "./assets/images/icon.png",
     "scheme": "livegate",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F5F1E8"
+      "backgroundColor": "#F4EFE7"
     },
     "ios": {
       "supportsTablet": true,
@@ -27,7 +27,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#F5F1E8",
+        "backgroundColor": "#F4EFE7",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -49,12 +49,6 @@
           "microphonePermission": "LiveGate uses the microphone when a content creator goes live with audio enabled.",
           "recordAudioAndroid": true
         }
-      ],
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.YOUR_GOOGLE_CLIENT_ID_PLACEHOLDER"
-        }
       ]
     ],
     "experiments": {
@@ -64,6 +58,10 @@
       "storeListing": {
         "androidPackage": "com.livegate.mobile",
         "iosBundleIdentifier": "com.livegate.mobile"
+      },
+      "router": {},
+      "eas": {
+        "projectId": "43aa178a-fad3-4afe-b95b-d228b043e4cd"
       }
     }
   }
