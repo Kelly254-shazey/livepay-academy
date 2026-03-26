@@ -37,9 +37,9 @@ COPY . .
 RUN cd /app/java-service && mvn -q -DskipTests package
 
 RUN cd /app/nodejs-service \
-    && npm ci \
-    && npm run build \
+    && npm ci --include=dev \
     && DATABASE_URL="mysql://placeholder:placeholder@localhost:3306/livegate_nodejs" npx prisma generate \
+    && npm run build \
     && npm prune --omit=dev
 
 RUN cd /app/python-service && python -m pip install --no-cache-dir .
