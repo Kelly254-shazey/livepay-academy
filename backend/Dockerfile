@@ -1,6 +1,10 @@
 # Backend services Dockerfile for Railway deployment
 FROM ubuntu:24.04
 
+# Railway variables are only available to Docker builds when declared as ARG.
+# Default this image to the public Node.js API service.
+ARG SERVICE_TYPE=nodejs
+
 # Install required dependencies
 RUN apt-get update && apt-get install -y \
     openjdk-21-jdk \
@@ -17,25 +21,28 @@ RUN apt-get update && apt-get install -y \
 
 # Set Python 3.11 as default
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+RUN python3 -m venv /opt/venv
+
+ENV PATH="/opt/venv/bin:${PATH}"
 
 WORKDIR /app
 
 # Copy backend files
 COPY . .
 
-# Build Java service (optional, can be skipped for Node.js/Python only)
-RUN if [ "$SERVICE_TYPE" = "java" ] || [ "$SERVICE_TYPE" = "" ]; then \
+# Build only the selected service for this image.
+RUN if [ "$SERVICE_TYPE" = "java" ]; then \
       cd java-service && mvn clean package -DskipTests -q; \
     fi
 
 # Setup Node.js service
-RUN if [ "$SERVICE_TYPE" = "nodejs" ] || [ "$SERVICE_TYPE" = "" ]; then \
+RUN if [ "$SERVICE_TYPE" = "nodejs" ]; then \
       cd nodejs-service && npm ci && npm run build && npx prisma generate; \
     fi
 
 # Setup Python service
-RUN if [ "$SERVICE_TYPE" = "python" ] || [ "$SERVICE_TYPE" = "" ]; then \
-      cd python-service && pip install --no-cache-dir -e .; \
+RUN if [ "$SERVICE_TYPE" = "python" ]; then \
+      cd python-service && python -m pip install --no-cache-dir -e .; \
     fi
 
 # Make run script executable
