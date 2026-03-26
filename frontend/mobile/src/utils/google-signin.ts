@@ -47,8 +47,8 @@ export async function signOutFromGoogle() {
 // Check if user is signed in
 export async function isUserSignedIn() {
   try {
-    const isSignedIn = await GoogleSignin.isSignedIn();
-    return isSignedIn;
+    const currentUser = await GoogleSignin.getCurrentUser();
+    return currentUser !== null;
   } catch (error) {
     return false;
   }
