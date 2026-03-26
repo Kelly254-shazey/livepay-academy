@@ -35,7 +35,7 @@ RUN if [ "$SERVICE_TYPE" = "nodejs" ] || [ "$SERVICE_TYPE" = "" ]; then \
 
 # Setup Python service
 RUN if [ "$SERVICE_TYPE" = "python" ] || [ "$SERVICE_TYPE" = "" ]; then \
-      cd python-service && pip install --no-cache-dir -e .; \
+      cd python-service && pip install --no-cache-dir --break-system-packages -e .; \
     fi
 
 # Make run script executable
