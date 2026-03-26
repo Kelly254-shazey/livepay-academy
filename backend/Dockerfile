@@ -7,10 +7,16 @@ RUN apt-get update && apt-get install -y \
     maven \
     nodejs \
     npm \
-    python3 \
+    python3.11 \
+    python3.11-venv \
+    python3.11-dev \
     python3-pip \
+    build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
 WORKDIR /app
 
