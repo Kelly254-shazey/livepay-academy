@@ -3,15 +3,19 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [env]
-# Railway automatically assigns PORT for web services
-# Default to Node.js service
-SERVICE_TYPE = "nodejs"
+# Railway automatically assigns PORT for the public web service.
+SERVICE_TYPE = "all"
 
-# Node.js Environment
 NODE_ENV = "production"
+SERVER_PORT = "8080"
+PYTHON_SERVICE_PORT = "8000"
+JAVA_FINANCE_URL = "http://127.0.0.1:8080"
+PYTHON_INTELLIGENCE_URL = "http://127.0.0.1:8000"
 
 # Database Configuration (set in Railway dashboard)
 # DATABASE_URL = "mysql://user:password@host:3306/livegate"
+# PYTHON_DATABASE_URL = "mysql+aiomysql://user:password@host:3306/livegate_python"
+# PYTHON_SOURCE_DATABASE_URL = "mysql+aiomysql://user:password@host:3306/livegate_nodejs"
 # REDIS_URL = "redis://host:port"
 
 [deploy]
