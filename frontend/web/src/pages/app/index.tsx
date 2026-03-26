@@ -1,4 +1,4 @@
-import { calculateCommission, categories, formatCurrency, platformCommissionRate } from '@livegate/shared';
+import { calculateCommission, categories, formatCurrency, platformCommissionRate } from '../../lib/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -101,7 +101,7 @@ function ProfileSettingsPanel({ mode }: { mode: 'viewer' | 'creator' }) {
   const settingsMutation = useMutation({
     mutationFn: webApi.saveProfileSettings,
     onSuccess: (result) => {
-      if (!session) return;
+      if (!session || !result) return;
 
       setPreferredRoles(result.settings.roles, result.settings.defaultRole);
       setSession({
@@ -287,7 +287,7 @@ function ProfileSettingsPanel({ mode }: { mode: 'viewer' | 'creator' }) {
         </div>
 
         {settingsMutation.isSuccess ? (
-          <InlineNotice body={settingsMutation.data.message} title="Settings saved" />
+          <InlineNotice body={settingsMutation.data?.message ?? ''} title="Settings saved" />
         ) : null}
         {settingsMutation.isError ? (
           <InlineNotice body={(settingsMutation.error as Error).message} title="Settings failed" tone="danger" />
@@ -737,7 +737,7 @@ export function CreatorDashboardPage() {
               </div>
               <div className="md:col-span-3">
                 {payoutMutation.isSuccess ? (
-                  <InlineNotice body={payoutMutation.data.message} title="Payout request submitted" />
+                  <InlineNotice body={payoutMutation.data?.message ?? ''} title="Payout request submitted" />
                 ) : null}
                 {payoutMutation.isError ? (
                   <InlineNotice body={(payoutMutation.error as Error).message} title="Payout failed" tone="danger" />
@@ -1001,7 +1001,7 @@ export function CheckoutPage() {
               </Link>
             ) : null}
           </div>
-          {mutation.isSuccess ? (
+          {mutation.isSuccess && mutation.data ? (
             <div className="space-y-4">
               <InlineNotice
                 body={`Checkout prepared for ${mutation.data.title} at ${formatCurrency(mutation.data.totalAmount ?? mutation.data.amount, mutation.data.currency)}.`}

@@ -3,7 +3,7 @@ import {
   switchSessionRole,
   type AuthSession,
   type UserRole,
-} from '@livegate/shared';
+} from '../shared';
 import { create } from 'zustand';
 import { Platform } from 'react-native';
 

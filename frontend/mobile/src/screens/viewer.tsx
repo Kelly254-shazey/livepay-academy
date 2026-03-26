@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { ProfileSettingsPayload } from '@livegate/shared';
-import { categories, DEMO_LIVE_ACCESS_CODE, formatCurrency, getSessionRoles } from '@livegate/shared';
+import type { ProfileSettingsPayload } from '../shared';
+import { categories, DEMO_LIVE_ACCESS_CODE, formatCurrency, getSessionRoles } from '../shared';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -1032,20 +1032,20 @@ export function ContentDetailsScreen() {
           </Surface>
           <Surface>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-              {query.data.content.accessGranted
+              {query.data?.content.accessGranted
                 ? 'Unlocked state active. Attachments or replay access can render here.'
                 : 'Payment is required before this content becomes accessible.'}
             </Text>
             <Button
               onPress={() =>
-                query.data.content.accessGranted
+                query.data?.content.accessGranted
                   ? undefined
                   : router.push({
                       pathname: '/(viewer)/checkout',
                       params: { productId: contentId, productType: 'content' },
                     })
               }
-              title={query.data.content.accessGranted ? 'Open content' : 'Continue to checkout'}
+              title={query.data?.content.accessGranted ? 'Open content' : 'Continue to checkout'}
             />
           </Surface>
         </>
@@ -1118,14 +1118,14 @@ export function ClassDetailsScreen() {
           </View>
           <Button
             onPress={() =>
-              query.data.classItem.accessGranted
+              query.data?.classItem.accessGranted
                 ? undefined
                 : router.push({
                     pathname: '/(viewer)/checkout',
                     params: { productId: classId, productType: 'class' },
                   })
             }
-            title={query.data.classItem.accessGranted ? 'Continue class' : 'Continue to checkout'}
+            title={query.data?.classItem.accessGranted ? 'Continue class' : 'Continue to checkout'}
           />
         </>
       ) : null}
@@ -1317,7 +1317,7 @@ export function SettingsScreen() {
   const saveMutation = useMutation({
     mutationFn: mobileApi.saveProfileSettings,
     onSuccess: (result) => {
-      if (!session) return;
+      if (!session || !result) return;
 
       setPreferredRoles(result.settings.roles, result.settings.defaultRole);
       setSession({
@@ -1499,7 +1499,7 @@ export function SettingsScreen() {
           </Surface>
           {saveMutation.isSuccess ? (
             <Surface>
-              <Text style={{ fontSize: 14, color: '#196B59' }}>{saveMutation.data.message}</Text>
+              <Text style={{ fontSize: 14, color: '#196B59' }}>{saveMutation.data?.message ?? ''}</Text>
             </Surface>
           ) : null}
           {saveMutation.isError ? (

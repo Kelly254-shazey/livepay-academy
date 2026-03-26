@@ -7,8 +7,8 @@ import type {
   PremiumContentSummary,
   TransactionRecord,
   WalletSummary,
-} from '@livegate/shared';
-import { formatCompactNumber, formatCurrency, formatDateTime } from '@livegate/shared';
+} from '../../lib/shared';
+import { formatCompactNumber, formatCurrency, formatDateTime } from '../../lib/shared';
 import { Link } from 'react-router-dom';
 import { Badge, Button, Card, EmptyState } from '@/components/ui';
 

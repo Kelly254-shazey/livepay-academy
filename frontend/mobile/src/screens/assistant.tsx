@@ -1,4 +1,4 @@
-import { assistantSuggestions, generateAssistantReply, getActiveRole } from '@livegate/shared';
+import { assistantSuggestions, generateAssistantReply, getActiveRole } from '../shared';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button, Heading, Screen, Surface, TextField } from '@/components/ui';

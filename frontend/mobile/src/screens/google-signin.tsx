@@ -1,4 +1,4 @@
-import { brand } from '@livegate/shared';
+import { brand } from '../shared';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import React from 'react';

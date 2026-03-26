@@ -19,9 +19,10 @@ import type {
   SearchResultsPayload,
   TransactionRecord,
   ViewerDashboardPayload,
-} from '@livegate/shared';
+} from './shared';
 import {
   apiRoutes,
+  DEMO_PASSWORD,
   categories,
   createDemoCheckout,
   forgotPasswordDemo,
@@ -44,7 +45,7 @@ import {
   signInWithDemo,
   signUpWithDemo,
   type UserRole,
-} from '@livegate/shared';
+} from './shared';
 import { http } from './http';
 import { useSessionStore } from '@/store/session-store';
 
@@ -121,7 +122,7 @@ export const webApi = {
   confirmEmailVerification: (body: { email: string; code: string }) =>
     withDemoFallback(
       () => http<AuthSession>(apiRoutes.auth.emailVerificationConfirm, { method: 'POST', body, authenticated: false }),
-      () => signInWithDemo({ ...body, activeRole: 'viewer' as UserRole }) as never,
+      () => signInWithDemo({ email: body.email, password: DEMO_PASSWORD, activeRole: 'viewer' as UserRole }) as never,
     ),
   forgotPassword: (body: { email: string }) =>
     withDemoFallback(() => http<{ message: string; maskedEmail: string }>(apiRoutes.auth.forgotPassword, {

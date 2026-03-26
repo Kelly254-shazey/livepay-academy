@@ -1,5 +1,5 @@
-import { brand, categories, getSessionRoles } from '@livegate/shared';
-import type { UserRole } from '@livegate/shared';
+import { brand, categories, getSessionRoles } from '../../lib/shared';
+import type { UserRole } from '../../lib/shared';
 import { type ReactNode, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, NavLink, useNavigate } from 'react-router-dom';

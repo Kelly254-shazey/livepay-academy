@@ -28,9 +28,10 @@ import type {
   SearchFilters,
   SearchResultsPayload,
   ViewerDashboardPayload,
-} from '@livegate/shared';
+} from '../shared';
 import {
   apiRoutes,
+  DEMO_PASSWORD,
   createDemoCheckout,
   forgotPasswordDemo,
   getDemoAdminDashboard,
@@ -52,7 +53,7 @@ import {
   signInWithDemo,
   signUpWithDemo,
   type UserRole,
-} from '@livegate/shared';
+} from '../shared';
 import { useSessionStore } from '@/store/session-store';
 
 function resolveExpoHost() {
@@ -72,6 +73,7 @@ function resolveExpoHost() {
 const ALLOWED_DOMAINS = [
   'localhost', // Development only
   '127.0.0.1', // Development only
+  'livepay-academy-production.up.railway.app', // Production Railway backend
   // Add your production API domains here
   // 'api.livegate.com',
   // 'staging-api.livegate.com'
@@ -348,7 +350,7 @@ export const mobileApi = {
   confirmEmailVerification: (body: { email: string; code: string }) =>
     withDemoFallback(
       () => request<AuthSession>(apiRoutes.auth.emailVerificationConfirm, { method: 'POST', body, authenticated: false }),
-      () => signInWithDemo({ ...body, activeRole: 'viewer' as UserRole }) as never,
+      () => signInWithDemo({ email: body.email, password: DEMO_PASSWORD, activeRole: 'viewer' as UserRole }) as never,
     ),
   forgotPassword: (body: { email: string }) =>
     withDemoFallback(

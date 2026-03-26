@@ -2,19 +2,26 @@
   "cli": {
     "version": ">= 16.0.0"
   },
+  "projectId": "livegate-mobile",
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "node": "20.x",
+      "npm": "10.x"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "node": "20.x",
+      "npm": "10.x"
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "APP_ENV": "production"
-      }
+      },
+      "node": "20.x",
+      "npm": "10.x"
     }
   },
   "submit": {

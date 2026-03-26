@@ -1,4 +1,4 @@
-import type { UserRole } from '@livegate/shared';
+import type { UserRole } from '../lib/shared';
 import type { ReactNode } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { useSessionStore } from '@/store/session-store';

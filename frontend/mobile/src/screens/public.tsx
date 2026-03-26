@@ -3,8 +3,8 @@ import {
   normalizeAuthSession,
   type DemoParticipant,
   type UserRole,
-} from '@livegate/shared';
-import { brand, productRules } from '@livegate/shared';
+} from '../shared';
+import { brand, productRules } from '../shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -263,9 +263,11 @@ export function SignInScreen() {
     mutationFn: (values: z.infer<typeof signInSchema>) =>
       mobileApi.signIn({ ...values, role: preferredRole, roles: preferredRoles }),
     onSuccess: (session) => {
-      const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
-      setSession(normalized);
-      router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
+      if (session) {
+        const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
+        setSession(normalized);
+        router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
+      }
     },
   });
 
@@ -358,12 +360,14 @@ export function SignUpScreen() {
         roles: preferredRoles 
       }),
     onSuccess: (session) => {
-      const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
-      setSession(normalized);
-      if (normalized.user.emailVerifiedAt) {
-        router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
-      } else {
-        router.replace('/(public)/email-verification');
+      if (session) {
+        const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
+        setSession(normalized);
+        if (normalized.user.emailVerified) {
+          router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
+        } else {
+          router.replace('/(public)/email-verification');
+        }
       }
     },
   });
@@ -456,7 +460,7 @@ export function SignUpScreen() {
             control={form.control}
             name="customGender"
             render={({ field }) => (
-              <TextField label="Please specify" onChangeText={field.onChange} placeholder="Your gender identity" value={field.value} />
+              <TextField label="Please specify" onChangeText={field.onChange} placeholder="Your gender identity" value={field.value ?? ''} />
             )}
           />
         )}
@@ -490,10 +494,12 @@ export function StaffAccessScreen() {
       return mobileApi.signIn({ ...values, role, roles: [role] });
     },
     onSuccess: (session) => {
-      const normalized = normalizeAuthSession(session, [session.user.role], session.user.role);
-      setPreferredRoles([normalized.user.role], normalized.user.role);
-      setSession(normalized);
-      router.replace('/(staff)/dashboard');
+      if (session) {
+        const normalized = normalizeAuthSession(session, [session.user.role], session.user.role);
+        setPreferredRoles([normalized.user.role], normalized.user.role);
+        setSession(normalized);
+        router.replace('/(staff)/dashboard');
+      }
     },
   });
 
@@ -552,9 +558,7 @@ export function ForgotPasswordScreen() {
             <TextField label="Email" onChangeText={field.onChange} placeholder="you@livegate.com" value={field.value} />
           )}
         />
-        {mutation.isSuccess ? <Text style={styles.successText}>{mutation.data.message}</Text> : null}
-        {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
-        <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title="Send reset email" />
+        {mutation.isSuccess ? <Text style={styles.successText}>{mutation.data?.message}</Text> : null}
       </Surface>
     </Screen>
   );
@@ -595,9 +599,7 @@ export function ResetPasswordScreen() {
             <TextField label="New password" onChangeText={field.onChange} placeholder="New password" secureTextEntry value={field.value} />
           )}
         />
-        {mutation.isSuccess ? <Text style={styles.successText}>{mutation.data.message}</Text> : null}
-        {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
-        <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title="Update password" />
+        {mutation.isSuccess ? <Text style={styles.successText}>{mutation.data?.message}</Text> : null}
       </Surface>
     </Screen>
   );
@@ -628,14 +630,14 @@ export function EmailVerificationScreen() {
           control={form.control}
           name="email"
           render={({ field }) => (
-            <TextField label="Email" editable={false} value={field.value} />
+            <TextField label="Email" onChangeText={field.onChange} value={field.value} />
           )}
         />
         <Controller
           control={form.control}
           name="code"
           render={({ field }) => (
-            <TextField label="Verification code" onChangeText={field.onChange} placeholder="000000" maxLength={6} value={field.value} />
+            <TextField label="Verification code" onChangeText={field.onChange} placeholder="000000" value={field.value ?? ''} />
           )}
         />
         {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
@@ -726,7 +728,7 @@ export function ProfileCompletionScreen() {
             control={form.control}
             name="customGender"
             render={({ field }) => (
-              <TextField label="Please specify" onChangeText={field.onChange} placeholder="Your gender identity" value={field.value} />
+              <TextField label="Please specify" onChangeText={field.onChange} placeholder="Your gender identity" value={field.value ?? ''} />
             )}
           />
         )}

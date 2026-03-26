@@ -1,4 +1,4 @@
-import { categories } from '@livegate/shared';
+import { categories } from '../../lib/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';

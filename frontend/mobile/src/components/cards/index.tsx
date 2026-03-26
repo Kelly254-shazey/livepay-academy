@@ -6,8 +6,8 @@ import type {
   PremiumContentSummary,
   TransactionRecord,
   WalletSummary,
-} from '@livegate/shared';
-import { formatCurrency } from '@livegate/shared';
+} from '../../shared';
+import { formatCurrency } from '../../shared';
 import { Pressable, Text, View } from 'react-native';
 import { Surface } from '@/components/ui';
 import { theme } from '@/theme';

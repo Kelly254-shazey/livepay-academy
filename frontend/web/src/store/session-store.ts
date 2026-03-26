@@ -1,4 +1,4 @@
-import { normalizeAuthSession, switchSessionRole, type AuthSession, type UserRole } from '@livegate/shared';
+import { normalizeAuthSession, switchSessionRole, type AuthSession, type UserRole } from '../lib/shared';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 

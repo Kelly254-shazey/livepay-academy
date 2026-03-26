@@ -4,7 +4,7 @@ import {
   demoParticipants,
   productRules,
   type DemoParticipant,
-} from '@livegate/shared';
+} from '../lib/shared';
 import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';

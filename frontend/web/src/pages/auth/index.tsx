@@ -3,7 +3,7 @@ import {
   normalizeAuthSession,
   type DemoParticipant,
   type UserRole,
-} from '@livegate/shared';
+} from '../../lib/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -140,7 +140,7 @@ const forgotSchema = z.object({
 
 const resetSchema = z.object({
   email: z.string().email(),
-  token: z.string().min(4),
+  code: z.string().trim().length(6),
   password: z.string().min(8),
 });
 
@@ -505,7 +505,7 @@ export function ForgotPasswordPage() {
 export function ResetPasswordPage() {
   const form = useForm<z.infer<typeof resetSchema>>({
     resolver: zodResolver(resetSchema),
-    defaultValues: { email: '', token: '', password: '' },
+    defaultValues: { email: '', code: '', password: '' },
   });
 
   const mutation = useMutation({
@@ -528,8 +528,8 @@ export function ResetPasswordPage() {
           <Input {...form.register('email')} placeholder="you@livegate.com" />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Reset token</label>
-          <Input {...form.register('token')} placeholder="Paste token" />
+          <label className="text-sm font-medium">Reset code</label>
+          <Input {...form.register('code')} placeholder="Paste code" />
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">New password</label>

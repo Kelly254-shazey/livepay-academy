@@ -25,7 +25,8 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "LiveGate uses the camera when a content creator starts a live session.",
-        "NSMicrophoneUsageDescription": "LiveGate uses the microphone when a content creator goes live with audio enabled."
+        "NSMicrophoneUsageDescription": "LiveGate uses the microphone when a content creator goes live with audio enabled.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -39,7 +40,9 @@
       "versionCode": 1,
       "permissions": [
         "CAMERA",
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [

@@ -1,4 +1,4 @@
-import { assistantSuggestions, generateAssistantReply, getActiveRole } from '@livegate/shared';
+import { assistantSuggestions, generateAssistantReply, getActiveRole } from '../../lib/shared';
 import { useMemo, useState } from 'react';
 import { useSessionStore } from '@/store/session-store';
 import { Button, Card, Input } from '@/components/ui';

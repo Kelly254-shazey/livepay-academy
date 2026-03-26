@@ -4,8 +4,7 @@
   "private": true,
   "workspaces": [
     "web",
-    "mobile",
-    "shared"
+    "mobile"
   ],
   "devDependencies": {
     "glob": "^10.3.0",

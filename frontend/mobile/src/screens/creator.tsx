@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { ProfileSettingsPayload } from '@livegate/shared';
-import { categories, formatCurrency, getSessionRoles } from '@livegate/shared';
+import type { ProfileSettingsPayload } from '../shared';
+import { categories, formatCurrency, getSessionRoles } from '../shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, useMicrophonePermissions, type CameraType } from 'expo-camera';
@@ -449,7 +449,7 @@ export function PayoutsScreen() {
             <TextField label="Note" onChangeText={field.onChange} placeholder="Optional note" value={field.value ?? ''} />
           )}
         />
-        {mutation.isSuccess ? <Text style={{ color: '#205C47' }}>{mutation.data.message}</Text> : null}
+        {mutation.isSuccess ? <Text style={{ color: '#205C47' }}>{mutation.data?.message ?? ''}</Text> : null}
         {mutation.isError ? <Text style={{ color: '#A34734' }}>{(mutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title="Submit payout request" />
       </Surface>
@@ -1125,7 +1125,7 @@ export function CreatorSettingsScreen() {
   const saveMutation = useMutation({
     mutationFn: mobileApi.saveProfileSettings,
     onSuccess: (result) => {
-      if (!session) return;
+      if (!session || !result) return;
 
       setPreferredRoles(result.settings.roles, result.settings.defaultRole);
       setSession({
@@ -1354,7 +1354,7 @@ export function CreatorSettingsScreen() {
           </Surface>
           {saveMutation.isSuccess ? (
             <Surface>
-              <Text style={{ fontSize: 14, color: '#196B59' }}>{saveMutation.data.message}</Text>
+              <Text style={{ fontSize: 14, color: '#196B59' }}>{saveMutation.data?.message ?? ''}</Text>
             </Surface>
           ) : null}
           {saveMutation.isError ? (
