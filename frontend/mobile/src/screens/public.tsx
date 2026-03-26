@@ -139,6 +139,21 @@ function DemoParticipantsPanel({
   );
 }
 
+function AuthDialogIntro({
+  eyebrow,
+  body,
+}: {
+  eyebrow: string;
+  body: string;
+}) {
+  return (
+    <View style={styles.authDialogIntro}>
+      <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
+      <Text style={styles.authDialogBody}>{body}</Text>
+    </View>
+  );
+}
+
 export function SplashScreenView() {
   return (
     <Screen>
@@ -187,7 +202,13 @@ export function OnboardingScreen() {
   );
 }
 
-function SignInFormDialogContent({ onSuccess }: { onSuccess: () => void }) {
+function SignInFormDialogContent({
+  onSuccess,
+  onOpenSignUp,
+}: {
+  onSuccess: () => void;
+  onOpenSignUp: () => void;
+}) {
   const preferredRole = useSessionStore((state) => state.preferredRole);
   const preferredRoles = useSessionStore((state) => state.preferredRoles);
   const setSession = useSessionStore((state) => state.setSession);
@@ -211,18 +232,35 @@ function SignInFormDialogContent({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <View style={{ gap: 12 }}>
+      <AuthDialogIntro
+        eyebrow="Welcome back"
+        body="Sign in with the email and password for the mode you selected below."
+      />
       <Controller
         control={form.control}
         name="email"
         render={({ field }) => (
-          <TextField label="Email" onChangeText={field.onChange} placeholder="you@livegate.com" value={field.value} />
+          <TextField
+            label="Email"
+            onChangeText={field.onChange}
+            placeholder="you@livegate.com"
+            value={field.value}
+            error={form.formState.errors.email?.message}
+          />
         )}
       />
       <Controller
         control={form.control}
         name="password"
         render={({ field }) => (
-          <TextField label="Password" onChangeText={field.onChange} placeholder="Password" secureTextEntry value={field.value} />
+          <TextField
+            label="Password"
+            onChangeText={field.onChange}
+            placeholder="Password"
+            secureTextEntry
+            value={field.value}
+            error={form.formState.errors.password?.message}
+          />
         )}
       />
       <Text style={styles.statusText}>
@@ -230,11 +268,28 @@ function SignInFormDialogContent({ onSuccess }: { onSuccess: () => void }) {
       </Text>
       {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
       <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Signing in...' : 'Sign in'} />
+      <View style={styles.authDialogActions}>
+        <Button
+          onPress={() => {
+            onSuccess();
+            router.push('/(public)/forgot-password');
+          }}
+          title="Forgot password"
+          variant="ghost"
+        />
+        <Button onPress={onOpenSignUp} title="Need an account? Sign up" variant="secondary" />
+      </View>
     </View>
   );
 }
 
-function SignUpFormDialogContent({ onSuccess }: { onSuccess: () => void }) {
+function SignUpFormDialogContent({
+  onSuccess,
+  onOpenSignIn,
+}: {
+  onSuccess: () => void;
+  onOpenSignIn: () => void;
+}) {
   const preferredRole = useSessionStore((state) => state.preferredRole);
   const preferredRoles = useSessionStore((state) => state.preferredRoles);
   const setSession = useSessionStore((state) => state.setSession);
@@ -277,39 +332,74 @@ function SignUpFormDialogContent({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <View style={{ gap: 12 }}>
+      <AuthDialogIntro
+        eyebrow="Create your account"
+        body="Finish the form below to open a viewer, creator, or hybrid LiveGate account."
+      />
       <Controller
         control={form.control}
         name="fullName"
         render={({ field }) => (
-          <TextField label="Full name" onChangeText={field.onChange} placeholder="Your full name" value={field.value} />
+          <TextField
+            label="Full name"
+            onChangeText={field.onChange}
+            placeholder="Your full name"
+            value={field.value}
+            error={form.formState.errors.fullName?.message}
+          />
         )}
       />
       <Controller
         control={form.control}
         name="username"
         render={({ field }) => (
-          <TextField label="Username" onChangeText={field.onChange} placeholder="Unique username" value={field.value} />
+          <TextField
+            label="Username"
+            onChangeText={field.onChange}
+            placeholder="Unique username"
+            value={field.value}
+            error={form.formState.errors.username?.message}
+          />
         )}
       />
       <Controller
         control={form.control}
         name="email"
         render={({ field }) => (
-          <TextField label="Email" onChangeText={field.onChange} placeholder="you@livegate.com" value={field.value} />
+          <TextField
+            label="Email"
+            onChangeText={field.onChange}
+            placeholder="you@livegate.com"
+            value={field.value}
+            error={form.formState.errors.email?.message}
+          />
         )}
       />
       <Controller
         control={form.control}
         name="password"
         render={({ field }) => (
-          <TextField label="Password" onChangeText={field.onChange} placeholder="Create password" secureTextEntry value={field.value} />
+          <TextField
+            label="Password"
+            onChangeText={field.onChange}
+            placeholder="Create password"
+            secureTextEntry
+            value={field.value}
+            error={form.formState.errors.password?.message}
+          />
         )}
       />
       <Controller
         control={form.control}
         name="dateOfBirth"
         render={({ field }) => (
-          <TextField label="Date of birth" onChangeText={field.onChange} placeholder="YYYY-MM-DD" value={field.value} />
+          <TextField
+            label="Date of birth"
+            onChangeText={field.onChange}
+            placeholder="YYYY-MM-DD"
+            value={field.value}
+            error={form.formState.errors.dateOfBirth?.message}
+          />
         )}
       />
       <Controller
@@ -339,7 +429,13 @@ function SignUpFormDialogContent({ onSuccess }: { onSuccess: () => void }) {
           control={form.control}
           name="customGender"
           render={({ field }) => (
-            <TextField label="Please specify" onChangeText={field.onChange} placeholder="Your gender identity" value={field.value ?? ''} />
+            <TextField
+              label="Please specify"
+              onChangeText={field.onChange}
+              placeholder="Your gender identity"
+              value={field.value ?? ''}
+              error={form.formState.errors.customGender?.message}
+            />
           )}
         />
       )}
@@ -347,7 +443,10 @@ function SignUpFormDialogContent({ onSuccess }: { onSuccess: () => void }) {
         Account mode: {preferredRoles.map(formatRoleLabel).join(' + ')}
       </Text>
       {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
-      <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Creating...' : 'Create account'} />
+      <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Creating account...' : 'Create account'} />
+      <View style={styles.authDialogActions}>
+        <Button onPress={onOpenSignIn} title="Already have an account? Sign in" variant="secondary" />
+      </View>
     </View>
   );
 }
@@ -411,23 +510,29 @@ export function RoleSelectionScreen() {
           </Surface>
         );
       })}
-      <Button onPress={() => setActiveDialog('signUp')} title="Continue to sign up" />
-      <Button onPress={() => setActiveDialog('signIn')} title="I already have an account" variant="ghost" />
+      <Button onPress={() => setActiveDialog('signUp')} title="Create account" />
+      <Button onPress={() => setActiveDialog('signIn')} title="Sign in" variant="ghost" />
 
       <Dialog
         visible={activeDialog === 'signUp'}
         onClose={() => setActiveDialog(null)}
-        title="Create account"
+        title="Create your account"
       >
-        <SignUpFormDialogContent onSuccess={() => setActiveDialog(null)} />
+        <SignUpFormDialogContent
+          onSuccess={() => setActiveDialog(null)}
+          onOpenSignIn={() => setActiveDialog('signIn')}
+        />
       </Dialog>
 
       <Dialog
         visible={activeDialog === 'signIn'}
         onClose={() => setActiveDialog(null)}
-        title="Sign in"
+        title="Sign in to LiveGate"
       >
-        <SignInFormDialogContent onSuccess={() => setActiveDialog(null)} />
+        <SignInFormDialogContent
+          onSuccess={() => setActiveDialog(null)}
+          onOpenSignUp={() => setActiveDialog('signUp')}
+        />
       </Dialog>
     </Screen>
   );
@@ -1052,6 +1157,19 @@ const styles = StyleSheet.create({
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.text,
     fontFamily: theme.typography.displayFontFamily,
+  },
+  authDialogIntro: {
+    gap: theme.spacing.xs,
+    marginBottom: theme.spacing.xs,
+  },
+  authDialogBody: {
+    fontSize: theme.typography.sizes.sm,
+    lineHeight: 22,
+    color: theme.colors.textSecondary,
+  },
+  authDialogActions: {
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
   },
   demoCard: {
     backgroundColor: theme.colors.surface,
