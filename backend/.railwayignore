@@ -1,52 +1,38 @@
-# Railway ignore file - files not needed for backend deployment
+# Railway ignore file for deploying the backend workspace as a Docker build context.
+# Keep source files, Dockerfile, startup scripts, and lockfiles available to the build.
+
 .git
 .gitignore
-.github
-node_modules
-*.log
-.env.local
-.env.*.local
+.github/
+.vscode/
+.idea/
 .DS_Store
 *.swp
 *.swo
 *~
-.vscode
-.idea
-dist
-build
-coverage
-.next
-out
+*.log
 
-# Frontend files (not needed for backend deployment)
-../frontend
-../README.md
+.env
+.env.local
+.env.*.local
 
-# IDE and system files
-.turbo
-.vercel
-.cache
-pnpm-lock.yaml
-package-lock.json
-yarn.lock
+.turbo/
+.vercel/
+.cache/
+coverage/
+.next/
+out/
 
-# Python cache
-__pycache__
+.m2/
+node_modules/
+**/node_modules/
+dist/
+build/
+target/
+
+__pycache__/
 *.pyc
 *.pyo
-*.egg-info
-.pytest_cache
-venv
-env
-
-# Maven cache (keep local for faster builds)
-# .m2/
-
-# Keep only necessary backend files
-Dockerfile
-run-services.sh
-docker-compose.yml
-java-service/
-nodejs-service/
-python-service/
-mysql/
+.pytest_cache/
+venv/
+env/
