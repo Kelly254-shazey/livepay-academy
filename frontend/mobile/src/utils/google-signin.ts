@@ -47,8 +47,18 @@ export async function signOutFromGoogle() {
 // Check if user is signed in
 export async function isUserSignedIn() {
   try {
-    const isSignedIn = await GoogleSignin.isSignedIn();
-    return isSignedIn;
+    const maybeGetCurrentUser = (GoogleSignin as unknown as { getCurrentUser?: () => unknown }).getCurrentUser;
+    if (maybeGetCurrentUser) {
+      const currentUser = await Promise.resolve(maybeGetCurrentUser());
+      return Boolean(currentUser);
+    }
+
+    const maybeHasPreviousSignIn = (GoogleSignin as unknown as { hasPreviousSignIn?: () => Promise<boolean> }).hasPreviousSignIn;
+    if (maybeHasPreviousSignIn) {
+      return await maybeHasPreviousSignIn();
+    }
+
+    return false;
   } catch (error) {
     return false;
   }

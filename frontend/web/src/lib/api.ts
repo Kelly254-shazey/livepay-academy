@@ -46,6 +46,7 @@ import {
   type UserRole,
 } from '@livegate/shared';
 import { http } from './http';
+import { demoFallbackEnabled } from './env';
 import { useSessionStore } from '@/store/session-store';
 
 type CreateLiveSessionInput = {
@@ -76,7 +77,15 @@ async function resolveCategoryId(categorySlug: string) {
 async function withDemoFallback<T>(run: () => Promise<T>, fallback: () => T | Promise<T>) {
   try {
     return await run();
-  } catch {
+  } catch (error) {
+    if (!demoFallbackEnabled) {
+      throw error;
+    }
+
+    if (typeof console !== 'undefined') {
+      console.warn('[LiveGate] Falling back to demo data because API request failed.', error);
+    }
+
     return fallback();
   }
 }
@@ -121,7 +130,7 @@ export const webApi = {
   confirmEmailVerification: (body: { email: string; code: string }) =>
     withDemoFallback(
       () => http<AuthSession>(apiRoutes.auth.emailVerificationConfirm, { method: 'POST', body, authenticated: false }),
-      () => signInWithDemo({ ...body, activeRole: 'viewer' as UserRole }) as never,
+      () => signInWithDemo({ email: body.email, password: 'demo', activeRole: 'viewer' as UserRole }) as never,
     ),
   forgotPassword: (body: { email: string }) =>
     withDemoFallback(() => http<{ message: string; maskedEmail: string }>(apiRoutes.auth.forgotPassword, {

@@ -88,6 +88,8 @@ interface TextFieldProps {
   error?: string;
   multiline?: boolean;
   secureTextEntry?: boolean;
+  editable?: boolean;
+  maxLength?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -99,6 +101,8 @@ export function TextField({
   error,
   multiline = false,
   secureTextEntry = false,
+  editable = true,
+  maxLength,
   style,
 }: TextFieldProps) {
   return (
@@ -117,6 +121,8 @@ export function TextField({
         multiline={multiline}
         numberOfLines={multiline ? 4 : 1}
         secureTextEntry={secureTextEntry}
+        editable={editable}
+        maxLength={maxLength}
       />
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>

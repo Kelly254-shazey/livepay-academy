@@ -360,7 +360,7 @@ export function SignUpScreen() {
     onSuccess: (session) => {
       const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
       setSession(normalized);
-      if (normalized.user.emailVerifiedAt) {
+      if (normalized.user.emailVerified) {
         router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
       } else {
         router.replace('/(public)/email-verification');
@@ -456,7 +456,12 @@ export function SignUpScreen() {
             control={form.control}
             name="customGender"
             render={({ field }) => (
-              <TextField label="Please specify" onChangeText={field.onChange} placeholder="Your gender identity" value={field.value} />
+              <TextField
+                label="Please specify"
+                onChangeText={field.onChange}
+                placeholder="Your gender identity"
+                value={field.value ?? ''}
+              />
             )}
           />
         )}
@@ -626,16 +631,22 @@ export function EmailVerificationScreen() {
         </Text>
         <Controller
           control={form.control}
-          name="email"
-          render={({ field }) => (
-            <TextField label="Email" editable={false} value={field.value} />
+            name="email"
+            render={({ field }) => (
+            <TextField label="Email" editable={false} onChangeText={() => undefined} value={field.value} />
           )}
         />
         <Controller
           control={form.control}
           name="code"
           render={({ field }) => (
-            <TextField label="Verification code" onChangeText={field.onChange} placeholder="000000" maxLength={6} value={field.value} />
+            <TextField
+              label="Verification code"
+              onChangeText={field.onChange}
+              placeholder="000000"
+              maxLength={6}
+              value={field.value}
+            />
           )}
         />
         {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
@@ -726,7 +737,12 @@ export function ProfileCompletionScreen() {
             control={form.control}
             name="customGender"
             render={({ field }) => (
-              <TextField label="Please specify" onChangeText={field.onChange} placeholder="Your gender identity" value={field.value} />
+              <TextField
+                label="Please specify"
+                onChangeText={field.onChange}
+                placeholder="Your gender identity"
+                value={field.value ?? ''}
+              />
             )}
           />
         )}

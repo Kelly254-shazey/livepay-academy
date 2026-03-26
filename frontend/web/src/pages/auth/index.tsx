@@ -140,7 +140,7 @@ const forgotSchema = z.object({
 
 const resetSchema = z.object({
   email: z.string().email(),
-  token: z.string().min(4),
+  code: z.string().min(4),
   password: z.string().min(8),
 });
 
@@ -505,7 +505,7 @@ export function ForgotPasswordPage() {
 export function ResetPasswordPage() {
   const form = useForm<z.infer<typeof resetSchema>>({
     resolver: zodResolver(resetSchema),
-    defaultValues: { email: '', token: '', password: '' },
+    defaultValues: { email: '', code: '', password: '' },
   });
 
   const mutation = useMutation({
@@ -529,7 +529,7 @@ export function ResetPasswordPage() {
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Reset token</label>
-          <Input {...form.register('token')} placeholder="Paste token" />
+          <Input {...form.register('code')} placeholder="Paste token" />
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">New password</label>

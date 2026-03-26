@@ -49,7 +49,25 @@ export async function http<T>(path: string, options: RequestOptions = {}) {
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
-  } catch {
+  } catch (error) {
+    const runtimeHostname = typeof window !== 'undefined' ? window.location.hostname : '';
+    const apiHost = (() => {
+      try {
+        return new URL(env.apiBaseUrl).hostname;
+      } catch {
+        return '';
+      }
+    })();
+
+    const looksLikeLocalhost =
+      apiHost === 'localhost' || apiHost === '127.0.0.1' || apiHost === '::1';
+
+    if (looksLikeLocalhost && runtimeHostname && runtimeHostname !== 'localhost') {
+      throw new ApiRequestError(
+        'Backend URL is set to localhost, which will not work on other phones. Configure VITE_API_BASE_URL to your hosted backend (or deploy backend behind /api on the same domain).',
+      );
+    }
+
     throw new ApiRequestError(
       'LiveGate backend is unavailable. Start the backend services and try again.',
     );

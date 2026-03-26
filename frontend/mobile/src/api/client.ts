@@ -72,9 +72,7 @@ function resolveExpoHost() {
 const ALLOWED_DOMAINS = [
   'localhost', // Development only
   '127.0.0.1', // Development only
-  // Add your production API domains here
-  // 'api.livegate.com',
-  // 'staging-api.livegate.com'
+  'livepay-academy-production.up.railway.app',
 ];
 
 // Security: Validate and sanitize URLs to prevent SSRF attacks
@@ -162,9 +160,11 @@ const inferredApiBaseUrl = (() => {
   return host ? `http://${host}:3000/api` : '';
 })();
 
+const productionApiBaseUrl = 'https://livepay-academy-production.up.railway.app/api';
+
 const apiBaseUrl =
   explicitApiBaseUrl ||
-  (Platform.OS === 'web' ? '' : inferredApiBaseUrl);
+  (Platform.OS === 'web' ? '' : inferredApiBaseUrl || productionApiBaseUrl);
 
 export class MobileApiError extends Error {}
 
@@ -348,7 +348,7 @@ export const mobileApi = {
   confirmEmailVerification: (body: { email: string; code: string }) =>
     withDemoFallback(
       () => request<AuthSession>(apiRoutes.auth.emailVerificationConfirm, { method: 'POST', body, authenticated: false }),
-      () => signInWithDemo({ ...body, activeRole: 'viewer' as UserRole }) as never,
+      () => signInWithDemo({ email: body.email, password: 'demo', activeRole: 'viewer' as UserRole }) as never,
     ),
   forgotPassword: (body: { email: string }) =>
     withDemoFallback(
