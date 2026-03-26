@@ -13,7 +13,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { z } from 'zod';
 import { mobileApi } from '@/api/client';
-import { Badge, Button, Heading, Screen, Surface, TextField } from '@/components/ui';
+import { Badge, Button, Heading, Screen, Surface, TextField, Dialog } from '@/components/ui';
 import { useSessionStore } from '@/store/session-store';
 import { theme } from '@/theme';
 
@@ -187,9 +187,177 @@ export function OnboardingScreen() {
   );
 }
 
+function SignInFormDialogContent({ onSuccess }: { onSuccess: () => void }) {
+  const preferredRole = useSessionStore((state) => state.preferredRole);
+  const preferredRoles = useSessionStore((state) => state.preferredRoles);
+  const setSession = useSessionStore((state) => state.setSession);
+  const form = useForm<z.infer<typeof signInSchema>>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: { email: '', password: '' },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (values: z.infer<typeof signInSchema>) =>
+      mobileApi.signIn({ ...values, role: preferredRole, roles: preferredRoles }),
+    onSuccess: (session) => {
+      if (session) {
+        const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
+        setSession(normalized);
+        onSuccess();
+        router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
+      }
+    },
+  });
+
+  return (
+    <View style={{ gap: 12 }}>
+      <Controller
+        control={form.control}
+        name="email"
+        render={({ field }) => (
+          <TextField label="Email" onChangeText={field.onChange} placeholder="you@livegate.com" value={field.value} />
+        )}
+      />
+      <Controller
+        control={form.control}
+        name="password"
+        render={({ field }) => (
+          <TextField label="Password" onChangeText={field.onChange} placeholder="Password" secureTextEntry value={field.value} />
+        )}
+      />
+      <Text style={styles.statusText}>
+        Selected mode: {preferredRoles.map(formatRoleLabel).join(' + ')}
+      </Text>
+      {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
+      <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Signing in...' : 'Sign in'} />
+    </View>
+  );
+}
+
+function SignUpFormDialogContent({ onSuccess }: { onSuccess: () => void }) {
+  const preferredRole = useSessionStore((state) => state.preferredRole);
+  const preferredRoles = useSessionStore((state) => state.preferredRoles);
+  const setSession = useSessionStore((state) => state.setSession);
+  const [showGenderCustom, setShowGenderCustom] = React.useState(false);
+  
+  const form = useForm<z.infer<typeof signUpSchema>>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: { 
+      fullName: '', 
+      email: '', 
+      password: '',
+      username: '',
+      dateOfBirth: '',
+      gender: 'prefer_not_to_say',
+      customGender: '',
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (values: z.infer<typeof signUpSchema>) =>
+      mobileApi.signUp({ 
+        ...values, 
+        role: preferredRole, 
+        roles: preferredRoles 
+      }),
+    onSuccess: (session) => {
+      if (session) {
+        const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
+        setSession(normalized);
+        if (normalized.user.emailVerified) {
+          onSuccess();
+          router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
+        } else {
+          onSuccess();
+          router.replace('/(public)/email-verification');
+        }
+      }
+    },
+  });
+
+  return (
+    <View style={{ gap: 12 }}>
+      <Controller
+        control={form.control}
+        name="fullName"
+        render={({ field }) => (
+          <TextField label="Full name" onChangeText={field.onChange} placeholder="Your full name" value={field.value} />
+        )}
+      />
+      <Controller
+        control={form.control}
+        name="username"
+        render={({ field }) => (
+          <TextField label="Username" onChangeText={field.onChange} placeholder="Unique username" value={field.value} />
+        )}
+      />
+      <Controller
+        control={form.control}
+        name="email"
+        render={({ field }) => (
+          <TextField label="Email" onChangeText={field.onChange} placeholder="you@livegate.com" value={field.value} />
+        )}
+      />
+      <Controller
+        control={form.control}
+        name="password"
+        render={({ field }) => (
+          <TextField label="Password" onChangeText={field.onChange} placeholder="Create password" secureTextEntry value={field.value} />
+        )}
+      />
+      <Controller
+        control={form.control}
+        name="dateOfBirth"
+        render={({ field }) => (
+          <TextField label="Date of birth" onChangeText={field.onChange} placeholder="YYYY-MM-DD" value={field.value} />
+        )}
+      />
+      <Controller
+        control={form.control}
+        name="gender"
+        render={({ field }) => (
+          <View style={{ gap: 8 }}>
+            <Text style={styles.statusText}>Gender</Text>
+            <View style={{ gap: 8 }}>
+              {(['male', 'female', 'prefer_not_to_say', 'custom'] as const).map((option) => (
+                <Button
+                  key={option}
+                  onPress={() => {
+                    field.onChange(option);
+                    setShowGenderCustom(option === 'custom');
+                  }}
+                  title={option === 'male' ? 'Male' : option === 'female' ? 'Female' : option === 'prefer_not_to_say' ? 'Prefer not to say' : 'Custom'}
+                  variant={field.value === option ? 'primary' : 'secondary'}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+      />
+      {showGenderCustom && (
+        <Controller
+          control={form.control}
+          name="customGender"
+          render={({ field }) => (
+            <TextField label="Please specify" onChangeText={field.onChange} placeholder="Your gender identity" value={field.value ?? ''} />
+          )}
+        />
+      )}
+      <Text style={styles.statusText}>
+        Account mode: {preferredRoles.map(formatRoleLabel).join(' + ')}
+      </Text>
+      {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
+      <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Creating...' : 'Create account'} />
+    </View>
+  );
+}
+
 export function RoleSelectionScreen() {
   const preferredRoles = useSessionStore((state) => state.preferredRoles);
+  const preferredRole = useSessionStore((state) => state.preferredRole);
   const setPreferredRoles = useSessionStore((state) => state.setPreferredRoles);
+  const setSession = useSessionStore((state) => state.setSession);
+  const [activeDialog, setActiveDialog] = React.useState<'signIn' | 'signUp' | null>(null);
 
   return (
     <Screen>
@@ -243,8 +411,24 @@ export function RoleSelectionScreen() {
           </Surface>
         );
       })}
-      <Button onPress={() => router.push('/(public)/sign-up')} title="Continue to sign up" />
-      <Button onPress={() => router.push('/(public)/sign-in')} title="I already have an account" variant="ghost" />
+      <Button onPress={() => setActiveDialog('signUp')} title="Continue to sign up" />
+      <Button onPress={() => setActiveDialog('signIn')} title="I already have an account" variant="ghost" />
+
+      <Dialog
+        visible={activeDialog === 'signUp'}
+        onClose={() => setActiveDialog(null)}
+        title="Create account"
+      >
+        <SignUpFormDialogContent onSuccess={() => setActiveDialog(null)} />
+      </Dialog>
+
+      <Dialog
+        visible={activeDialog === 'signIn'}
+        onClose={() => setActiveDialog(null)}
+        title="Sign in"
+      >
+        <SignInFormDialogContent onSuccess={() => setActiveDialog(null)} />
+      </Dialog>
     </Screen>
   );
 }

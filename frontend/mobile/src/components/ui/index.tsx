@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
+  Modal,
   type ViewStyle,
   type TextStyle,
   type StyleProp,
@@ -174,6 +175,45 @@ export function Badge({ children, variant = 'default', style }: BadgeProps) {
   );
 }
 
+// Dialog/Modal
+interface DialogProps {
+  visible: boolean;
+  onClose: () => void;
+  title?: string;
+  children: React.ReactNode;
+}
+
+export function Dialog({ visible, onClose, title, children }: DialogProps) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.dialogOverlay}>
+        <View style={styles.dialogContent}>
+          {title && (
+            <View style={styles.dialogHeader}>
+              <Text style={styles.dialogTitle}>{title}</Text>
+              <TouchableOpacity onPress={onClose} style={styles.dialogCloseButton}>
+                <Text style={styles.dialogCloseText}>×</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          <ScrollView
+            style={styles.dialogScroll}
+            contentContainerStyle={styles.dialogScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {children}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // Avatar
 interface AvatarProps {
   name?: string;
@@ -335,6 +375,56 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.sizes.xs,
     fontWeight: theme.typography.weights.medium,
     letterSpacing: 0.4,
+  },
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+  },
+  dialogContent: {
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSubtle,
+    maxHeight: '85%',
+    width: '100%',
+    ...theme.shadow.lg,
+  },
+  dialogHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderSubtle,
+  },
+  dialogTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text,
+    fontFamily: theme.typography.displayFontFamily,
+    flex: 1,
+  },
+  dialogCloseButton: {
+    padding: theme.spacing.md,
+    marginRight: -theme.spacing.md,
+  },
+  dialogCloseText: {
+    fontSize: 28,
+    color: theme.colors.textSecondary,
+    fontWeight: '300',
+  },
+  dialogScroll: {
+    flex: 1,
+  },
+  dialogScrollContent: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+    gap: theme.spacing.lg,
   },
   avatar: {
     borderRadius: theme.radius.pill,

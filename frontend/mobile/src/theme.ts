@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 
 function createShadow({
   color,
@@ -30,34 +30,64 @@ function createShadow({
   };
 }
 
-export const theme = {
-  colors: {
-    background: '#f4efe7',
-    backgroundAccent: '#ebe2d3',
-    surface: '#fffaf2',
-    surfaceMuted: '#f3ebdf',
-    surfaceElevated: '#ffffff',
-    border: '#ddd1c0',
-    borderSubtle: '#ece2d5',
-    text: '#14231f',
-    textSecondary: '#435550',
-    textMuted: '#72807b',
-    accent: '#0f766e',
-    accentHover: '#115e59',
-    accentMuted: '#d9f0ea',
-    primary: '#0f766e',
-    primarySoft: '#d8ebe5',
-    success: '#1f8a70',
-    successMuted: '#d7f0e8',
-    warning: '#c9891c',
-    warningMuted: '#faebc9',
-    danger: '#c6513d',
-    dangerMuted: '#f8ddd7',
-    error: '#c6513d',
-    info: '#2563eb',
-    infoMuted: '#dbe7ff',
-    overlay: 'rgba(20, 35, 31, 0.08)',
-  },
+const lightColors = {
+  background: '#f4efe7',
+  backgroundAccent: '#ebe2d3',
+  surface: '#fffaf2',
+  surfaceMuted: '#f3ebdf',
+  surfaceElevated: '#ffffff',
+  border: '#ddd1c0',
+  borderSubtle: '#ece2d5',
+  text: '#14231f',
+  textSecondary: '#435550',
+  textMuted: '#72807b',
+  accent: '#0f766e',
+  accentHover: '#115e59',
+  accentMuted: '#d9f0ea',
+  primary: '#0f766e',
+  primarySoft: '#d8ebe5',
+  success: '#1f8a70',
+  successMuted: '#d7f0e8',
+  warning: '#c9891c',
+  warningMuted: '#faebc9',
+  danger: '#c6513d',
+  dangerMuted: '#f8ddd7',
+  error: '#c6513d',
+  info: '#2563eb',
+  infoMuted: '#dbe7ff',
+  overlay: 'rgba(20, 35, 31, 0.08)',
+};
+
+const darkColors = {
+  background: '#0a0a0a',
+  backgroundAccent: '#1a1a1a',
+  surface: '#1a1a1a',
+  surfaceMuted: '#262626',
+  surfaceElevated: '#2d2d2d',
+  border: '#404040',
+  borderSubtle: '#2d2d2d',
+  text: '#f5f5f5',
+  textSecondary: '#d4d4d4',
+  textMuted: '#a1a1a1',
+  accent: '#14b8a6',
+  accentHover: '#0d9488',
+  accentMuted: '#164e63',
+  primary: '#14b8a6',
+  primarySoft: '#1e5a57',
+  success: '#34d399',
+  successMuted: '#1f3a34',
+  warning: '#fbbf24',
+  warningMuted: '#4a3e1f',
+  danger: '#f87171',
+  dangerMuted: '#4a2622',
+  error: '#f87171',
+  info: '#60a5fa',
+  infoMuted: '#1f2f5f',
+  overlay: 'rgba(255, 255, 255, 0.1)',
+};
+
+const createTheme = (colors: typeof lightColors) => ({
+  colors,
   spacing: {
     xs: 4,
     sm: 8,
@@ -77,9 +107,9 @@ export const theme = {
     pill: 999,
   },
   shadow: {
-    sm: createShadow({ color: '#14231f', x: 0, y: 6, blur: 16, opacity: 0.08, elevation: 3 }),
-    md: createShadow({ color: '#14231f', x: 0, y: 12, blur: 28, opacity: 0.12, elevation: 6 }),
-    lg: createShadow({ color: '#14231f', x: 0, y: 18, blur: 38, opacity: 0.16, elevation: 10 }),
+    sm: createShadow({ color: colors.text, x: 0, y: 6, blur: 16, opacity: 0.12, elevation: 3 }),
+    md: createShadow({ color: colors.text, x: 0, y: 12, blur: 28, opacity: 0.16, elevation: 6 }),
+    lg: createShadow({ color: colors.text, x: 0, y: 18, blur: 38, opacity: 0.2, elevation: 10 }),
   },
   typography: {
     fontFamily: Platform.select({
@@ -110,4 +140,12 @@ export const theme = {
       bold: '700' as const,
     },
   },
-};
+});
+
+export const lightTheme = createTheme(lightColors);
+export const darkTheme = createTheme(darkColors);
+
+export type Theme = typeof lightTheme;
+
+// Default to light theme - will be overridden by store
+export const theme = lightTheme;

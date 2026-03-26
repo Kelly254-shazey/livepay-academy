@@ -102,7 +102,7 @@ export const webApi = {
   signInWithGoogle: (body: { idToken: string; role?: string; roles?: UserRole[] }) =>
     withDemoFallback(
       () => http<AuthSession>(apiRoutes.auth.signInWithGoogle, { method: 'POST', body, authenticated: false }),
-      () => signInWithDemo({ email: 'google@demo.local', password: 'demo', activeRole: (body.role || 'viewer') as UserRole, roles: body.roles }),
+      () => signInWithDemo({ email: 'google@demo.local', activeRole: (body.role || 'viewer') as UserRole, roles: body.roles }),
     ),
   refresh: (body: { refreshToken: string }) =>
     withDemoFallback(
@@ -122,20 +122,20 @@ export const webApi = {
   confirmEmailVerification: (body: { email: string; code: string }) =>
     withDemoFallback(
       () => http<AuthSession>(apiRoutes.auth.emailVerificationConfirm, { method: 'POST', body, authenticated: false }),
-      () => signInWithDemo({ email: body.email, password: DEMO_PASSWORD, activeRole: 'viewer' as UserRole }) as never,
+      () => signInWithDemo({ email: body.email, activeRole: 'viewer' as UserRole }) as never,
     ),
   forgotPassword: (body: { email: string }) =>
     withDemoFallback(() => http<{ message: string; maskedEmail: string }>(apiRoutes.auth.forgotPassword, {
       method: 'POST',
       body,
       authenticated: false,
-    }), forgotPasswordDemo),
+    }), () => forgotPasswordDemo(body)),
   resetPassword: (body: { email: string; code: string; password: string }) =>
     withDemoFallback(() => http<{ message: string }>(apiRoutes.auth.resetPassword, {
       method: 'POST',
       body,
       authenticated: false,
-    }), resetPasswordDemo),
+    }), () => resetPasswordDemo(body)),
   completeProfile: (body: { 
     fullName: string; 
     username: string; 
@@ -298,7 +298,7 @@ export const webApi = {
           fullName: session?.user.fullName,
           email: session?.user.email,
           roles: session?.user.roles,
-          activeRole: session?.user.role,
+          defaultRole: session?.user.role,
         });
       },
     ),

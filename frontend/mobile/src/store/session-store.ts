@@ -46,6 +46,7 @@ interface SessionState {
   session: AuthSession | null;
   unlockedDemoLiveIds: string[];
   demoLiveChats: Record<string, DemoLiveChatMessage[]>;
+  isDarkMode: boolean;
   setHydrated: (hydrated: boolean) => void;
   completeOnboarding: () => void;
   setPreferredRole: (role: UserRole) => void;
@@ -58,6 +59,7 @@ interface SessionState {
     message: Omit<DemoLiveChatMessage, 'id'>,
   ) => void;
   resetDemoLiveChat: (liveId: string) => void;
+  setIsDarkMode: (isDark: boolean) => void;
   signOut: () => void;
 }
 
@@ -65,72 +67,78 @@ interface SessionState {
 const createStore = () => {
   if (Platform.OS === 'web') {
     // Web platform: skip persist middleware to avoid import.meta issues
-    return create<SessionState>((set) => ({
-      hydrated: true,
-      hasSeenOnboarding: false,
-      preferredRole: 'viewer',
-      preferredRoles: ['viewer'],
-      session: null,
-      unlockedDemoLiveIds: [],
-      demoLiveChats: initialDemoLiveChats,
-      setHydrated: (hydrated) => set({ hydrated }),
-      completeOnboarding: () => set({ hasSeenOnboarding: true }),
-      setPreferredRole: (preferredRole) =>
-        set((state) => ({
-          preferredRole,
-          preferredRoles: state.preferredRoles.includes(preferredRole)
-            ? state.preferredRoles
-            : [preferredRole],
-        })),
-      setPreferredRoles: (roles, activeRole) =>
-        set({
-          preferredRoles: Array.from(new Set(roles)),
-          preferredRole: activeRole ?? roles[0] ?? 'viewer',
-        }),
-      setActiveRole: (role) =>
-        set((state) => ({
-          preferredRole: role,
-          session: switchSessionRole(state.session, role),
-        })),
-      setSession: (session) =>
-        set((state) => ({
-          session:
-            session === null
-              ? null
-              : normalizeAuthSession(session, state.preferredRoles, state.preferredRole),
-        })),
-      unlockDemoLiveAccess: (liveId) =>
-        set((state) => ({
-          unlockedDemoLiveIds: state.unlockedDemoLiveIds.includes(liveId)
-            ? state.unlockedDemoLiveIds
-            : [...state.unlockedDemoLiveIds, liveId],
-        })),
-      sendDemoLiveChatMessage: (liveId, message) =>
-        set((state) => ({
-          demoLiveChats: {
-            ...state.demoLiveChats,
-            [liveId]: [
-              ...(state.demoLiveChats[liveId] ?? []),
-              { ...message, id: `${liveId}-${Date.now()}` },
-            ],
-          },
-        })),
-      resetDemoLiveChat: (liveId) =>
-        set((state) => ({
-          demoLiveChats: {
-            ...state.demoLiveChats,
-            [liveId]: initialDemoLiveChats[liveId] ?? [],
-          },
-        })),
-      signOut: () =>
-        set({
-          session: null,
-          preferredRole: 'viewer',
-          preferredRoles: ['viewer'],
-          unlockedDemoLiveIds: [],
-          demoLiveChats: initialDemoLiveChats,
-        }),
-    }));
+    return create<SessionState>((set) => {
+      const store: SessionState = {
+        hydrated: true,
+        hasSeenOnboarding: false,
+        preferredRole: 'viewer',
+        preferredRoles: ['viewer'],
+        session: null,
+        unlockedDemoLiveIds: [],
+        demoLiveChats: initialDemoLiveChats,
+        isDarkMode: false,
+        setHydrated: (hydrated: boolean) => set({ hydrated }),
+        completeOnboarding: () => set({ hasSeenOnboarding: true }),
+        setPreferredRole: (preferredRole: UserRole) =>
+          set((state) => ({
+            preferredRole,
+            preferredRoles: state.preferredRoles.includes(preferredRole)
+              ? state.preferredRoles
+              : [preferredRole],
+          })),
+        setPreferredRoles: (roles: UserRole[], activeRole?: UserRole) =>
+          set({
+            preferredRoles: Array.from(new Set(roles)),
+            preferredRole: activeRole ?? roles[0] ?? 'viewer',
+          }),
+        setActiveRole: (role: UserRole) =>
+          set((state) => ({
+            preferredRole: role,
+            session: switchSessionRole(state.session, role),
+          })),
+        setSession: (session: AuthSession | null) =>
+          set((state) => ({
+            session:
+              session === null
+                ? null
+                : normalizeAuthSession(session, state.preferredRoles, state.preferredRole),
+          })),
+        unlockDemoLiveAccess: (liveId: string) =>
+          set((state) => ({
+            unlockedDemoLiveIds: state.unlockedDemoLiveIds.includes(liveId)
+              ? state.unlockedDemoLiveIds
+              : [...state.unlockedDemoLiveIds, liveId],
+          })),
+        sendDemoLiveChatMessage: (liveId: string, message: Omit<DemoLiveChatMessage, 'id'>) =>
+          set((state) => ({
+            demoLiveChats: {
+              ...state.demoLiveChats,
+              [liveId]: [
+                ...(state.demoLiveChats[liveId] ?? []),
+                { ...message, id: `${liveId}-${Date.now()}` },
+              ],
+            },
+          })),
+        resetDemoLiveChat: (liveId: string) =>
+          set((state) => ({
+            demoLiveChats: {
+              ...state.demoLiveChats,
+              [liveId]: initialDemoLiveChats[liveId] ?? [],
+            },
+          })),
+        setIsDarkMode: (isDarkMode: boolean) => set({ isDarkMode }),
+        signOut: () =>
+          set({
+            session: null,
+            preferredRole: 'viewer',
+            preferredRoles: ['viewer'],
+            unlockedDemoLiveIds: [],
+            demoLiveChats: initialDemoLiveChats,
+            isDarkMode: false,
+          }),
+      };
+      return store;
+    });
   } else {
     // Native platform: use persist middleware
     const { createJSONStorage, persist } = require('zustand/middleware');
@@ -146,6 +154,7 @@ const createStore = () => {
           session: null,
           unlockedDemoLiveIds: [],
           demoLiveChats: initialDemoLiveChats,
+          isDarkMode: false,
           setHydrated: (hydrated: boolean) => set({ hydrated }),
           completeOnboarding: () => set({ hasSeenOnboarding: true }),
           setPreferredRole: (preferredRole: UserRole) =>
@@ -195,6 +204,7 @@ const createStore = () => {
                 [liveId]: initialDemoLiveChats[liveId] ?? [],
               },
             })),
+          setIsDarkMode: (isDarkMode: boolean) => set({ isDarkMode }),
           signOut: () =>
             set({
               session: null,
@@ -202,6 +212,7 @@ const createStore = () => {
               preferredRoles: ['viewer'],
               unlockedDemoLiveIds: [],
               demoLiveChats: initialDemoLiveChats,
+              isDarkMode: false,
             }),
         }),
         {
@@ -214,6 +225,7 @@ const createStore = () => {
             session: state.session,
             unlockedDemoLiveIds: state.unlockedDemoLiveIds,
             demoLiveChats: state.demoLiveChats,
+            isDarkMode: state.isDarkMode,
           }),
           onRehydrateStorage: () => (state?: SessionState) => {
             state?.setHydrated(true);
