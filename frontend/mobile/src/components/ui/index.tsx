@@ -1,7 +1,10 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -233,6 +236,9 @@ function createStyles(theme: Theme) {
       alignItems: 'center',
       padding: theme.spacing.lg,
     },
+    dialogBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+    },
     dialogContent: {
       backgroundColor: theme.colors.surfaceElevated,
       borderRadius: theme.radius.lg,
@@ -240,6 +246,9 @@ function createStyles(theme: Theme) {
       borderColor: theme.colors.borderSubtle,
       maxHeight: '85%',
       width: '100%',
+      maxWidth: 520,
+      minHeight: 0,
+      overflow: 'hidden',
       ...theme.shadow.lg,
     },
     dialogHeader: {
@@ -269,7 +278,8 @@ function createStyles(theme: Theme) {
       fontWeight: '300',
     },
     dialogScroll: {
-      flex: 1,
+      flexGrow: 0,
+      minHeight: 0,
     },
     dialogScrollContent: {
       paddingHorizontal: theme.spacing.lg,
@@ -441,8 +451,20 @@ export function Dialog({ visible, onClose, title, children }: DialogProps) {
   const styles = createStyles(theme);
 
   return (
-    <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}>
-      <View style={styles.dialogOverlay}>
+    <Modal
+      animationType="fade"
+      hardwareAccelerated
+      onRequestClose={onClose}
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      transparent
+      visible={visible}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.dialogOverlay}
+      >
+        <Pressable onPress={onClose} style={styles.dialogBackdrop} />
         <View style={styles.dialogContent}>
           {title ? (
             <View style={styles.dialogHeader}>
@@ -454,13 +476,15 @@ export function Dialog({ visible, onClose, title, children }: DialogProps) {
           ) : null}
           <ScrollView
             contentContainerStyle={styles.dialogScrollContent}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
             showsVerticalScrollIndicator={false}
             style={styles.dialogScroll}
           >
             {children}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

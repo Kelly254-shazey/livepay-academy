@@ -10,7 +10,7 @@ import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { z } from 'zod';
 import { mobileApi } from '@/api/client';
 import { Badge, Button, Heading, Screen, Surface, TextField, Dialog } from '@/components/ui';
@@ -487,6 +487,27 @@ export function RoleSelectionScreen() {
   const setPreferredRoles = useSessionStore((state) => state.setPreferredRoles);
   const setSession = useSessionStore((state) => state.setSession);
   const [activeDialog, setActiveDialog] = React.useState<'signIn' | 'signUp' | null>(null);
+  const { width } = useWindowDimensions();
+  const compactHeroLayout = width < 390;
+  const useFullScreenAuth = width < 768;
+
+  function openSignUp() {
+    if (useFullScreenAuth) {
+      router.push('/(public)/sign-up');
+      return;
+    }
+
+    setActiveDialog('signUp');
+  }
+
+  function openSignIn() {
+    if (useFullScreenAuth) {
+      router.push('/(public)/sign-in');
+      return;
+    }
+
+    setActiveDialog('signIn');
+  }
 
   return (
     <Screen>
@@ -497,12 +518,12 @@ export function RoleSelectionScreen() {
           <Badge variant="primary">Live now</Badge>
           <Badge variant="default">For you</Badge>
         </View>
-        <View style={styles.roleHeroFeed}>
+        <View style={[styles.roleHeroFeed, compactHeroLayout && styles.roleHeroFeedCompact]}>
           <View style={[styles.roleHeroTile, styles.roleHeroTilePrimary]}>
             <Text style={styles.roleHeroTileKicker}>Trending stream</Text>
             <Text style={styles.roleHeroTileTitle}>Content creator drop-ins, premium rooms, and bite-size discovery.</Text>
           </View>
-          <View style={styles.roleHeroAside}>
+          <View style={[styles.roleHeroAside, compactHeroLayout && styles.roleHeroAsideCompact]}>
             <View style={[styles.roleHeroTile, styles.roleHeroTileSmall]}>
               <Text style={styles.roleHeroMetric}>24/7</Text>
               <Text style={styles.roleHeroTileCaption}>Discovery rhythm</Text>
@@ -540,8 +561,13 @@ export function RoleSelectionScreen() {
           </Surface>
         );
       })}
-      <Button onPress={() => setActiveDialog('signUp')} title="Create account" />
-      <Button onPress={() => setActiveDialog('signIn')} title="Sign in" variant="ghost" />
+      <Button onPress={openSignUp} title="Create account" />
+      <Button onPress={openSignIn} title="Sign in" variant="ghost" />
+      {useFullScreenAuth ? (
+        <Text style={styles.authEntryNote}>
+          Auth opens full screen on phones so every field stays visible.
+        </Text>
+      ) : null}
       <Button onPress={() => router.replace('/(public)/onboarding')} title="Back to welcome" variant="secondary" />
 
       <Dialog
@@ -1208,6 +1234,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     alignItems: 'stretch',
   },
+  roleHeroFeedCompact: {
+    flexDirection: 'column',
+  },
   roleHeroTile: {
     borderRadius: theme.radius.lg,
     borderWidth: 1,
@@ -1223,6 +1252,9 @@ const styles = StyleSheet.create({
   roleHeroAside: {
     flex: 0.95,
     gap: theme.spacing.md,
+  },
+  roleHeroAsideCompact: {
+    flexDirection: 'row',
   },
   roleHeroTileSmall: {
     flex: 1,
@@ -1244,6 +1276,7 @@ const styles = StyleSheet.create({
     color: '#fffaf2',
     fontWeight: theme.typography.weights.semibold,
     fontFamily: theme.typography.displayFontFamily,
+    flexShrink: 1,
   },
   roleHeroMetric: {
     fontSize: theme.typography.sizes['2xl'],
@@ -1255,6 +1288,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.sizes.sm,
     color: '#d6e6df',
     lineHeight: 20,
+    flexShrink: 1,
   },
   roleIntroCard: {
     backgroundColor: theme.colors.surface,
@@ -1289,6 +1323,13 @@ const styles = StyleSheet.create({
   authDialogActions: {
     gap: theme.spacing.sm,
     marginTop: theme.spacing.xs,
+  },
+  authEntryNote: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginTop: -theme.spacing.xs,
   },
   demoCard: {
     backgroundColor: theme.colors.surface,
