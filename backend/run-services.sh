@@ -81,9 +81,19 @@ normalize_runtime_env() {
     fi
   fi
 
-  if [ -z "${DATABASE_URL:-}" ] && [ -n "${mysql_host}" ] && [ -n "${mysql_user}" ] && [ -n "${mysql_password}" ] && [ -n "${node_database_name}" ]; then
-    export DATABASE_URL="mysql://${mysql_user}:${mysql_password}@${mysql_host}:${mysql_port}/${node_database_name}"
-    echo "Derived DATABASE_URL from Railway MySQL variables"
+  # Apply local development defaults only outside production. On Railway,
+  # missing database configuration must not silently fall back to localhost.
+  if [ "${NODE_ENV:-}" != "production" ]; then
+    mysql_host="${mysql_host:-127.0.0.1}"
+    mysql_user="${mysql_user:-root}"
+    node_database_name="${node_database_name:-livegate_nodejs}"
+  fi
+
+  if [ -z "${DATABASE_URL:-}" ] && [ -n "${mysql_host}" ] && [ -n "${mysql_user}" ] && [ -n "${node_database_name}" ]; then
+    local auth_part="${mysql_user}"
+    [ -n "${mysql_password}" ] && auth_part="${auth_part}:${mysql_password}"
+    export DATABASE_URL="mysql://${auth_part}@${mysql_host}:${mysql_port}/${node_database_name}"
+    echo "Configured DATABASE_URL to point to host: ${mysql_host}"
   fi
 
   java_database_name="$(derive_database_name "${node_database_name}" "java")"
@@ -107,6 +117,11 @@ normalize_runtime_env() {
 
   if [ -z "${PYTHON_SOURCE_DATABASE_URL:-}" ] && [ -n "${DATABASE_URL:-}" ]; then
     export PYTHON_SOURCE_DATABASE_URL="$(printf '%s' "${DATABASE_URL}" | sed 's#^mysql://#mysql+aiomysql://#')"
+  fi
+
+  if [ -z "${JWT_SECRET:-}" ] && [ "${NODE_ENV:-}" != "production" ]; then
+    export JWT_SECRET="dev-secret-keep-it-secret-keep-it-safe"
+    echo "Using default JWT_SECRET for development"
   fi
 
   if [ -z "${JWT_ACCESS_SECRET:-}" ] && [ -n "${JWT_SECRET:-}" ]; then

@@ -194,6 +194,12 @@ function isLocalHostname(hostname: string): boolean {
   return ['localhost', '127.0.0.1', '::1'].includes(hostname.toLowerCase());
 }
 
+function isLiveGatePublicHostname(hostname: string): boolean {
+  return ['livepay-academy.vercel.app', 'livepay-academy-production.up.railway.app'].includes(
+    hostname.toLowerCase(),
+  );
+}
+
 function getHostnameFromUrl(value: string): string {
   try {
     return new URL(value).hostname.toLowerCase();
@@ -239,12 +245,13 @@ const resolvedSocketOrigin =
     : explicitSocketOrigin;
 
 const apiBaseUrl =
-  resolvedApiBaseUrl ||
   expoWebDevFallbackApiBaseUrl ||
+  resolvedApiBaseUrl ||
   (Platform.OS === 'web' ? '' : inferredApiBaseUrl);
+
 const socketOrigin =
-  resolvedSocketOrigin ||
   expoWebDevFallbackSocketOrigin ||
+  resolvedSocketOrigin ||
   (apiBaseUrl ? new URL(apiBaseUrl).origin : '');
 
 export class MobileApiError extends Error {
@@ -289,6 +296,10 @@ function getResponseErrorMessage(statusCode: number, fallback?: string | null) {
 }
 
 function getNetworkErrorMessage(parsedUrl: URL) {
+  if (Platform.OS === 'web' && isLiveGatePublicHostname(parsedUrl.hostname)) {
+    return `LiveGate backend at ${parsedUrl.origin} is unavailable right now. The deployed API returned an invalid response before sign-in could complete.`;
+  }
+
   if (Platform.OS === 'web' && !isLocalHostname(parsedUrl.hostname)) {
     const browserOrigin =
       typeof window !== 'undefined' ? window.location.origin : 'this browser origin';
@@ -501,14 +512,15 @@ async function request<T>(
     headers.set('Accept', 'application/json');
   }
 
-  if (!headers.has('x-request-id')) {
-    headers.set('x-request-id', createClientRequestId());
+  // Security/CORS: Minimize custom headers on Web to avoid preflight rejections
+  if (Platform.OS !== 'web') {
+    if (!headers.has('x-request-id')) {
+      headers.set('x-request-id', createClientRequestId());
+    }
+    if (!headers.has('x-source-service')) {
+      headers.set('x-source-service', 'mobile-app');
+    }
   }
-
-  if (!headers.has('x-source-service')) {
-    headers.set('x-source-service', 'mobile-app');
-  }
-
   if (!headers.has('Content-Type') && options.body !== undefined) {
     headers.set('Content-Type', 'application/json');
   }
