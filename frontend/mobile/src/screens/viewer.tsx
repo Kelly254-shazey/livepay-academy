@@ -99,6 +99,14 @@ const appearanceModes = ['system', 'light', 'dark'] as const;
 type ViewerCheckoutProductType = 'live' | 'content' | 'class';
 type AccessTargetType = 'live_session' | 'premium_content' | 'class';
 
+function normalizeAppearanceMode(
+  value: unknown,
+): (typeof appearanceModes)[number] {
+  return appearanceModes.includes(value as (typeof appearanceModes)[number])
+    ? (value as (typeof appearanceModes)[number])
+    : 'system';
+}
+
 function formatRoleLabel(role: string) {
   if (role === 'creator') return 'Content Creator';
   if (role === 'viewer') return 'Viewer';
@@ -236,8 +244,8 @@ export function HomeScreen() {
           overflow: 'hidden',
           borderRadius: theme.radius.xl,
           borderWidth: 1,
-          borderColor: '#beded6',
-          backgroundColor: '#10211d',
+          borderColor: '#d7c5b6',
+          backgroundColor: '#171b24',
           padding: theme.spacing.lg,
           gap: theme.spacing.lg,
           minHeight: 230,
@@ -252,7 +260,7 @@ export function HomeScreen() {
             width: 170,
             height: 170,
             borderRadius: theme.radius.pill,
-            backgroundColor: '#1f8a70',
+            backgroundColor: '#9a6b42',
             opacity: 0.28,
           }}
         />
@@ -264,7 +272,7 @@ export function HomeScreen() {
             width: 220,
             height: 150,
             borderRadius: theme.radius.pill,
-            backgroundColor: '#2dd4bf',
+            backgroundColor: '#f0c987',
             opacity: 0.18,
           }}
         />
@@ -280,7 +288,7 @@ export function HomeScreen() {
               borderRadius: theme.radius.lg,
               borderWidth: 1,
               borderColor: 'rgba(255,255,255,0.12)',
-              backgroundColor: 'rgba(255,255,255,0.08)',
+              backgroundColor: 'rgba(255,255,255,0.06)',
               padding: theme.spacing.lg,
               justifyContent: 'space-between',
             }}
@@ -288,7 +296,7 @@ export function HomeScreen() {
             <Text
               style={{
                 fontSize: theme.typography.sizes.xs,
-                color: '#bdeee4',
+                color: '#f0c987',
                 textTransform: 'uppercase',
                 letterSpacing: 1.4,
                 fontWeight: theme.typography.weights.medium,
@@ -300,7 +308,7 @@ export function HomeScreen() {
               style={{
                 fontSize: theme.typography.sizes.xl,
                 lineHeight: 29,
-                color: '#fffaf2',
+                color: '#f7f0e8',
                 fontWeight: theme.typography.weights.semibold,
                 fontFamily: theme.typography.displayFontFamily,
               }}
@@ -316,7 +324,7 @@ export function HomeScreen() {
                 borderRadius: theme.radius.lg,
                 borderWidth: 1,
                 borderColor: 'rgba(255,255,255,0.12)',
-                backgroundColor: 'rgba(255,255,255,0.08)',
+                backgroundColor: 'rgba(255,255,255,0.06)',
                 padding: theme.spacing.lg,
                 justifyContent: 'space-between',
               }}
@@ -324,14 +332,14 @@ export function HomeScreen() {
               <Text
                 style={{
                   fontSize: theme.typography.sizes['2xl'],
-                  color: '#fffaf2',
+                  color: '#f7f0e8',
                   fontWeight: theme.typography.weights.bold,
                   fontFamily: theme.typography.displayFontFamily,
                 }}
               >
                 24/7
               </Text>
-              <Text style={{ fontSize: theme.typography.sizes.sm, color: '#d6e6df', lineHeight: 20 }}>
+              <Text style={{ fontSize: theme.typography.sizes.sm, color: '#d4c7ba', lineHeight: 20 }}>
                 Discovery rhythm
               </Text>
             </View>
@@ -342,7 +350,7 @@ export function HomeScreen() {
                 borderRadius: theme.radius.lg,
                 borderWidth: 1,
                 borderColor: 'rgba(255,255,255,0.12)',
-                backgroundColor: 'rgba(216,235,229,0.16)',
+                backgroundColor: 'rgba(240,201,135,0.16)',
                 padding: theme.spacing.lg,
                 justifyContent: 'space-between',
               }}
@@ -350,14 +358,14 @@ export function HomeScreen() {
               <Text
                 style={{
                   fontSize: theme.typography.sizes['2xl'],
-                  color: '#fffaf2',
+                  color: '#f7f0e8',
                   fontWeight: theme.typography.weights.bold,
                   fontFamily: theme.typography.displayFontFamily,
                 }}
               >
                 1 tap
               </Text>
-              <Text style={{ fontSize: theme.typography.sizes.sm, color: '#d6e6df', lineHeight: 20 }}>
+              <Text style={{ fontSize: theme.typography.sizes.sm, color: '#d4c7ba', lineHeight: 20 }}>
                 Switch roles later
               </Text>
             </View>
@@ -1554,7 +1562,9 @@ export function SettingsScreen() {
           roles: result.settings.roles,
         },
       });
-      setThemePreference(result.settings.appearancePreferences.theme);
+      setThemePreference(
+        normalizeAppearanceMode(result.settings.appearancePreferences.theme),
+      );
       await queryClient.invalidateQueries({ queryKey: queryKeys.profile.settings });
     },
   });
@@ -1562,8 +1572,17 @@ export function SettingsScreen() {
 
   useEffect(() => {
     if (query.data) {
-      setSettings(query.data);
-      setThemePreference(query.data.appearancePreferences.theme);
+      const normalizedTheme = normalizeAppearanceMode(
+        query.data.appearancePreferences.theme,
+      );
+      setSettings({
+        ...query.data,
+        appearancePreferences: {
+          ...query.data.appearancePreferences,
+          theme: normalizedTheme,
+        },
+      });
+      setThemePreference(normalizedTheme);
     }
   }, [query.data, setThemePreference]);
 

@@ -56,6 +56,31 @@ const onboardingHighlights = [
   },
 ] as const;
 
+const validAuthRoles: UserRole[] = ['viewer', 'creator', 'moderator', 'admin'];
+
+function normalizePreferredRole(
+  role: unknown,
+  fallback: UserRole = 'viewer',
+): UserRole {
+  return validAuthRoles.includes(role as UserRole) ? (role as UserRole) : fallback;
+}
+
+function normalizePreferredRoles(
+  roles: unknown,
+  fallbackRole: UserRole = 'viewer',
+): UserRole[] {
+  const source = Array.isArray(roles) ? roles : [roles];
+  const normalized = Array.from(
+    new Set(
+      source.filter((item): item is UserRole =>
+        validAuthRoles.includes(item as UserRole),
+      ),
+    ),
+  );
+
+  return normalized.length ? normalized : [fallbackRole];
+}
+
 function nextPathForRole(role: UserRole, roles: UserRole[] = [role]) {
   if (role === 'creator') return '/(creator)/(tabs)/dashboard';
   if (role === 'admin' || role === 'moderator') return '/(staff)/dashboard';
@@ -239,8 +264,15 @@ function SignInFormDialogContent({
   onSuccess: () => void;
   onOpenSignUp: () => void;
 }) {
-  const preferredRole = useSessionStore((state) => state.preferredRole);
-  const preferredRoles = useSessionStore((state) => state.preferredRoles);
+  const preferredRole = useSessionStore((state) =>
+    normalizePreferredRole(state.preferredRole),
+  );
+  const preferredRoles = useSessionStore((state) =>
+    normalizePreferredRoles(
+      state.preferredRoles,
+      normalizePreferredRole(state.preferredRole),
+    ),
+  );
   const setSession = useSessionStore((state) => state.setSession);
   const form = useForm<z.infer<typeof signInSchema>>({
     resolver: zodResolver(signInSchema),
@@ -320,8 +352,15 @@ function SignUpFormDialogContent({
   onSuccess: () => void;
   onOpenSignIn: () => void;
 }) {
-  const preferredRole = useSessionStore((state) => state.preferredRole);
-  const preferredRoles = useSessionStore((state) => state.preferredRoles);
+  const preferredRole = useSessionStore((state) =>
+    normalizePreferredRole(state.preferredRole),
+  );
+  const preferredRoles = useSessionStore((state) =>
+    normalizePreferredRoles(
+      state.preferredRoles,
+      normalizePreferredRole(state.preferredRole),
+    ),
+  );
   const setSession = useSessionStore((state) => state.setSession);
   const [showGenderCustom, setShowGenderCustom] = React.useState(false);
   
@@ -482,8 +521,15 @@ function SignUpFormDialogContent({
 }
 
 export function RoleSelectionScreen() {
-  const preferredRoles = useSessionStore((state) => state.preferredRoles);
-  const preferredRole = useSessionStore((state) => state.preferredRole);
+  const preferredRole = useSessionStore((state) =>
+    normalizePreferredRole(state.preferredRole),
+  );
+  const preferredRoles = useSessionStore((state) =>
+    normalizePreferredRoles(
+      state.preferredRoles,
+      normalizePreferredRole(state.preferredRole),
+    ),
+  );
   const setPreferredRoles = useSessionStore((state) => state.setPreferredRoles);
   const setSession = useSessionStore((state) => state.setSession);
   const [activeDialog, setActiveDialog] = React.useState<'signIn' | 'signUp' | null>(null);
@@ -596,8 +642,15 @@ export function RoleSelectionScreen() {
 }
 
 export function SignInScreen() {
-  const preferredRole = useSessionStore((state) => state.preferredRole);
-  const preferredRoles = useSessionStore((state) => state.preferredRoles);
+  const preferredRole = useSessionStore((state) =>
+    normalizePreferredRole(state.preferredRole),
+  );
+  const preferredRoles = useSessionStore((state) =>
+    normalizePreferredRoles(
+      state.preferredRoles,
+      normalizePreferredRole(state.preferredRole),
+    ),
+  );
   const setPreferredRoles = useSessionStore((state) => state.setPreferredRoles);
   const setSession = useSessionStore((state) => state.setSession);
   const form = useForm<z.infer<typeof signInSchema>>({
@@ -689,8 +742,15 @@ export function SignInScreen() {
 }
 
 export function SignUpScreen() {
-  const preferredRole = useSessionStore((state) => state.preferredRole);
-  const preferredRoles = useSessionStore((state) => state.preferredRoles);
+  const preferredRole = useSessionStore((state) =>
+    normalizePreferredRole(state.preferredRole),
+  );
+  const preferredRoles = useSessionStore((state) =>
+    normalizePreferredRoles(
+      state.preferredRoles,
+      normalizePreferredRole(state.preferredRole),
+    ),
+  );
   const setSession = useSessionStore((state) => state.setSession);
   const [showGenderCustom, setShowGenderCustom] = React.useState(false);
   
@@ -1198,8 +1258,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: theme.radius.xl,
     borderWidth: 1,
-    borderColor: '#beded6',
-    backgroundColor: '#10211d',
+    borderColor: '#d7c5b6',
+    backgroundColor: '#171b24',
     padding: theme.spacing.lg,
     gap: theme.spacing.lg,
     minHeight: 230,
@@ -1212,7 +1272,7 @@ const styles = StyleSheet.create({
     width: 170,
     height: 170,
     borderRadius: theme.radius.pill,
-    backgroundColor: '#1f8a70',
+    backgroundColor: '#9a6b42',
     opacity: 0.28,
   },
   roleHeroBackdropBottom: {
@@ -1222,7 +1282,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 150,
     borderRadius: theme.radius.pill,
-    backgroundColor: '#2dd4bf',
+    backgroundColor: '#f0c987',
     opacity: 0.18,
   },
   roleHeroHeader: {
@@ -1241,7 +1301,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
     padding: theme.spacing.lg,
     justifyContent: 'space-between',
   },
@@ -1261,11 +1321,11 @@ const styles = StyleSheet.create({
     minHeight: 58,
   },
   roleHeroTileAccent: {
-    backgroundColor: 'rgba(216,235,229,0.16)',
+    backgroundColor: 'rgba(240,201,135,0.16)',
   },
   roleHeroTileKicker: {
     fontSize: theme.typography.sizes.xs,
-    color: '#bdeee4',
+    color: '#f0c987',
     textTransform: 'uppercase',
     letterSpacing: 1.4,
     fontWeight: theme.typography.weights.medium,
@@ -1273,20 +1333,20 @@ const styles = StyleSheet.create({
   roleHeroTileTitle: {
     fontSize: theme.typography.sizes.xl,
     lineHeight: 29,
-    color: '#fffaf2',
+    color: '#f7f0e8',
     fontWeight: theme.typography.weights.semibold,
     fontFamily: theme.typography.displayFontFamily,
     flexShrink: 1,
   },
   roleHeroMetric: {
     fontSize: theme.typography.sizes['2xl'],
-    color: '#fffaf2',
+    color: '#f7f0e8',
     fontWeight: theme.typography.weights.bold,
     fontFamily: theme.typography.displayFontFamily,
   },
   roleHeroTileCaption: {
     fontSize: theme.typography.sizes.sm,
-    color: '#d6e6df',
+    color: '#d4c7ba',
     lineHeight: 20,
     flexShrink: 1,
   },
@@ -1354,8 +1414,8 @@ const styles = StyleSheet.create({
   highlightCard: {
     borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderColor: '#d8ede7',
-    backgroundColor: '#eef8f4',
+    borderColor: '#ead8c7',
+    backgroundColor: '#faf2ea',
     padding: theme.spacing.lg,
     gap: theme.spacing.xs,
   },
@@ -1379,8 +1439,8 @@ const styles = StyleSheet.create({
     fontWeight: theme.typography.weights.medium,
   },
   modeCardActive: {
-    borderColor: '#b3ddd3',
-    backgroundColor: '#f5fbf9',
+    borderColor: '#e0cdbd',
+    backgroundColor: '#f9f2ea',
   },
   modeTitle: {
     fontSize: theme.typography.sizes.xl,

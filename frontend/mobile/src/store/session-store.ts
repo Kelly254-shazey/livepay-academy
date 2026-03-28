@@ -8,6 +8,96 @@ import { create } from 'zustand';
 import { Appearance, Platform } from 'react-native';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
+const validThemePreferences: ThemePreference[] = ['system', 'light', 'dark'];
+const validUserRoles: UserRole[] = ['viewer', 'creator', 'moderator', 'admin'];
+
+function normalizeThemePreference(themePreference: unknown): ThemePreference {
+  return validThemePreferences.includes(themePreference as ThemePreference)
+    ? (themePreference as ThemePreference)
+    : 'system';
+}
+
+function normalizeUserRole(role: unknown, fallback: UserRole = 'viewer'): UserRole {
+  return validUserRoles.includes(role as UserRole) ? (role as UserRole) : fallback;
+}
+
+function normalizeUserRoles(
+  roles: unknown,
+  fallbackRoles: UserRole[] = ['viewer'],
+): UserRole[] {
+  const source = Array.isArray(roles) ? roles : [roles];
+  const normalized = Array.from(
+    new Set(
+      source.filter((item): item is UserRole =>
+        validUserRoles.includes(item as UserRole),
+      ),
+    ),
+  );
+
+  return normalized.length ? normalized : fallbackRoles;
+}
+
+function isSessionShape(value: unknown): value is AuthSession {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<AuthSession>;
+  return Boolean(
+    candidate.user &&
+      typeof candidate.user === 'object' &&
+      candidate.tokens &&
+      typeof candidate.tokens === 'object',
+  );
+}
+
+function sanitizeSession(
+  session: unknown,
+  preferredRoles: unknown,
+  preferredRole: unknown,
+): AuthSession | null {
+  if (!isSessionShape(session)) {
+    return null;
+  }
+
+  const fallbackRole = normalizeUserRole(
+    session.activeRole ?? session.user.role ?? preferredRole,
+  );
+  const normalizedRoles = normalizeUserRoles(
+    session.user.roles ?? preferredRoles,
+    [fallbackRole],
+  );
+
+  return normalizeAuthSession(
+    session,
+    normalizedRoles,
+    normalizeUserRole(preferredRole, fallbackRole),
+  );
+}
+
+function sanitizePersistedState(
+  value: Partial<SessionState> | undefined,
+): Partial<SessionState> {
+  const normalizedThemePreference = normalizeThemePreference(value?.themePreference);
+  const preferredRole = normalizeUserRole(value?.preferredRole);
+  const preferredRoles = normalizeUserRoles(value?.preferredRoles, [preferredRole]);
+
+  return {
+    hasSeenOnboarding: Boolean(value?.hasSeenOnboarding),
+    preferredRole: preferredRoles.includes(preferredRole) ? preferredRole : preferredRoles[0],
+    preferredRoles,
+    session: sanitizeSession(value?.session, preferredRoles, preferredRole),
+    unlockedDemoLiveIds: Array.isArray(value?.unlockedDemoLiveIds)
+      ? value.unlockedDemoLiveIds.filter((item): item is string => typeof item === 'string')
+      : [],
+    demoLiveChats:
+      value?.demoLiveChats && typeof value.demoLiveChats === 'object'
+        ? value.demoLiveChats
+        : initialDemoLiveChats,
+    isDarkMode: resolveIsDarkMode(normalizedThemePreference),
+    themePreference: normalizedThemePreference,
+  };
+}
 
 function resolveIsDarkMode(themePreference: ThemePreference) {
   if (themePreference === 'dark') {
@@ -107,29 +197,45 @@ const createStore = () => {
           set({ authBootstrapStatus, authBootstrapError }),
         completeOnboarding: () => set({ hasSeenOnboarding: true }),
         setPreferredRole: (preferredRole: UserRole) =>
-          set((state) => ({
-            preferredRole,
-            preferredRoles: state.preferredRoles.includes(preferredRole)
-              ? state.preferredRoles
-              : [preferredRole],
-          })),
+          set((state) => {
+            const normalizedPreferredRole = normalizeUserRole(preferredRole);
+            const normalizedPreferredRoles = normalizeUserRoles(state.preferredRoles, [
+              normalizedPreferredRole,
+            ]);
+
+            return {
+              preferredRole: normalizedPreferredRole,
+              preferredRoles: normalizedPreferredRoles.includes(normalizedPreferredRole)
+                ? normalizedPreferredRoles
+                : [normalizedPreferredRole],
+            };
+          }),
         setPreferredRoles: (roles: UserRole[], activeRole?: UserRole) =>
-          set({
-            preferredRoles: Array.from(new Set(roles)),
-            preferredRole: activeRole ?? roles[0] ?? 'viewer',
+          set(() => {
+            const normalizedPreferredRoles = normalizeUserRoles(
+              roles,
+              [normalizeUserRole(activeRole)],
+            );
+            return {
+              preferredRoles: normalizedPreferredRoles,
+              preferredRole: normalizeUserRole(
+                activeRole,
+                normalizedPreferredRoles[0] ?? 'viewer',
+              ),
+            };
           }),
         setActiveRole: (role: UserRole) =>
           set((state) => ({
-            preferredRole: role,
-            session: switchSessionRole(state.session, role),
+            preferredRole: normalizeUserRole(role, state.preferredRole),
+            session: switchSessionRole(
+              state.session,
+              normalizeUserRole(role, state.preferredRole),
+            ),
           })),
         setSession: (session: AuthSession | null) =>
           set((state) => ({
             authBootstrapError: null,
-            session:
-              session === null
-                ? null
-                : normalizeAuthSession(session, state.preferredRoles, state.preferredRole),
+            session: sanitizeSession(session, state.preferredRoles, state.preferredRole),
           })),
         unlockDemoLiveAccess: (liveId: string) =>
           set((state) => ({
@@ -161,13 +267,13 @@ const createStore = () => {
           }),
         setThemePreference: (themePreference: ThemePreference) =>
           set({
-            themePreference,
-            isDarkMode: resolveIsDarkMode(themePreference),
+            themePreference: normalizeThemePreference(themePreference),
+            isDarkMode: resolveIsDarkMode(normalizeThemePreference(themePreference)),
           }),
         signOut: () =>
           set((state) => ({
-            themePreference: state.themePreference,
-            isDarkMode: state.isDarkMode,
+            themePreference: normalizeThemePreference(state.themePreference),
+            isDarkMode: resolveIsDarkMode(normalizeThemePreference(state.themePreference)),
             authBootstrapStatus: 'ready',
             authBootstrapError: null,
             session: null,
@@ -203,29 +309,45 @@ const createStore = () => {
             set({ authBootstrapStatus, authBootstrapError }),
           completeOnboarding: () => set({ hasSeenOnboarding: true }),
           setPreferredRole: (preferredRole: UserRole) =>
-            set((state: SessionState) => ({
-              preferredRole,
-              preferredRoles: state.preferredRoles.includes(preferredRole)
-                ? state.preferredRoles
-                : [preferredRole],
-            })),
+            set((state: SessionState) => {
+              const normalizedPreferredRole = normalizeUserRole(preferredRole);
+              const normalizedPreferredRoles = normalizeUserRoles(state.preferredRoles, [
+                normalizedPreferredRole,
+              ]);
+
+              return {
+                preferredRole: normalizedPreferredRole,
+                preferredRoles: normalizedPreferredRoles.includes(normalizedPreferredRole)
+                  ? normalizedPreferredRoles
+                  : [normalizedPreferredRole],
+              };
+            }),
           setPreferredRoles: (roles: UserRole[], activeRole?: UserRole) =>
-            set({
-              preferredRoles: Array.from(new Set(roles)),
-              preferredRole: activeRole ?? roles[0] ?? 'viewer',
+            set(() => {
+              const normalizedPreferredRoles = normalizeUserRoles(
+                roles,
+                [normalizeUserRole(activeRole)],
+              );
+              return {
+                preferredRoles: normalizedPreferredRoles,
+                preferredRole: normalizeUserRole(
+                  activeRole,
+                  normalizedPreferredRoles[0] ?? 'viewer',
+                ),
+              };
             }),
           setActiveRole: (role: UserRole) =>
-            set((state: SessionState) => ({
-              preferredRole: role,
-              session: switchSessionRole(state.session, role),
-            })),
+            set((state: SessionState) => {
+              const normalizedPreferredRole = normalizeUserRole(role, state.preferredRole);
+              return {
+                preferredRole: normalizedPreferredRole,
+                session: switchSessionRole(state.session, normalizedPreferredRole),
+              };
+            }),
           setSession: (session: AuthSession | null) =>
             set((state: SessionState) => ({
               authBootstrapError: null,
-              session:
-                session === null
-                  ? null
-                  : normalizeAuthSession(session, state.preferredRoles, state.preferredRole),
+              session: sanitizeSession(session, state.preferredRoles, state.preferredRole),
             })),
           unlockDemoLiveAccess: (liveId: string) =>
             set((state: SessionState) => ({
@@ -257,13 +379,13 @@ const createStore = () => {
             }),
           setThemePreference: (themePreference: ThemePreference) =>
             set({
-              themePreference,
-              isDarkMode: resolveIsDarkMode(themePreference),
+              themePreference: normalizeThemePreference(themePreference),
+              isDarkMode: resolveIsDarkMode(normalizeThemePreference(themePreference)),
             }),
           signOut: () =>
             set((state: SessionState) => ({
-              themePreference: state.themePreference,
-              isDarkMode: state.isDarkMode,
+              themePreference: normalizeThemePreference(state.themePreference),
+              isDarkMode: resolveIsDarkMode(normalizeThemePreference(state.themePreference)),
               authBootstrapStatus: 'ready',
               authBootstrapError: null,
               session: null,
@@ -275,6 +397,9 @@ const createStore = () => {
         }),
         {
           name: 'livegate-mobile-session',
+          version: 2,
+          migrate: (persistedState: unknown) =>
+            sanitizePersistedState(persistedState as Partial<SessionState> | undefined),
           storage: createJSONStorage(() => fileStorage),
           partialize: (state: SessionState) => ({
             hasSeenOnboarding: state.hasSeenOnboarding,
@@ -287,13 +412,13 @@ const createStore = () => {
             themePreference: state.themePreference,
           }),
           onRehydrateStorage: () => (state?: SessionState) => {
-            if (state?.themePreference === 'system' && state.isDarkMode) {
-              state.setThemePreference('dark');
-            } else if (state) {
-              state.setThemePreference(state.themePreference);
+            if (state && typeof state.setThemePreference === 'function') {
+              state.setThemePreference(normalizeThemePreference(state.themePreference));
             }
 
-            state?.setHydrated(true);
+            if (state && typeof state.setHydrated === 'function') {
+              state.setHydrated(true);
+            }
           },
         },
       ),

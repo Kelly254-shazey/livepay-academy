@@ -74,6 +74,14 @@ const accessModes = [
 type VisibilityMode = (typeof visibilityModes)[number]['value'];
 type AccessMode = (typeof accessModes)[number]['value'];
 
+function normalizeAppearanceMode(
+  value: unknown,
+): (typeof appearanceModes)[number] {
+  return appearanceModes.includes(value as (typeof appearanceModes)[number])
+    ? (value as (typeof appearanceModes)[number])
+    : 'system';
+}
+
 function formatRoleLabel(role: string) {
   if (role === 'creator') return 'Content Creator';
   if (role === 'viewer') return 'Viewer';
@@ -1161,7 +1169,9 @@ export function CreatorSettingsScreen() {
           roles: result.settings.roles,
         },
       });
-      setThemePreference(result.settings.appearancePreferences.theme);
+      setThemePreference(
+        normalizeAppearanceMode(result.settings.appearancePreferences.theme),
+      );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.profile.settings }),
         queryClient.invalidateQueries({ queryKey: queryKeys.creator.dashboard }),
@@ -1172,8 +1182,17 @@ export function CreatorSettingsScreen() {
 
   useEffect(() => {
     if (query.data) {
-      setSettings(query.data);
-      setThemePreference(query.data.appearancePreferences.theme);
+      const normalizedTheme = normalizeAppearanceMode(
+        query.data.appearancePreferences.theme,
+      );
+      setSettings({
+        ...query.data,
+        appearancePreferences: {
+          ...query.data.appearancePreferences,
+          theme: normalizedTheme,
+        },
+      });
+      setThemePreference(normalizedTheme);
     }
   }, [query.data, setThemePreference]);
 
