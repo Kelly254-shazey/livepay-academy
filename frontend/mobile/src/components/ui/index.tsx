@@ -449,12 +449,22 @@ export function Badge({ children, variant = 'default', style }: BadgeProps) {
 export function Dialog({ visible, onClose, title, children }: DialogProps) {
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const handleClose = React.useCallback(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLElement) {
+        activeElement.blur();
+      }
+    }
+
+    onClose();
+  }, [onClose]);
 
   return (
     <Modal
       animationType="fade"
       hardwareAccelerated
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
       presentationStyle="overFullScreen"
       statusBarTranslucent
       transparent
@@ -464,12 +474,12 @@ export function Dialog({ visible, onClose, title, children }: DialogProps) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.dialogOverlay}
       >
-        <Pressable onPress={onClose} style={styles.dialogBackdrop} />
+        <Pressable onPress={handleClose} style={styles.dialogBackdrop} />
         <View style={styles.dialogContent}>
           {title ? (
             <View style={styles.dialogHeader}>
               <Text style={styles.dialogTitle}>{title}</Text>
-              <TouchableOpacity onPress={onClose} style={styles.dialogCloseButton}>
+              <TouchableOpacity onPress={handleClose} style={styles.dialogCloseButton}>
                 <Text style={styles.dialogCloseText}>x</Text>
               </TouchableOpacity>
             </View>

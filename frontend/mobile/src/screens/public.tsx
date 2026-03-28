@@ -10,10 +10,19 @@ import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import React from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { z } from 'zod';
 import { mobileApi } from '@/api/client';
-import { Badge, Button, Heading, Screen, Surface, TextField, Dialog } from '@/components/ui';
+import { Dialog, Screen } from '@/components/ui';
 import { useSessionStore } from '@/store/session-store';
 import { theme } from '@/theme';
 
@@ -169,6 +178,154 @@ const googleSignInSchema = z.object({
 });
 
 const GOOGLE_AUTH_HELP = 'Google sign-in is not configured yet. Use email and password for now.';
+const publicPalette = {
+  background: '#f4f7fb',
+  surface: '#ffffff',
+  surfaceMuted: '#eef4fa',
+  surfaceAccent: '#e0f2fe',
+  infoSoft: '#dbeafe',
+  border: '#d7e3f0',
+  borderSubtle: '#e5edf6',
+  text: '#0f172a',
+  textSecondary: '#475569',
+  textMuted: '#64748b',
+  accent: '#0ea5e9',
+  success: '#059669',
+  danger: '#dc2626',
+};
+
+function PublicScreen({ children }: { children: React.ReactNode }) {
+  return <Screen style={styles.publicScreen}>{children}</Screen>;
+}
+
+function PublicSurface({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return <View style={[styles.publicSurface, style]}>{children}</View>;
+}
+
+function PublicHeading({
+  title,
+  eyebrow,
+  body,
+}: {
+  title: string;
+  eyebrow?: string;
+  body?: string;
+}) {
+  return (
+    <View style={styles.publicHeadingContainer}>
+      {eyebrow ? <Text style={styles.publicEyebrow}>{eyebrow}</Text> : null}
+      <Text style={styles.publicTitle}>{title}</Text>
+      {body ? <Text style={styles.publicBody}>{body}</Text> : null}
+    </View>
+  );
+}
+
+function Badge({
+  children,
+  variant = 'default',
+}: {
+  children: React.ReactNode;
+  variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger';
+}) {
+  return (
+    <View
+      style={[
+        styles.publicBadge,
+        variant === 'primary' ? styles.publicBadgePrimary : styles.publicBadgeDefault,
+      ]}
+    >
+      <Text
+        style={[
+          styles.publicBadgeText,
+          variant === 'primary' ? styles.publicBadgeTextPrimary : styles.publicBadgeTextDefault,
+        ]}
+      >
+        {children}
+      </Text>
+    </View>
+  );
+}
+
+function Button({
+  onPress,
+  title,
+  variant = 'primary',
+  disabled = false,
+}: {
+  onPress: () => void;
+  title: string;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  disabled?: boolean;
+}) {
+  const isPrimary = variant === 'primary';
+  const isGhost = variant === 'ghost';
+  const isDanger = variant === 'danger';
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.75}
+      disabled={disabled}
+      onPress={onPress}
+      style={[
+        styles.publicButton,
+        isPrimary && styles.publicButtonPrimary,
+        isGhost && styles.publicButtonGhost,
+        isDanger && styles.publicButtonDanger,
+        !isPrimary && !isGhost && !isDanger && styles.publicButtonSecondary,
+        disabled && styles.publicButtonDisabled,
+      ]}
+    >
+      <Text
+        style={[
+          styles.publicButtonText,
+          isPrimary && styles.publicButtonTextPrimary,
+          isGhost && styles.publicButtonTextGhost,
+          isDanger && styles.publicButtonTextPrimary,
+          !isPrimary && !isGhost && !isDanger && styles.publicButtonTextSecondary,
+        ]}
+      >
+        {title}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function TextField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  error,
+  secureTextEntry = false,
+}: {
+  label?: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+  error?: string;
+  secureTextEntry?: boolean;
+}) {
+  return (
+    <View style={styles.publicTextFieldContainer}>
+      {label ? <Text style={styles.publicTextFieldLabel}>{label}</Text> : null}
+      <TextInput
+        style={[styles.publicTextInput, error ? styles.publicTextInputError : null]}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={publicPalette.textMuted}
+        secureTextEntry={secureTextEntry}
+        value={value}
+      />
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+    </View>
+  );
+}
 
 function DemoParticipantsPanel({
   title,
@@ -183,12 +340,12 @@ function DemoParticipantsPanel({
     <View style={{ gap: 12 }}>
       <Text style={styles.panelTitle}>{title}</Text>
       {participants.map((participant) => (
-        <Surface key={participant.id} style={styles.demoCard}>
+        <PublicSurface key={participant.id} style={styles.demoCard}>
           <Badge variant="primary">{participant.roleLabel.replace(/Creator/g, 'Content Creator')}</Badge>
           <Text style={styles.demoName}>{participant.fullName}</Text>
           <Text style={styles.demoSummary}>{participant.summary}</Text>
           <Button onPress={() => onUse(participant)} title={`Use ${participant.title}`} variant="secondary" />
-        </Surface>
+        </PublicSurface>
       ))}
     </View>
   );
@@ -211,13 +368,13 @@ function AuthDialogIntro({
 
 export function SplashScreenView() {
   return (
-    <Screen>
+    <PublicScreen>
       <View style={styles.splashWrap}>
         <Badge variant="primary">Premium live learning</Badge>
         <Text style={styles.splashTitle}>{brand.name}</Text>
         <Text style={styles.splashBody}>{brand.tagline}</Text>
       </View>
-    </Screen>
+    </PublicScreen>
   );
 }
 
@@ -225,9 +382,9 @@ export function OnboardingScreen() {
   const completeOnboarding = useSessionStore((state) => state.completeOnboarding);
 
   return (
-    <Screen>
-      <Heading title="Welcome to LiveGate" />
-      <Surface>
+    <PublicScreen>
+      <PublicHeading title="Welcome to LiveGate" />
+      <PublicSurface>
         <Text style={styles.sectionEyebrow}>
           What the app is built to do
         </Text>
@@ -240,11 +397,11 @@ export function OnboardingScreen() {
             <Text style={styles.highlightBody}>{item.body}</Text>
           </View>
         ))}
-      </Surface>
+      </PublicSurface>
       {productRules.slice(0, 3).map((rule) => (
-        <Surface key={rule} style={styles.ruleCard}>
+        <PublicSurface key={rule} style={styles.ruleCard}>
           <Text style={styles.ruleText}>{rule}</Text>
-        </Surface>
+        </PublicSurface>
       ))}
       <Button
         onPress={() => {
@@ -253,7 +410,7 @@ export function OnboardingScreen() {
         }}
         title="Continue"
       />
-    </Screen>
+    </PublicScreen>
   );
 }
 
@@ -264,15 +421,10 @@ function SignInFormDialogContent({
   onSuccess: () => void;
   onOpenSignUp: () => void;
 }) {
-  const preferredRole = useSessionStore((state) =>
-    normalizePreferredRole(state.preferredRole),
-  );
-  const preferredRoles = useSessionStore((state) =>
-    normalizePreferredRoles(
-      state.preferredRoles,
-      normalizePreferredRole(state.preferredRole),
-    ),
-  );
+  const rawPreferredRole = useSessionStore((state) => state.preferredRole);
+  const rawPreferredRoles = useSessionStore((state) => state.preferredRoles);
+  const preferredRole = normalizePreferredRole(rawPreferredRole);
+  const preferredRoles = normalizePreferredRoles(rawPreferredRoles, preferredRole);
   const setSession = useSessionStore((state) => state.setSession);
   const form = useForm<z.infer<typeof signInSchema>>({
     resolver: zodResolver(signInSchema),
@@ -352,15 +504,10 @@ function SignUpFormDialogContent({
   onSuccess: () => void;
   onOpenSignIn: () => void;
 }) {
-  const preferredRole = useSessionStore((state) =>
-    normalizePreferredRole(state.preferredRole),
-  );
-  const preferredRoles = useSessionStore((state) =>
-    normalizePreferredRoles(
-      state.preferredRoles,
-      normalizePreferredRole(state.preferredRole),
-    ),
-  );
+  const rawPreferredRole = useSessionStore((state) => state.preferredRole);
+  const rawPreferredRoles = useSessionStore((state) => state.preferredRoles);
+  const preferredRole = normalizePreferredRole(rawPreferredRole);
+  const preferredRoles = normalizePreferredRoles(rawPreferredRoles, preferredRole);
   const setSession = useSessionStore((state) => state.setSession);
   const [showGenderCustom, setShowGenderCustom] = React.useState(false);
   
@@ -521,17 +668,11 @@ function SignUpFormDialogContent({
 }
 
 export function RoleSelectionScreen() {
-  const preferredRole = useSessionStore((state) =>
-    normalizePreferredRole(state.preferredRole),
-  );
-  const preferredRoles = useSessionStore((state) =>
-    normalizePreferredRoles(
-      state.preferredRoles,
-      normalizePreferredRole(state.preferredRole),
-    ),
-  );
+  const rawPreferredRole = useSessionStore((state) => state.preferredRole);
+  const rawPreferredRoles = useSessionStore((state) => state.preferredRoles);
+  const preferredRole = normalizePreferredRole(rawPreferredRole);
+  const preferredRoles = normalizePreferredRoles(rawPreferredRoles, preferredRole);
   const setPreferredRoles = useSessionStore((state) => state.setPreferredRoles);
-  const setSession = useSessionStore((state) => state.setSession);
   const [activeDialog, setActiveDialog] = React.useState<'signIn' | 'signUp' | null>(null);
   const { width } = useWindowDimensions();
   const compactHeroLayout = width < 390;
@@ -556,7 +697,7 @@ export function RoleSelectionScreen() {
   }
 
   return (
-    <Screen>
+    <PublicScreen>
       <View style={styles.roleHero}>
         <View style={styles.roleHeroBackdropTop} />
         <View style={styles.roleHeroBackdropBottom} />
@@ -582,20 +723,20 @@ export function RoleSelectionScreen() {
         </View>
       </View>
 
-      <Surface style={styles.roleIntroCard}>
+      <PublicSurface style={styles.roleIntroCard}>
         <Text style={styles.sectionEyebrow}>Mode</Text>
         <Text style={styles.roleIntroTitle}>How are you using LiveGate?</Text>
         <Text style={styles.roleIntroBody}>
           Choose the public mode that should shape your first experience.
         </Text>
-      </Surface>
+      </PublicSurface>
       {publicModes.map((mode) => {
         const selected =
           preferredRoles.length === mode.roles.length &&
           mode.roles.every((role) => preferredRoles.includes(role));
 
         return (
-          <Surface key={mode.id} style={selected ? styles.modeCardActive : undefined}>
+          <PublicSurface key={mode.id} style={selected ? styles.modeCardActive : undefined}>
             <Badge variant={selected ? 'primary' : 'default'}>{selected ? 'Selected' : 'Mode'}</Badge>
             <Text style={styles.modeTitle}>{mode.title}</Text>
             <Text style={styles.modeBody}>{mode.body}</Text>
@@ -604,7 +745,7 @@ export function RoleSelectionScreen() {
               title={selected ? 'Selected' : `Use ${mode.title}`}
               variant={selected ? 'primary' : 'secondary'}
             />
-          </Surface>
+          </PublicSurface>
         );
       })}
       <Button onPress={openSignUp} title="Create account" />
@@ -637,20 +778,15 @@ export function RoleSelectionScreen() {
           onOpenSignUp={() => setActiveDialog('signUp')}
         />
       </Dialog>
-    </Screen>
+    </PublicScreen>
   );
 }
 
 export function SignInScreen() {
-  const preferredRole = useSessionStore((state) =>
-    normalizePreferredRole(state.preferredRole),
-  );
-  const preferredRoles = useSessionStore((state) =>
-    normalizePreferredRoles(
-      state.preferredRoles,
-      normalizePreferredRole(state.preferredRole),
-    ),
-  );
+  const rawPreferredRole = useSessionStore((state) => state.preferredRole);
+  const rawPreferredRoles = useSessionStore((state) => state.preferredRoles);
+  const preferredRole = normalizePreferredRole(rawPreferredRole);
+  const preferredRoles = normalizePreferredRoles(rawPreferredRoles, preferredRole);
   const setPreferredRoles = useSessionStore((state) => state.setPreferredRoles);
   const setSession = useSessionStore((state) => state.setSession);
   const form = useForm<z.infer<typeof signInSchema>>({
@@ -673,13 +809,13 @@ export function SignInScreen() {
   const publicParticipants = demoParticipants.filter((participant) => participant.audience === 'public');
 
   return (
-    <Screen>
-      <Heading
+    <PublicScreen>
+      <PublicHeading
         title="Sign in"
         eyebrow="Account access"
         body="Use the email address or username linked to the mode you selected."
       />
-      <Surface>
+      <PublicSurface>
         <Text style={styles.sectionEyebrow}>Google sign-in</Text>
         <Button
           onPress={() => {}}
@@ -725,9 +861,9 @@ export function SignInScreen() {
         <View style={styles.authDialogActions}>
           <Button onPress={() => router.push('/(public)/forgot-password')} title="Forgot password" variant="ghost" />
           <Button onPress={() => router.replace('/(public)/role-selection')} title="Back to mode selection" variant="ghost" />
-          <Button onPress={() => router.push('/(public)/sign-up')} title="Need an account? Sign up" variant="secondary" />
+          <Button onPress={() => router.push('/(public)/sign-up')} title="Need an account? Sign up" variant="ghost" />
         </View>
-      </Surface>
+      </PublicSurface>
       <DemoParticipantsPanel
         onUse={(participant) => {
           setPreferredRoles(participant.roles, participant.defaultRole);
@@ -737,20 +873,15 @@ export function SignInScreen() {
         participants={publicParticipants}
         title="Demo participants"
       />
-    </Screen>
+    </PublicScreen>
   );
 }
 
 export function SignUpScreen() {
-  const preferredRole = useSessionStore((state) =>
-    normalizePreferredRole(state.preferredRole),
-  );
-  const preferredRoles = useSessionStore((state) =>
-    normalizePreferredRoles(
-      state.preferredRoles,
-      normalizePreferredRole(state.preferredRole),
-    ),
-  );
+  const rawPreferredRole = useSessionStore((state) => state.preferredRole);
+  const rawPreferredRoles = useSessionStore((state) => state.preferredRoles);
+  const preferredRole = normalizePreferredRole(rawPreferredRole);
+  const preferredRoles = normalizePreferredRoles(rawPreferredRoles, preferredRole);
   const setSession = useSessionStore((state) => state.setSession);
   const [showGenderCustom, setShowGenderCustom] = React.useState(false);
   
@@ -788,13 +919,13 @@ export function SignUpScreen() {
   });
 
   return (
-    <Screen>
-      <Heading
+    <PublicScreen>
+      <PublicHeading
         title="Create account"
         eyebrow="Join LiveGate"
         body="Use one account for viewer access, creator tools, or both."
       />
-      <Surface>
+      <PublicSurface>
         <Text style={styles.sectionEyebrow}>Google sign-up</Text>
         <Button
           onPress={() => {}}
@@ -916,10 +1047,10 @@ export function SignUpScreen() {
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Creating account...' : 'Create account'} />
         <View style={styles.authDialogActions}>
           <Button onPress={() => router.replace('/(public)/role-selection')} title="Back to mode selection" variant="ghost" />
-          <Button onPress={() => router.push('/(public)/sign-in')} title="Already have an account? Sign in" variant="secondary" />
+          <Button onPress={() => router.push('/(public)/sign-in')} title="Already have an account? Sign in" variant="ghost" />
         </View>
-      </Surface>
-    </Screen>
+      </PublicSurface>
+    </PublicScreen>
   );
 }
 
@@ -953,9 +1084,9 @@ export function StaffAccessScreen() {
   });
 
   return (
-    <Screen>
-      <Heading title="Restricted access" />
-      <Surface>
+    <PublicScreen>
+      <PublicHeading title="Restricted access" />
+      <PublicSurface>
         <Controller
           control={form.control}
           name="identifier"
@@ -978,7 +1109,7 @@ export function StaffAccessScreen() {
         />
         {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Opening portal...' : 'Enter staff portal'} />
-      </Surface>
+      </PublicSurface>
       <DemoParticipantsPanel
         onUse={(participant) => {
           setPreferredRoles(participant.roles, participant.defaultRole);
@@ -988,7 +1119,7 @@ export function StaffAccessScreen() {
         participants={staffParticipants}
         title="Staff demo accounts"
       />
-    </Screen>
+    </PublicScreen>
   );
 }
 
@@ -1003,13 +1134,13 @@ export function ForgotPasswordScreen() {
   });
 
   return (
-    <Screen>
-      <Heading
+    <PublicScreen>
+      <PublicHeading
         title="Forgot password"
         eyebrow="Recovery"
         body="Enter the email tied to your account and we will send a recovery code."
       />
-      <Surface>
+      <PublicSurface>
         <Controller
           control={form.control}
           name="email"
@@ -1027,8 +1158,8 @@ export function ForgotPasswordScreen() {
         {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Sending...' : 'Send recovery code'} />
         <Button onPress={() => router.push('/(public)/sign-in')} title="Back to sign in" variant="ghost" />
-      </Surface>
-    </Screen>
+      </PublicSurface>
+    </PublicScreen>
   );
 }
 
@@ -1043,13 +1174,13 @@ export function ResetPasswordScreen() {
   });
 
   return (
-    <Screen>
-      <Heading
+    <PublicScreen>
+      <PublicHeading
         title="Reset password"
         eyebrow="Recovery"
         body="Enter the code you received and choose a new password."
       />
-      <Surface>
+      <PublicSurface>
         <Controller
           control={form.control}
           name="email"
@@ -1094,13 +1225,13 @@ export function ResetPasswordScreen() {
         {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Updating password...' : 'Update password'} />
         <Button onPress={() => router.push('/(public)/sign-in')} title="Back to sign in" variant="ghost" />
-      </Surface>
-    </Screen>
+      </PublicSurface>
+    </PublicScreen>
   );
 }
 
 export function EmailVerificationScreen() {
-  const { session } = useSessionStore();
+  const session = useSessionStore((state) => state.session);
   const form = useForm<z.infer<typeof emailVerificationSchema>>({
     resolver: zodResolver(emailVerificationSchema),
     defaultValues: { email: session?.user.email || '', code: '' },
@@ -1114,9 +1245,9 @@ export function EmailVerificationScreen() {
   });
 
   return (
-    <Screen>
-      <Heading title="Verify email" />
-      <Surface>
+    <PublicScreen>
+      <PublicHeading title="Verify email" />
+      <PublicSurface>
         <Text style={styles.statusText}>
           We sent a 6-digit code to {form.getValues('email')}
         </Text>
@@ -1136,13 +1267,13 @@ export function EmailVerificationScreen() {
         />
         {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Verifying...' : 'Verify email'} />
-      </Surface>
-    </Screen>
+      </PublicSurface>
+    </PublicScreen>
   );
 }
 
 export function ProfileCompletionScreen() {
-  const { session } = useSessionStore();
+  const session = useSessionStore((state) => state.session);
   const setSession = useSessionStore((state) => state.setSession);
   const [showGenderCustom, setShowGenderCustom] = React.useState(false);
   
@@ -1171,9 +1302,9 @@ export function ProfileCompletionScreen() {
   });
 
   return (
-    <Screen>
-      <Heading title="Complete your profile" />
-      <Surface>
+    <PublicScreen>
+      <PublicHeading title="Complete your profile" />
+      <PublicSurface>
         <Controller
           control={form.control}
           name="fullName"
@@ -1228,12 +1359,141 @@ export function ProfileCompletionScreen() {
         )}
         {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
         <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title={mutation.isPending ? 'Saving...' : 'Complete profile'} />
-      </Surface>
-    </Screen>
+      </PublicSurface>
+    </PublicScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  publicScreen: {
+    backgroundColor: publicPalette.background,
+  },
+  publicSurface: {
+    backgroundColor: publicPalette.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: publicPalette.borderSubtle,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.md,
+    ...theme.shadow.md,
+  },
+  publicHeadingContainer: {
+    gap: theme.spacing.sm,
+  },
+  publicBadge: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 6,
+    borderRadius: theme.radius.pill,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+  },
+  publicBadgeDefault: {
+    backgroundColor: publicPalette.surfaceMuted,
+    borderColor: publicPalette.borderSubtle,
+  },
+  publicBadgePrimary: {
+    backgroundColor: publicPalette.surfaceAccent,
+    borderColor: publicPalette.surfaceAccent,
+  },
+  publicBadgeText: {
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: theme.typography.weights.medium,
+    letterSpacing: 0.4,
+  },
+  publicBadgeTextDefault: {
+    color: publicPalette.text,
+  },
+  publicBadgeTextPrimary: {
+    color: publicPalette.accent,
+  },
+  publicEyebrow: {
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: theme.typography.weights.medium,
+    color: publicPalette.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 1.6,
+  },
+  publicTitle: {
+    fontSize: theme.typography.sizes['4xl'],
+    fontWeight: theme.typography.weights.bold,
+    color: publicPalette.text,
+    lineHeight: theme.typography.sizes['4xl'] * 1.12,
+    fontFamily: theme.typography.displayFontFamily,
+  },
+  publicBody: {
+    fontSize: theme.typography.sizes.base,
+    color: publicPalette.textSecondary,
+    lineHeight: theme.typography.sizes.base * 1.5,
+  },
+  publicButton: {
+    minHeight: 52,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: theme.spacing.xl,
+  },
+  publicButtonPrimary: {
+    backgroundColor: publicPalette.accent,
+    borderColor: publicPalette.accent,
+    ...theme.shadow.md,
+  },
+  publicButtonSecondary: {
+    backgroundColor: publicPalette.surface,
+    borderColor: publicPalette.border,
+    ...theme.shadow.sm,
+  },
+  publicButtonGhost: {
+    backgroundColor: publicPalette.surfaceAccent,
+    borderColor: 'transparent',
+  },
+  publicButtonDanger: {
+    backgroundColor: publicPalette.danger,
+    borderColor: publicPalette.danger,
+    ...theme.shadow.sm,
+  },
+  publicButtonDisabled: {
+    opacity: 0.55,
+  },
+  publicButtonText: {
+    fontFamily: theme.typography.fontFamily,
+    fontWeight: theme.typography.weights.semibold,
+    letterSpacing: 0.2,
+    fontSize: theme.typography.sizes.base,
+  },
+  publicButtonTextPrimary: {
+    color: '#ffffff',
+  },
+  publicButtonTextSecondary: {
+    color: publicPalette.text,
+  },
+  publicButtonTextGhost: {
+    color: publicPalette.accent,
+  },
+  publicTextFieldContainer: {
+    gap: theme.spacing.xs,
+  },
+  publicTextFieldLabel: {
+    fontSize: theme.typography.sizes.sm,
+    fontWeight: theme.typography.weights.medium,
+    color: publicPalette.textSecondary,
+    marginBottom: theme.spacing.xs,
+  },
+  publicTextInput: {
+    borderWidth: 1,
+    borderColor: publicPalette.border,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    fontSize: theme.typography.sizes.base,
+    color: publicPalette.text,
+    backgroundColor: publicPalette.surfaceMuted,
+    fontFamily: theme.typography.fontFamily,
+  },
+  publicTextInputError: {
+    borderColor: publicPalette.danger,
+  },
   splashWrap: {
     flex: 1,
     justifyContent: 'center',
@@ -1243,14 +1503,14 @@ const styles = StyleSheet.create({
   splashTitle: {
     fontSize: theme.typography.sizes['5xl'],
     lineHeight: 54,
-    color: theme.colors.text,
+    color: publicPalette.text,
     fontWeight: theme.typography.weights.bold,
     fontFamily: theme.typography.displayFontFamily,
   },
   splashBody: {
     fontSize: theme.typography.sizes.lg,
     lineHeight: 28,
-    color: theme.colors.textSecondary,
+    color: publicPalette.textSecondary,
     maxWidth: 320,
   },
   roleHero: {
@@ -1258,8 +1518,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: theme.radius.xl,
     borderWidth: 1,
-    borderColor: '#27374a',
-    backgroundColor: '#0f172a',
+    borderColor: publicPalette.border,
+    backgroundColor: publicPalette.surface,
     padding: theme.spacing.lg,
     gap: theme.spacing.lg,
     minHeight: 230,
@@ -1272,8 +1532,8 @@ const styles = StyleSheet.create({
     width: 170,
     height: 170,
     borderRadius: theme.radius.pill,
-    backgroundColor: '#0ea5e9',
-    opacity: 0.28,
+    backgroundColor: publicPalette.surfaceAccent,
+    opacity: 0.9,
   },
   roleHeroBackdropBottom: {
     position: 'absolute',
@@ -1282,8 +1542,8 @@ const styles = StyleSheet.create({
     width: 220,
     height: 150,
     borderRadius: theme.radius.pill,
-    backgroundColor: '#38bdf8',
-    opacity: 0.18,
+    backgroundColor: publicPalette.infoSoft,
+    opacity: 0.72,
   },
   roleHeroHeader: {
     flexDirection: 'row',
@@ -1300,8 +1560,8 @@ const styles = StyleSheet.create({
   roleHeroTile: {
     borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderColor: publicPalette.borderSubtle,
+    backgroundColor: publicPalette.surfaceMuted,
     padding: theme.spacing.lg,
     justifyContent: 'space-between',
   },
@@ -1321,11 +1581,11 @@ const styles = StyleSheet.create({
     minHeight: 58,
   },
   roleHeroTileAccent: {
-    backgroundColor: 'rgba(14,165,233,0.18)',
+    backgroundColor: publicPalette.surfaceAccent,
   },
   roleHeroTileKicker: {
     fontSize: theme.typography.sizes.xs,
-    color: '#7dd3fc',
+    color: publicPalette.accent,
     textTransform: 'uppercase',
     letterSpacing: 1.4,
     fontWeight: theme.typography.weights.medium,
@@ -1333,42 +1593,42 @@ const styles = StyleSheet.create({
   roleHeroTileTitle: {
     fontSize: theme.typography.sizes.xl,
     lineHeight: 29,
-    color: '#f8fafc',
+    color: publicPalette.text,
     fontWeight: theme.typography.weights.semibold,
     fontFamily: theme.typography.displayFontFamily,
     flexShrink: 1,
   },
   roleHeroMetric: {
     fontSize: theme.typography.sizes['2xl'],
-    color: '#f8fafc',
+    color: publicPalette.text,
     fontWeight: theme.typography.weights.bold,
     fontFamily: theme.typography.displayFontFamily,
   },
   roleHeroTileCaption: {
     fontSize: theme.typography.sizes.sm,
-    color: '#cbd5e1',
+    color: publicPalette.textSecondary,
     lineHeight: 20,
     flexShrink: 1,
   },
   roleIntroCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: publicPalette.surface,
   },
   roleIntroTitle: {
     fontSize: theme.typography.sizes['3xl'],
     lineHeight: 38,
-    color: theme.colors.text,
+    color: publicPalette.text,
     fontWeight: theme.typography.weights.bold,
     fontFamily: theme.typography.displayFontFamily,
   },
   roleIntroBody: {
     fontSize: theme.typography.sizes.base,
     lineHeight: 25,
-    color: theme.colors.textSecondary,
+    color: publicPalette.textSecondary,
   },
   panelTitle: {
     fontSize: theme.typography.sizes.lg,
     fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.text,
+    color: publicPalette.text,
     fontFamily: theme.typography.displayFontFamily,
   },
   authDialogIntro: {
@@ -1378,7 +1638,7 @@ const styles = StyleSheet.create({
   authDialogBody: {
     fontSize: theme.typography.sizes.sm,
     lineHeight: 22,
-    color: theme.colors.textSecondary,
+    color: publicPalette.textSecondary,
   },
   authDialogActions: {
     gap: theme.spacing.sm,
@@ -1386,90 +1646,90 @@ const styles = StyleSheet.create({
   },
   authEntryNote: {
     fontSize: theme.typography.sizes.sm,
-    color: theme.colors.textMuted,
+    color: publicPalette.textMuted,
     textAlign: 'center',
     lineHeight: 22,
     marginTop: -theme.spacing.xs,
   },
   demoCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: publicPalette.surface,
   },
   demoName: {
     fontSize: theme.typography.sizes.lg,
     fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.text,
+    color: publicPalette.text,
   },
   demoSummary: {
     fontSize: theme.typography.sizes.sm,
     lineHeight: 22,
-    color: theme.colors.textSecondary,
+    color: publicPalette.textSecondary,
   },
   sectionEyebrow: {
     fontSize: theme.typography.sizes.xs,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: theme.colors.accent,
+    color: publicPalette.accent,
     fontWeight: theme.typography.weights.medium,
   },
   highlightCard: {
     borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderColor: '#e0f2fe',
-    backgroundColor: '#f8fcff',
+    borderColor: publicPalette.borderSubtle,
+    backgroundColor: publicPalette.surfaceMuted,
     padding: theme.spacing.lg,
     gap: theme.spacing.xs,
   },
   highlightTitle: {
     fontSize: theme.typography.sizes.base,
     fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.text,
+    color: publicPalette.text,
   },
   highlightBody: {
     fontSize: theme.typography.sizes.sm,
     lineHeight: 22,
-    color: theme.colors.textSecondary,
+    color: publicPalette.textSecondary,
   },
   ruleCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: publicPalette.surface,
   },
   ruleText: {
     fontSize: theme.typography.sizes.base,
     lineHeight: 24,
-    color: theme.colors.text,
+    color: publicPalette.text,
     fontWeight: theme.typography.weights.medium,
   },
   modeCardActive: {
-    borderColor: '#bae6fd',
-    backgroundColor: '#f0f9ff',
+    borderColor: publicPalette.accent,
+    backgroundColor: publicPalette.surfaceAccent,
   },
   modeTitle: {
     fontSize: theme.typography.sizes.xl,
     fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.text,
+    color: publicPalette.text,
     fontFamily: theme.typography.displayFontFamily,
   },
   modeBody: {
     fontSize: theme.typography.sizes.sm,
     lineHeight: 22,
-    color: theme.colors.textSecondary,
+    color: publicPalette.textSecondary,
   },
   statusText: {
     fontSize: theme.typography.sizes.sm,
-    color: theme.colors.textMuted,
+    color: publicPalette.textMuted,
   },
   successText: {
     fontSize: theme.typography.sizes.sm,
-    color: theme.colors.success,
+    color: publicPalette.success,
     fontWeight: theme.typography.weights.medium,
   },
   errorText: {
     fontSize: theme.typography.sizes.sm,
-    color: theme.colors.danger,
+    color: publicPalette.danger,
     fontWeight: theme.typography.weights.medium,
   },
   dividerText: {
     fontSize: theme.typography.sizes.sm,
-    color: theme.colors.textMuted,
+    color: publicPalette.textMuted,
     textAlign: 'center',
     marginVertical: theme.spacing.md,
     fontWeight: theme.typography.weights.medium,

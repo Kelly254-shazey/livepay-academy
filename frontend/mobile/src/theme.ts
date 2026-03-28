@@ -60,16 +60,16 @@ const lightColors = {
 };
 
 const darkColors = {
-  background: '#0a0a0a',
-  backgroundAccent: '#171717',
-  surface: '#171717',
-  surfaceMuted: '#262626',
-  surfaceElevated: '#1c1c1c',
-  border: '#404040',
-  borderSubtle: '#2a2a2a',
+  background: '#111827',
+  backgroundAccent: '#172033',
+  surface: '#18212f',
+  surfaceMuted: '#1f2937',
+  surfaceElevated: '#202b3b',
+  border: '#334155',
+  borderSubtle: '#253043',
   text: '#fafafa',
-  textSecondary: '#a3a3a3',
-  textMuted: '#737373',
+  textSecondary: '#cbd5e1',
+  textMuted: '#94a3b8',
   accent: '#0ea5e9',
   accentHover: '#38bdf8',
   accentMuted: 'rgba(14, 165, 233, 0.1)',
@@ -84,7 +84,7 @@ const darkColors = {
   error: '#ef4444',
   info: '#3b82f6',
   infoMuted: 'rgba(59, 130, 246, 0.14)',
-  overlay: 'rgba(255, 255, 255, 0.05)',
+  overlay: 'rgba(255, 255, 255, 0.06)',
 };
 
 const createTheme = (colors: typeof lightColors) => ({

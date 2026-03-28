@@ -388,42 +388,151 @@ export function CreatorProfileScreen() {
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
   const signOut = useSessionStore((state) => state.signOut);
   const roles = getSessionRoles(session);
+  const dashboardQuery = useQuery({
+    queryKey: queryKeys.creator.dashboard,
+    queryFn: mobileApi.getCreatorDashboard,
+    enabled: Boolean(session),
+  });
+  const settingsQuery = useQuery({
+    queryKey: [...queryKeys.profile.settings, session?.user.id, 'creator-profile'],
+    queryFn: mobileApi.getProfileSettings,
+    enabled: Boolean(session),
+  });
+  const handle = getUserHandle(session);
+  const connectedProviders = session?.user.authProviders?.length
+    ? session.user.authProviders.join(', ')
+    : 'local';
 
   return (
     <Screen>
-      <Heading title="Content creator profile" />
+      <Heading
+        title="Content creator profile"
+        eyebrow="Studio identity"
+        body="Your creator profile now reads like a polished public-facing account hub, with stronger studio signals and faster access to the tools that matter."
+      />
+      {dashboardQuery.isLoading ? <LoadingState label="Refreshing your studio..." /> : null}
+      {dashboardQuery.isError ? <EmptyState body={(dashboardQuery.error as Error).message} title="Studio summary unavailable" /> : null}
       <Surface>
-        <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>
-          {session?.user.fullName ?? 'LiveGate content creator'}
-        </Text>
-        <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
-          {session?.user.email ?? 'No email loaded'}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <Avatar name={session?.user.fullName} size="lg" />
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text, fontFamily: theme.typography.displayFontFamily }}>
+              {session?.user.fullName ?? 'LiveGate content creator'}
+            </Text>
+            <Text style={{ fontSize: 14, color: theme.colors.accent, fontWeight: '600' }}>{handle}</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
+              {session?.user.email ?? 'No email loaded'}
+            </Text>
+          </View>
+        </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <Badge variant={session?.user.emailVerified ? 'success' : 'warning'}>
+            {session?.user.emailVerified ? 'Verified email' : 'Verify email'}
+          </Badge>
+          <Badge variant={dashboardQuery.data?.verificationStatus === 'verified' ? 'success' : 'warning'}>
+            {dashboardQuery.data?.verificationStatus === 'verified' ? 'Creator approved' : 'Verification in review'}
+          </Badge>
+          <Badge variant={settingsQuery.data?.privacyPreferences.publicCreatorProfile ? 'primary' : 'warning'}>
+            {settingsQuery.data?.privacyPreferences.publicCreatorProfile ? 'Public profile' : 'Private profile'}
+          </Badge>
           {roles.map((role) => (
             <CategoryChip active={session?.user.role === role} key={role} title={formatRoleLabel(role)} />
           ))}
         </View>
+        <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
+          Connected sign-in methods: {connectedProviders}. Earnings, payouts, and verification status remain backend-validated before any studio action is trusted.
+        </Text>
+      </Surface>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <SummaryTile
+          body="People following your creator presence."
+          label="Followers"
+          value={String(dashboardQuery.data?.followers ?? 0)}
+        />
+        <SummaryTile
+          body="Lives, content, and classes actively managed from this account."
+          label="Studio items"
+          value={String(dashboardQuery.data?.managedContent.items.length ?? 0)}
+        />
+        <SummaryTile
+          body="Funds currently available from completed transactions."
+          label="Available"
+          value={
+            dashboardQuery.data
+              ? formatCurrency(dashboardQuery.data.wallet.availableBalance, dashboardQuery.data.wallet.currency)
+              : formatCurrency(0)
+          }
+        />
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <QuickActionTile
+          actionTitle="Open settings"
+          body="Profile posture, payouts, alerts, and workspace defaults."
+          icon="settings-outline"
+          onPress={() => router.push('/(creator)/settings')}
+          title="Settings"
+          variant="ghost"
+        />
+        <QuickActionTile
+          actionTitle="Open payouts"
+          body="Request a payout and review the state of your balance."
+          icon="wallet-outline"
+          onPress={() => router.push('/(creator)/payouts')}
+          title="Payouts"
+        />
+        <QuickActionTile
+          actionTitle="Open updates"
+          body="Announcements, payout changes, and studio alerts."
+          icon="notifications-outline"
+          onPress={() => router.push('/(creator)/notifications')}
+          title="Notifications"
+        />
         {roles.includes('viewer') ? (
-          <Button
+          <QuickActionTile
+            actionTitle="Switch workspace"
+            body="Move into the viewer workspace with the same account."
+            icon="swap-horizontal-outline"
             onPress={() => {
               setActiveRole('viewer');
               router.replace('/(viewer)/(tabs)/home');
             }}
-            title="Switch to viewer workspace"
+            title="Viewer mode"
+            variant="secondary"
           />
         ) : null}
-        <Button onPress={() => router.push('/(creator)/settings')} title="Settings" variant="secondary" />
-        <Button onPress={() => router.push('/(creator)/notifications')} title="Notifications" variant="ghost" />
-        <Button
-          onPress={() => {
-            signOut();
-            router.replace('/(public)/sign-in');
-          }}
-          title="Sign out"
-          variant="ghost"
+      </View>
+      <Surface>
+        <SectionLead
+          body="This studio profile summarizes verification, visibility, monetization readiness, and account reach in a way that feels closer to a real creator network."
+          eyebrow="Studio posture"
+          title="How your creator presence looks right now"
         />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          <SummaryTile
+            body="Whether the platform can surface your profile broadly."
+            label="Discovery"
+            value={settingsQuery.data?.privacyPreferences.publicCreatorProfile ? 'Public' : 'Private'}
+          />
+          <SummaryTile
+            body="Theme and workspace feel for your studio surfaces."
+            label="Theme"
+            value={settingsQuery.data?.appearancePreferences.theme ?? 'system'}
+          />
+          <SummaryTile
+            body="The route your studio opens into by default."
+            label="Default role"
+            value={formatRoleLabel(settingsQuery.data?.defaultRole ?? session?.user.role ?? 'creator')}
+          />
+        </View>
       </Surface>
+      <Button
+        onPress={() => {
+          signOut();
+          router.replace('/(public)/sign-in');
+        }}
+        title="Sign out"
+        variant="ghost"
+      />
     </Screen>
   );
 }
@@ -448,6 +557,7 @@ export function PayoutsScreen() {
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(creator)/(tabs)/profile" label="Back to profile" />
       <Heading title="Request payout" />
       <Surface>
         <Controller
@@ -484,6 +594,120 @@ export function PayoutsScreen() {
   );
 }
 
+function goBackOrReplace(fallback: string) {
+  if (typeof router.canGoBack === 'function' && router.canGoBack()) {
+    router.back();
+    return;
+  }
+
+  router.replace(fallback as never);
+}
+
+function getUserHandle(
+  session: ReturnType<typeof useSessionStore.getState>['session'],
+) {
+  if (session?.user.username?.trim()) {
+    return `@${session.user.username.trim()}`;
+  }
+
+  const email = session?.user.email ?? 'creator@livegate.app';
+  return `@${email.split('@')[0]}`;
+}
+
+function ScreenBackLink({
+  fallback,
+  label = 'Back',
+}: {
+  fallback: string;
+  label?: string;
+}) {
+  return (
+    <View style={{ marginBottom: -theme.spacing.sm }}>
+      <Button onPress={() => goBackOrReplace(fallback)} title={label} variant="ghost" />
+    </View>
+  );
+}
+
+function SectionLead({
+  eyebrow,
+  title,
+  body,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <View style={{ gap: theme.spacing.xs }}>
+      <Text
+        style={{
+          fontSize: theme.typography.sizes.xs,
+          letterSpacing: 1.3,
+          textTransform: 'uppercase',
+          color: theme.colors.accent,
+          fontWeight: theme.typography.weights.medium,
+        }}
+      >
+        {eyebrow}
+      </Text>
+      <Text
+        style={{
+          fontSize: theme.typography.sizes.xl,
+          lineHeight: 28,
+          color: theme.colors.text,
+          fontWeight: theme.typography.weights.bold as any,
+          fontFamily: theme.typography.displayFontFamily,
+        }}
+      >
+        {title}
+      </Text>
+      <Text style={{ fontSize: theme.typography.sizes.sm, lineHeight: 22, color: theme.colors.textSecondary }}>
+        {body}
+      </Text>
+    </View>
+  );
+}
+
+function QuickActionTile({
+  icon,
+  title,
+  body,
+  actionTitle,
+  onPress,
+  variant = 'secondary',
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  body: string;
+  actionTitle: string;
+  onPress: () => void;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+}) {
+  return (
+    <Surface style={{ flex: 1, minWidth: '45%', backgroundColor: theme.colors.surface }}>
+      <View
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: theme.radius.pill,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.colors.primarySoft,
+        }}
+      >
+        <Ionicons color={theme.colors.accent} name={icon} size={20} />
+      </View>
+      <Text style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>
+        {title}
+      </Text>
+      <Text style={{ fontSize: theme.typography.sizes.sm, lineHeight: 20, color: theme.colors.textSecondary }}>
+        {body}
+      </Text>
+      <Button onPress={onPress} title={actionTitle} variant={variant} />
+    </Surface>
+  );
+}
+
 export function CreateLiveScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -510,7 +734,8 @@ export function CreateLiveScreen() {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
   const session = useSessionStore((state) => state.session);
-  const liveChatMessages = useSessionStore((state) => state.demoLiveChats['creator-preview-live'] ?? []);
+  const liveChatMessages =
+    useSessionStore((state) => state.demoLiveChats['creator-preview-live']) ?? [];
   const sendDemoLiveChatMessage = useSessionStore((state) => state.sendDemoLiveChatMessage);
   const resetDemoLiveChat = useSessionStore((state) => state.resetDemoLiveChat);
 
@@ -605,6 +830,7 @@ export function CreateLiveScreen() {
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(creator)/(tabs)/dashboard" label="Back to dashboard" />
       {!isLive ? (
         <>
           <Heading title="New live session" />
@@ -759,7 +985,7 @@ export function CreateLiveScreen() {
               marginTop: 16,
               borderRadius: 28,
               overflow: 'hidden',
-              backgroundColor: '#081513',
+              backgroundColor: '#172033',
               borderWidth: 1,
               borderColor: 'rgba(255,255,255,0.08)',
             }}
@@ -779,21 +1005,21 @@ export function CreateLiveScreen() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   paddingHorizontal: 24,
-                  backgroundColor: '#10211D',
+                  backgroundColor: '#172033',
                 }}
               >
                 <Text
                   style={{
                     fontSize: 26,
                     fontWeight: '700',
-                    color: '#F8F1E7',
+                    color: '#f8fafc',
                     textAlign: 'center',
                     fontFamily: theme.typography.displayFontFamily,
                   }}
                 >
                   {cameraEnabled ? 'Enable camera access to preview your live' : 'Camera is off'}
                 </Text>
-                <Text style={{ marginTop: 10, fontSize: 14, lineHeight: 22, color: '#BBD2CC', textAlign: 'center' }}>
+                <Text style={{ marginTop: 10, fontSize: 14, lineHeight: 22, color: '#cbd5e1', textAlign: 'center' }}>
                   {cameraEnabled
                     ? 'Turn on camera access, or continue with audio only.'
                     : 'Your live can still start with audio only if microphone stays enabled.'}
@@ -827,7 +1053,7 @@ export function CreateLiveScreen() {
                   paddingHorizontal: 12,
                   paddingVertical: 8,
                   borderRadius: 999,
-                  backgroundColor: 'rgba(16,33,29,0.72)',
+                  backgroundColor: 'rgba(23,32,51,0.78)',
                 }}
               >
                 <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
@@ -839,7 +1065,7 @@ export function CreateLiveScreen() {
                   paddingHorizontal: 12,
                   paddingVertical: 8,
                   borderRadius: 999,
-                  backgroundColor: 'rgba(16,33,29,0.72)',
+                  backgroundColor: 'rgba(23,32,51,0.78)',
                 }}
               >
                 <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
@@ -895,7 +1121,7 @@ export function CreateLiveScreen() {
             style={{
               overflow: 'hidden',
               borderRadius: theme.radius.xl,
-              backgroundColor: '#081513',
+              backgroundColor: '#172033',
               ...theme.shadow.lg,
             }}
           >
@@ -916,7 +1142,7 @@ export function CreateLiveScreen() {
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 6,
-                    backgroundColor: 'rgba(11,21,19,0.62)',
+                    backgroundColor: 'rgba(23,32,51,0.78)',
                     paddingHorizontal: 12,
                     paddingVertical: 8,
                     borderRadius: theme.radius.pill,
@@ -935,14 +1161,14 @@ export function CreateLiveScreen() {
                   borderRadius: 22,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: 'rgba(11,21,19,0.62)',
+                  backgroundColor: 'rgba(23,32,51,0.78)',
                 }}
               >
                 <Ionicons color="#fffaf2" name={showAudienceMessages ? 'chatbubble' : 'chatbubble-outline'} size={20} />
               </TouchableOpacity>
             </View>
 
-            <View style={{ width: '100%', aspectRatio: 9 / 16, backgroundColor: '#081513' }}>
+            <View style={{ width: '100%', aspectRatio: 9 / 16, backgroundColor: '#172033' }}>
               {canShowCameraPreview ? (
                 <CameraView active facing={cameraFacing} mirror={cameraFacing === 'front'} mode="video" style={{ flex: 1 }} />
               ) : (
@@ -952,16 +1178,16 @@ export function CreateLiveScreen() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     paddingHorizontal: 24,
-                    backgroundColor: '#10211D',
+                    backgroundColor: '#172033',
                   }}
                 >
-                  <Ionicons color="#fffaf2" name="videocam-off-outline" size={42} />
+                  <Ionicons color="#f8fafc" name="videocam-off-outline" size={42} />
                   <Text
                     style={{
                       marginTop: 14,
                       fontSize: 22,
                       lineHeight: 30,
-                      color: '#F8F1E7',
+                      color: '#f8fafc',
                       textAlign: 'center',
                       fontWeight: '700',
                       fontFamily: theme.typography.displayFontFamily,
@@ -991,12 +1217,12 @@ export function CreateLiveScreen() {
                       alignSelf: 'flex-start',
                       maxWidth: '92%',
                       borderRadius: 18,
-                      backgroundColor: 'rgba(11,21,19,0.62)',
+                      backgroundColor: 'rgba(23,32,51,0.78)',
                       paddingHorizontal: 12,
                       paddingVertical: 10,
                     }}
                   >
-                    <Text style={{ color: '#b8d8cf', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
+                    <Text style={{ color: '#bfdbfe', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
                       {message.author}
                     </Text>
                     <Text style={{ color: '#fffaf2', fontSize: 13, lineHeight: 18 }}>{message.body}</Text>
@@ -1020,7 +1246,7 @@ export function CreateLiveScreen() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 8,
-                  backgroundColor: 'rgba(11,21,19,0.72)',
+                  backgroundColor: 'rgba(23,32,51,0.82)',
                   borderRadius: 22,
                   padding: 8,
                 }}
@@ -1063,7 +1289,7 @@ export function CreateLiveScreen() {
                   borderRadius: 28,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: micEnabled ? 'rgba(11,21,19,0.68)' : theme.colors.danger,
+                  backgroundColor: micEnabled ? 'rgba(23,32,51,0.82)' : theme.colors.danger,
                 }}
               >
                 <Ionicons color="#fffaf2" name={micEnabled ? 'mic-outline' : 'mic-off-outline'} size={24} />
@@ -1077,7 +1303,7 @@ export function CreateLiveScreen() {
                   borderRadius: 28,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: cameraEnabled ? 'rgba(11,21,19,0.68)' : theme.colors.danger,
+                  backgroundColor: cameraEnabled ? 'rgba(23,32,51,0.82)' : theme.colors.danger,
                 }}
               >
                 <Ionicons color="#fffaf2" name={cameraEnabled ? 'videocam-outline' : 'videocam-off-outline'} size={24} />
@@ -1091,7 +1317,7 @@ export function CreateLiveScreen() {
                   borderRadius: 28,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: 'rgba(11,21,19,0.68)',
+                  backgroundColor: 'rgba(23,32,51,0.82)',
                 }}
               >
                 <Ionicons color="#fffaf2" name="camera-reverse-outline" size={24} />
@@ -1132,6 +1358,7 @@ export function CreatorNotificationsScreen() {
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(creator)/(tabs)/profile" label="Back to profile" />
       <Heading title="Content creator updates" />
       {query.isLoading ? <LoadingState label="Loading notifications..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Notifications unavailable" /> : null}
@@ -1150,6 +1377,11 @@ export function CreatorSettingsScreen() {
   const query = useQuery({
     queryKey: [...queryKeys.profile.settings, session?.user.id, 'creator'],
     queryFn: mobileApi.getProfileSettings,
+    enabled: Boolean(session),
+  });
+  const dashboardQuery = useQuery({
+    queryKey: queryKeys.creator.dashboard,
+    queryFn: mobileApi.getCreatorDashboard,
     enabled: Boolean(session),
   });
   const saveMutation = useMutation({
@@ -1209,9 +1441,11 @@ export function CreatorSettingsScreen() {
   const connectedProviders = session?.user.authProviders?.length
     ? session.user.authProviders.join(', ')
     : 'local';
+  const handle = getUserHandle(session);
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(creator)/(tabs)/profile" label="Back to profile" />
       <Heading
         title="Content creator settings"
         eyebrow="Profile, payouts, and security"
@@ -1227,6 +1461,9 @@ export function CreatorSettingsScreen() {
               <View style={{ flex: 1, gap: 4 }}>
                 <Text style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold as any, color: theme.colors.text, fontFamily: theme.typography.displayFontFamily }}>
                   {session?.user.fullName ?? settings.fullName}
+                </Text>
+                <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.accent, fontWeight: '600' }}>
+                  {handle}
                 </Text>
                 <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textSecondary }}>
                   {session?.user.email ?? settings.email}
@@ -1246,7 +1483,33 @@ export function CreatorSettingsScreen() {
               Connected sign-in methods: {connectedProviders}. Session tokens stay in secure storage on supported devices.
             </Text>
           </Surface>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SummaryTile
+              body="Audience currently attached to your creator presence."
+              label="Followers"
+              value={String(dashboardQuery.data?.followers ?? 0)}
+            />
+            <SummaryTile
+              body="Published or ready studio assets tracked by the backend."
+              label="Studio items"
+              value={String(dashboardQuery.data?.managedContent.items.length ?? 0)}
+            />
+            <SummaryTile
+              body="Liquid creator balance currently available for payout."
+              label="Available"
+              value={
+                dashboardQuery.data
+                  ? formatCurrency(dashboardQuery.data.wallet.availableBalance, dashboardQuery.data.wallet.currency)
+                  : formatCurrency(0)
+              }
+            />
+          </View>
           <Surface>
+            <SectionLead
+              body="Identity controls stay focused: who you are, how your account opens, and how payout routing is described."
+              eyebrow="Identity"
+              title="Studio basics"
+            />
             <TextField
               label="Full name"
               onChangeText={(value) => setSettings((current) => (current ? { ...current, fullName: value } : current))}
@@ -1306,6 +1569,13 @@ export function CreatorSettingsScreen() {
                 />
               ))}
             </View>
+          </Surface>
+          <Surface>
+            <SectionLead
+              body="Theme and density settings help the studio feel intentional while keeping the financial and moderation truth on the backend."
+              eyebrow="Experience"
+              title="Workspace feel"
+            />
             <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>Appearance</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {appearanceModes.map((mode) => (
@@ -1329,6 +1599,42 @@ export function CreatorSettingsScreen() {
                   title={mode}
                 />
               ))}
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              <SummaryTile
+                body="Applied instantly and saved back to the shared account settings."
+                label="Theme"
+                value={settings.appearancePreferences.theme}
+              />
+              <SummaryTile
+                body="Controls the density of studio-heavy screens."
+                label="Density"
+                value={settings.appearancePreferences.compactMode ? 'Compact' : 'Comfort'}
+              />
+            </View>
+          </Surface>
+          <Surface>
+            <SectionLead
+              body="Studio alerts are grouped around the things creators care about most: reminders, purchase visibility, announcements, and locked system notices."
+              eyebrow="Alerts"
+              title="Notification posture"
+            />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              <QuickActionTile
+                actionTitle="Open updates"
+                body="Review current creator updates before tuning the alert switches."
+                icon="notifications-outline"
+                onPress={() => router.push('/(creator)/notifications')}
+                title="Updates feed"
+                variant="ghost"
+              />
+              <QuickActionTile
+                actionTitle="Open payouts"
+                body="Review payout flow and balance status alongside your settings."
+                icon="wallet-outline"
+                onPress={() => router.push('/(creator)/payouts')}
+                title="Payout desk"
+              />
             </View>
           </Surface>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
@@ -1385,6 +1691,13 @@ export function CreatorSettingsScreen() {
               disabled
             />
           </View>
+          <Surface>
+            <SectionLead
+              body="Audience visibility and payout routing are exposed clearly here, while payout approval and creator eligibility still live on the backend."
+              eyebrow="Privacy and payouts"
+              title="Discovery and monetization"
+            />
+          </Surface>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <SettingsToggle
               body="Use tighter spacing in dashboard-heavy surfaces."

@@ -1,29 +1,27 @@
 import { useRouter, useSegments } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { getRequiredAuthStep } from '@/shared';
 import { useSessionStore } from '@/store/session-store';
 
 export function RouteGate() {
   const router = useRouter();
   const segments = useSegments();
-  const [bootReady, setBootReady] = useState(false);
   const hydrated = useSessionStore((state) => state.hydrated);
+  const authBootstrapStatus = useSessionStore((state) => state.authBootstrapStatus);
   const hasSeenOnboarding = useSessionStore((state) => state.hasSeenOnboarding);
   const session = useSessionStore((state) => state.session);
   const lastRouteRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setBootReady(true), 700);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated || !bootReady) return;
+    if (!hydrated || authBootstrapStatus !== 'ready') {
+      return;
+    }
 
     const root = segments[0];
+    const child = segments[1];
     let nextRoute: string | null = null;
 
-    if (!hasSeenOnboarding && root !== '(public)') {
+    if (!hasSeenOnboarding && (root !== '(public)' || child !== 'onboarding')) {
       nextRoute = '/(public)/onboarding';
     } else if (!session) {
       if (root !== '(public)') {
@@ -51,12 +49,16 @@ export function RouteGate() {
       }
     }
 
-    // Only navigate if the route has changed from last time
     if (nextRoute && lastRouteRef.current !== nextRoute) {
       lastRouteRef.current = nextRoute;
       router.replace(nextRoute as never);
+      return;
     }
-  }, [bootReady, hasSeenOnboarding, hydrated, router, segments, session]);
+
+    if (!nextRoute) {
+      lastRouteRef.current = null;
+    }
+  }, [authBootstrapStatus, hasSeenOnboarding, hydrated, router, segments, session]);
 
   return null;
 }

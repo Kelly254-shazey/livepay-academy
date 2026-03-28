@@ -26,7 +26,7 @@ export default function CreatorTabsLayout() {
           borderTopWidth: 1,
           elevation: 18,
           ...(Platform.OS === 'web'
-            ? { boxShadow: '0px 12px 28px rgba(16,33,29,0.18)' }
+            ? { boxShadow: '0px 12px 28px rgba(23,32,51,0.22)' }
             : {
                 shadowColor: appTheme.colors.text,
                 shadowOffset: { width: 0, height: 12 },

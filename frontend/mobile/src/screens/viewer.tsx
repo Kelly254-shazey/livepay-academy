@@ -225,6 +225,120 @@ function SummaryTile({
   );
 }
 
+function goBackOrReplace(fallback: string) {
+  if (typeof router.canGoBack === 'function' && router.canGoBack()) {
+    router.back();
+    return;
+  }
+
+  router.replace(fallback as never);
+}
+
+function getUserHandle(
+  session: ReturnType<typeof useSessionStore.getState>['session'],
+) {
+  if (session?.user.username?.trim()) {
+    return `@${session.user.username.trim()}`;
+  }
+
+  const email = session?.user.email ?? 'viewer@livegate.app';
+  return `@${email.split('@')[0]}`;
+}
+
+function ScreenBackLink({
+  fallback,
+  label = 'Back',
+}: {
+  fallback: string;
+  label?: string;
+}) {
+  return (
+    <View style={{ marginBottom: -theme.spacing.sm }}>
+      <Button onPress={() => goBackOrReplace(fallback)} title={label} variant="ghost" />
+    </View>
+  );
+}
+
+function SectionLead({
+  eyebrow,
+  title,
+  body,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <View style={{ gap: theme.spacing.xs }}>
+      <Text
+        style={{
+          fontSize: theme.typography.sizes.xs,
+          letterSpacing: 1.3,
+          textTransform: 'uppercase',
+          color: theme.colors.accent,
+          fontWeight: theme.typography.weights.medium,
+        }}
+      >
+        {eyebrow}
+      </Text>
+      <Text
+        style={{
+          fontSize: theme.typography.sizes.xl,
+          lineHeight: 28,
+          color: theme.colors.text,
+          fontWeight: theme.typography.weights.bold as any,
+          fontFamily: theme.typography.displayFontFamily,
+        }}
+      >
+        {title}
+      </Text>
+      <Text style={{ fontSize: theme.typography.sizes.sm, lineHeight: 22, color: theme.colors.textSecondary }}>
+        {body}
+      </Text>
+    </View>
+  );
+}
+
+function QuickActionTile({
+  icon,
+  title,
+  body,
+  actionTitle,
+  onPress,
+  variant = 'secondary',
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  body: string;
+  actionTitle: string;
+  onPress: () => void;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+}) {
+  return (
+    <Surface style={{ flex: 1, minWidth: '45%', backgroundColor: theme.colors.surface }}>
+      <View
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: theme.radius.pill,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.colors.primarySoft,
+        }}
+      >
+        <Ionicons color={theme.colors.accent} name={icon} size={20} />
+      </View>
+      <Text style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>
+        {title}
+      </Text>
+      <Text style={{ fontSize: theme.typography.sizes.sm, lineHeight: 20, color: theme.colors.textSecondary }}>
+        {body}
+      </Text>
+      <Button onPress={onPress} title={actionTitle} variant={variant} />
+    </Surface>
+  );
+}
+
 export function HomeScreen() {
   const session = useSessionStore((state) => state.session);
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
@@ -244,8 +358,8 @@ export function HomeScreen() {
           overflow: 'hidden',
           borderRadius: theme.radius.xl,
           borderWidth: 1,
-          borderColor: '#27374a',
-          backgroundColor: '#0f172a',
+          borderColor: '#334155',
+          backgroundColor: '#172033',
           padding: theme.spacing.lg,
           gap: theme.spacing.lg,
           minHeight: 230,
@@ -584,45 +698,140 @@ export function ViewerProfileScreen() {
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
   const signOut = useSessionStore((state) => state.signOut);
   const roles = getSessionRoles(session);
+  const dashboardQuery = useQuery({
+    queryKey: queryKeys.viewer.dashboard,
+    queryFn: mobileApi.getViewerDashboard,
+  });
+  const settingsQuery = useQuery({
+    queryKey: [...queryKeys.profile.settings, session?.user.id, 'viewer-profile'],
+    queryFn: mobileApi.getProfileSettings,
+    enabled: Boolean(session),
+  });
+  const handle = getUserHandle(session);
+  const purchasedCount =
+    (dashboardQuery.data?.purchasedLives.items.length ?? 0) +
+    (dashboardQuery.data?.purchasedContent.items.length ?? 0) +
+    (dashboardQuery.data?.enrolledClasses.items.length ?? 0);
+  const followingCount = dashboardQuery.data?.followedCreators.items.length ?? 0;
+  const transactionCount = dashboardQuery.data?.transactions.items.length ?? 0;
+  const themeMode = settingsQuery.data?.appearancePreferences.theme ?? 'system';
+  const communityVisibility = settingsQuery.data?.privacyPreferences.communityVisibility ?? true;
+  const connectedProviders = session?.user.authProviders?.length
+    ? session.user.authProviders.join(', ')
+    : 'local';
 
   return (
     <Screen>
-      <Heading title="Account" />
+      <Heading
+        title="Account"
+        eyebrow="Viewer identity"
+        body="Your profile now behaves more like a social product hub, with a clearer identity layer, quick actions, and trusted status signals."
+      />
+      {dashboardQuery.isLoading ? <LoadingState label="Refreshing your account..." /> : null}
+      {dashboardQuery.isError ? <EmptyState body={(dashboardQuery.error as Error).message} title="Account summary unavailable" /> : null}
       <Surface style={{ backgroundColor: theme.colors.surface }}>
-        <Avatar name={session?.user.fullName} size="lg" />
-        <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text, fontFamily: theme.typography.displayFontFamily }}>
-          {session?.user.fullName ?? 'LiveGate viewer'}
-        </Text>
-        <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
-          {session?.user.email ?? 'No email loaded'}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <Avatar name={session?.user.fullName} size="lg" />
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text, fontFamily: theme.typography.displayFontFamily }}>
+              {session?.user.fullName ?? 'LiveGate viewer'}
+            </Text>
+            <Text style={{ fontSize: 14, color: theme.colors.accent, fontWeight: '600' }}>{handle}</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
+              {session?.user.email ?? 'No email loaded'}
+            </Text>
+          </View>
+        </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <Badge variant={session?.user.emailVerified ? 'success' : 'warning'}>
+            {session?.user.emailVerified ? 'Verified email' : 'Verify email'}
+          </Badge>
+          <Badge variant={communityVisibility ? 'primary' : 'warning'}>
+            {communityVisibility ? 'Community visible' : 'Low-visibility mode'}
+          </Badge>
+          <Badge variant="default">Theme {themeMode}</Badge>
           {roles.map((role) => (
             <CategoryChip active={session?.user.role === role} key={role} title={formatRoleLabel(role)} />
           ))}
         </View>
+        <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
+          Signed in with {connectedProviders}. Access to paid lives, premium content, and classes is still confirmed by backend truth before unlock.
+        </Text>
+      </Surface>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <SummaryTile body="Lives, classes, and premium content already unlocked." label="Library" value={String(purchasedCount)} />
+        <SummaryTile body="Creators you can revisit without searching again." label="Following" value={String(followingCount)} />
+        <SummaryTile body="Successful purchase records kept in your history." label="Transactions" value={String(transactionCount)} />
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <QuickActionTile
+          actionTitle="Open notifications"
+          body="Purchase updates, live reminders, and system alerts."
+          icon="notifications-outline"
+          onPress={() => router.push('/(viewer)/notifications')}
+          title="Notifications"
+        />
+        <QuickActionTile
+          actionTitle="Open transactions"
+          body="Checkout history and payment confidence in one place."
+          icon="wallet-outline"
+          onPress={() => router.push('/(viewer)/wallet')}
+          title="Wallet"
+        />
+        <QuickActionTile
+          actionTitle="Open settings"
+          body="Appearance, privacy, and notification controls."
+          icon="settings-outline"
+          onPress={() => router.push('/(viewer)/settings')}
+          title="Settings"
+          variant="ghost"
+        />
         {roles.includes('creator') ? (
-          <Button
+          <QuickActionTile
+            actionTitle="Switch workspace"
+            body="Jump into your creator dashboard without leaving this account."
+            icon="swap-horizontal-outline"
             onPress={() => {
               setActiveRole('creator');
               router.replace('/(creator)/(tabs)/dashboard');
             }}
-            title="Switch to content creator workspace"
+            title="Creator mode"
             variant="secondary"
           />
         ) : null}
-        <Button onPress={() => router.push('/(viewer)/notifications')} title="Notifications" />
-        <Button onPress={() => router.push('/(viewer)/wallet')} title="Wallet" variant="secondary" />
-        <Button onPress={() => router.push('/(viewer)/settings')} title="Settings" variant="ghost" />
-        <Button
-          onPress={() => {
-            signOut();
-            router.replace('/(public)/sign-in');
-          }}
-          title="Sign out"
-          variant="ghost"
+      </View>
+      <Surface>
+        <SectionLead
+          body="This account surface mirrors the kind of calm profile summary users expect in a polished social product: identity, trust, and quick movement."
+          eyebrow="Profile posture"
+          title="What your account signals right now"
         />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          <SummaryTile
+            body="Derived from your verified sign-in state."
+            label="Trust"
+            value={session?.user.emailVerified ? 'Verified' : 'Pending'}
+          />
+          <SummaryTile
+            body="The mode your account opens into by default."
+            label="Default role"
+            value={formatRoleLabel(settingsQuery.data?.defaultRole ?? session?.user.role ?? 'viewer')}
+          />
+          <SummaryTile
+            body="How dense the viewer surfaces feel across the app."
+            label="Layout"
+            value={settingsQuery.data?.appearancePreferences.compactMode ? 'Compact' : 'Comfort'}
+          />
+        </View>
       </Surface>
+      <Button
+        onPress={() => {
+          signOut();
+          router.replace('/(public)/sign-in');
+        }}
+        title="Sign out"
+        variant="ghost"
+      />
     </Screen>
   );
 }
@@ -637,6 +846,7 @@ export function CategoryDetailScreen() {
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(viewer)/(tabs)/categories" label="Back to categories" />
       <Heading title={slug?.replace(/-/g, ' ') ?? 'Category'} />
       {query.isLoading ? <LoadingState label="Loading category..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Category unavailable" /> : null}
@@ -670,6 +880,7 @@ export function CreatorProfileScreen() {
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(viewer)/(tabs)/search" label="Back" />
       {query.isLoading ? <LoadingState label="Loading content creator..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Content creator unavailable" /> : null}
       {query.data ? (
@@ -771,6 +982,7 @@ export function LiveDetailsScreen() {
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(viewer)/(tabs)/home" label="Back to home" />
       {query.isLoading ? <LoadingState label="Loading live session..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Live unavailable" /> : null}
       {query.data ? (
@@ -882,7 +1094,9 @@ export function LiveRoomScreen() {
   const { liveId } = useLocalSearchParams<{ liveId: string }>();
   const unlockedDemoLiveIds = useSessionStore((state) => state.unlockedDemoLiveIds);
   const session = useSessionStore((state) => state.session);
-  const demoLiveChatMessages = useSessionStore((state) => (liveId ? state.demoLiveChats[liveId] ?? [] : []));
+  const demoLiveChatMessages =
+    useSessionStore((state) => (liveId ? state.demoLiveChats[liveId] : undefined)) ??
+    [];
   const sendDemoLiveChatMessage = useSessionStore((state) => state.sendDemoLiveChatMessage);
   const [showChat, setShowChat] = useState(false);
   const [chatDraft, setChatDraft] = useState('');
@@ -914,6 +1128,7 @@ export function LiveRoomScreen() {
 
   return (
     <Screen>
+      <ScreenBackLink fallback={liveId ? `/(viewer)/live/${liveId}` : '/(viewer)/(tabs)/home'} label="Back to live details" />
       {query.isLoading ? <LoadingState label="Connecting to live room..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Live room unavailable" /> : null}
       {query.data ? (
@@ -996,13 +1211,13 @@ export function LiveRoomScreen() {
                     style={{
                       overflow: 'hidden',
                       borderRadius: theme.radius.xl,
-                      backgroundColor: '#0b1513',
+                      backgroundColor: '#172033',
                       ...theme.shadow.lg,
                     }}
                   >
                     <View style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Badge variant="danger">Live</Badge>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(11,21,19,0.58)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: theme.radius.pill }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(23,32,51,0.72)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: theme.radius.pill }}>
                         <Ionicons color="#fffaf2" name="eye-outline" size={16} />
                         <Text style={{ color: '#fffaf2', fontSize: 13, fontWeight: '600' }}>{viewerCount}</Text>
                       </View>
@@ -1014,7 +1229,7 @@ export function LiveRoomScreen() {
                       fullscreenOptions={{ enable: true }}
                       nativeControls={false}
                       player={videoPlayer}
-                      style={{ width: '100%', aspectRatio: 9 / 16, backgroundColor: '#0b1513' }}
+                      style={{ width: '100%', aspectRatio: 9 / 16, backgroundColor: '#172033' }}
                     />
 
                     {showChat ? (
@@ -1035,12 +1250,12 @@ export function LiveRoomScreen() {
                               alignSelf: 'flex-start',
                               maxWidth: '92%',
                               borderRadius: 18,
-                              backgroundColor: 'rgba(11,21,19,0.62)',
+                              backgroundColor: 'rgba(23,32,51,0.78)',
                               paddingHorizontal: 12,
                               paddingVertical: 10,
                             }}
                           >
-                            <Text style={{ color: '#b8d8cf', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
+                            <Text style={{ color: '#bfdbfe', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
                               {message.authorName}
                             </Text>
                             <Text style={{ color: '#fffaf2', fontSize: 13, lineHeight: 18 }}>{message.body}</Text>
@@ -1051,19 +1266,19 @@ export function LiveRoomScreen() {
 
                     <View style={{ position: 'absolute', right: 14, bottom: 18, zIndex: 2, gap: 12 }}>
                       <View style={{ alignItems: 'center', gap: 6 }}>
-                        <View style={{ width: 52, height: 52, borderRadius: theme.radius.pill, backgroundColor: 'rgba(11,21,19,0.62)', alignItems: 'center', justifyContent: 'center' }}>
+                        <View style={{ width: 52, height: 52, borderRadius: theme.radius.pill, backgroundColor: 'rgba(23,32,51,0.78)', alignItems: 'center', justifyContent: 'center' }}>
                           <Ionicons color="#fffaf2" name="people-outline" size={22} />
                         </View>
                         <Text style={{ color: '#fffaf2', fontSize: 12, fontWeight: '600' }}>{viewerCount}</Text>
                       </View>
                       <View style={{ alignItems: 'center', gap: 6 }}>
-                        <View style={{ width: 52, height: 52, borderRadius: theme.radius.pill, backgroundColor: 'rgba(11,21,19,0.62)', alignItems: 'center', justifyContent: 'center' }}>
+                        <View style={{ width: 52, height: 52, borderRadius: theme.radius.pill, backgroundColor: 'rgba(23,32,51,0.78)', alignItems: 'center', justifyContent: 'center' }}>
                           <Ionicons color="#fffaf2" name="videocam-outline" size={22} />
                         </View>
                         <Text style={{ color: '#fffaf2', fontSize: 12, fontWeight: '600' }}>{scenes.length}</Text>
                       </View>
                       <View style={{ alignItems: 'center', gap: 6 }}>
-                        <View style={{ width: 52, height: 52, borderRadius: theme.radius.pill, backgroundColor: 'rgba(11,21,19,0.62)', alignItems: 'center', justifyContent: 'center' }}>
+                        <View style={{ width: 52, height: 52, borderRadius: theme.radius.pill, backgroundColor: 'rgba(23,32,51,0.78)', alignItems: 'center', justifyContent: 'center' }}>
                           <Ionicons
                             color="#fffaf2"
                             name={showChat ? 'chatbubble' : 'chatbubble-outline'}
@@ -1169,6 +1384,7 @@ export function ContentDetailsScreen() {
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(viewer)/(tabs)/library" label="Back" />
       {query.isLoading ? <LoadingState label="Loading content..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Content unavailable" /> : null}
       {query.data ? (
@@ -1230,6 +1446,7 @@ export function ClassDetailsScreen() {
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(viewer)/(tabs)/library" label="Back" />
       {query.isLoading ? <LoadingState label="Loading class..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Class unavailable" /> : null}
       {query.data ? (
@@ -1307,6 +1524,7 @@ export function NotificationsScreen() {
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(viewer)/(tabs)/profile" label="Back to profile" />
       <Heading title="Updates" />
       {query.isLoading ? <LoadingState label="Loading notifications..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Notifications unavailable" /> : null}
@@ -1333,6 +1551,7 @@ export function ViewerWalletScreen() {
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(viewer)/(tabs)/profile" label="Back to profile" />
       <Heading title="Transactions" />
       {query.isLoading ? <LoadingState label="Loading transactions..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Wallet unavailable" /> : null}
@@ -1442,6 +1661,7 @@ export function CheckoutScreen() {
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(viewer)/(tabs)/library" label="Back" />
       <Heading title="Secure checkout session" />
       {!productId || !productType ? (
         <EmptyState
@@ -1540,6 +1760,11 @@ export function SettingsScreen() {
   const setPreferredRoles = useSessionStore((state) => state.setPreferredRoles);
   const themePreference = useSessionStore((state) => state.themePreference);
   const setThemePreference = useSessionStore((state) => state.setThemePreference);
+  const dashboardQuery = useQuery({
+    queryKey: queryKeys.viewer.dashboard,
+    queryFn: mobileApi.getViewerDashboard,
+    enabled: Boolean(session),
+  });
   const query = useQuery({
     queryKey: [...queryKeys.profile.settings, session?.user.id, 'viewer'],
     queryFn: mobileApi.getProfileSettings,
@@ -1599,9 +1824,11 @@ export function SettingsScreen() {
   const connectedProviders = session?.user.authProviders?.length
     ? session.user.authProviders.join(', ')
     : 'local';
+  const handle = getUserHandle(session);
 
   return (
     <Screen>
+      <ScreenBackLink fallback="/(viewer)/(tabs)/profile" label="Back to profile" />
       <Heading
         title="Preferences"
         eyebrow="Profile and security"
@@ -1617,6 +1844,9 @@ export function SettingsScreen() {
               <View style={{ flex: 1, gap: 4 }}>
                 <Text style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold as any, color: theme.colors.text, fontFamily: theme.typography.displayFontFamily }}>
                   {session?.user.fullName ?? settings.fullName}
+                </Text>
+                <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.accent, fontWeight: '600' }}>
+                  {handle}
                 </Text>
                 <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textSecondary }}>
                   {session?.user.email ?? settings.email}
@@ -1636,7 +1866,29 @@ export function SettingsScreen() {
               Connected sign-in methods: {connectedProviders}. Secure token storage is active on supported devices.
             </Text>
           </Surface>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SummaryTile
+              body="Creators currently saved into your account graph."
+              label="Following"
+              value={String(dashboardQuery.data?.followedCreators.items.length ?? 0)}
+            />
+            <SummaryTile
+              body="Total checkout records connected to this account."
+              label="Purchases"
+              value={String(dashboardQuery.data?.transactions.items.length ?? 0)}
+            />
+            <SummaryTile
+              body="How your account appears to the broader learning community."
+              label="Visibility"
+              value={settings.privacyPreferences.communityVisibility ? 'Visible' : 'Limited'}
+            />
+          </View>
           <Surface>
+            <SectionLead
+              body="Identity controls stay simple here: readable profile information, role context, and a locked email path for safer recovery flows."
+              eyebrow="Identity"
+              title="Profile basics"
+            />
             <TextField
               label="Full name"
               onChangeText={(value) => setSettings((current) => (current ? { ...current, fullName: value } : current))}
@@ -1664,6 +1916,13 @@ export function SettingsScreen() {
                 />
               ))}
             </View>
+          </Surface>
+          <Surface>
+            <SectionLead
+              body="Theme and density settings shape how the product feels without affecting account security or financial truth."
+              eyebrow="Experience"
+              title="App feel"
+            />
             <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>Appearance</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {appearanceModes.map((mode) => (
@@ -1687,6 +1946,35 @@ export function SettingsScreen() {
                   title={mode}
                 />
               ))}
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              <SummaryTile
+                body="Applied instantly and persisted when you save."
+                label="Theme"
+                value={settings.appearancePreferences.theme}
+              />
+              <SummaryTile
+                body="Tighter spacing for dashboard-heavy browsing."
+                label="Density"
+                value={settings.appearancePreferences.compactMode ? 'Compact' : 'Comfort'}
+              />
+            </View>
+          </Surface>
+          <Surface>
+            <SectionLead
+              body="Notification preferences are grouped the way users expect in mature social products: reminders, purchases, announcements, and locked critical alerts."
+              eyebrow="Alerts"
+              title="Notification center"
+            />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              <QuickActionTile
+                actionTitle="Open updates"
+                body="Review the current notification feed before changing delivery preferences."
+                icon="notifications-outline"
+                onPress={() => router.push('/(viewer)/notifications')}
+                title="Updates feed"
+                variant="ghost"
+              />
             </View>
           </Surface>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
@@ -1743,6 +2031,13 @@ export function SettingsScreen() {
               disabled
             />
           </View>
+          <Surface>
+            <SectionLead
+              body="Privacy stays simple: community discovery and system trust are visible here, while sensitive security flows remain backend controlled."
+              eyebrow="Privacy"
+              title="Visibility and trust"
+            />
+          </Surface>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <SettingsToggle
               body="Use tighter spacing in dashboard-heavy screens."

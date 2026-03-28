@@ -7,6 +7,7 @@ import swaggerUi from "swagger-ui-express";
 import { API_PREFIX } from "./common/constants/domain";
 import { errorHandler } from "./common/errors/error-handler";
 import { httpLogger } from "./config/logger";
+import { corsCredentials, corsOriginDelegate } from "./config/cors";
 import { env } from "./config/env";
 import { createSwaggerDocument } from "./config/swagger";
 import { requestContext } from "./common/middleware/request-context";
@@ -107,16 +108,13 @@ export function createApp() {
     javaFinanceClient,
     walletsService
   );
-  const corsOrigin = env.CORS_ORIGIN === "*" ? "*" : env.CORS_ORIGIN;
-  const corsCredentials = env.CORS_ORIGIN !== "*";
-
   // Railway/Vercel sit behind a reverse proxy, and auth throttling depends on the original client IP.
   app.set("trust proxy", 1);
   app.use(requestContext);
   app.use(httpLogger);
   app.use(
     cors({
-      origin: corsOrigin,
+      origin: corsOriginDelegate,
       credentials: corsCredentials
     })
   );

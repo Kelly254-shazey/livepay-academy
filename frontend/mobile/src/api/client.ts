@@ -245,6 +245,7 @@ export class MobileApiError extends Error {
 }
 
 let inFlightRefresh: Promise<string | null> | null = null;
+const localApiProbeCache = new Map<string, Promise<boolean>>();
 
 function getResponseErrorMessage(statusCode: number, fallback?: string | null) {
   if (fallback?.trim()) {
@@ -268,6 +269,70 @@ function getResponseErrorMessage(statusCode: number, fallback?: string | null) {
   }
 
   return 'Request failed.';
+}
+
+function getNetworkErrorMessage(parsedUrl: URL) {
+  if (Platform.OS === 'web' && !isLocalHostname(parsedUrl.hostname)) {
+    const browserOrigin =
+      typeof window !== 'undefined' ? window.location.origin : 'this browser origin';
+
+    return `Browser access to ${parsedUrl.origin} was blocked. Allow ${browserOrigin} in backend CORS or use the local Node API for Expo web development.`;
+  }
+
+  if (isDevelopmentRuntime && isLocalHostname(parsedUrl.hostname)) {
+    return `Unable to reach the LiveGate backend at ${parsedUrl.origin}. Start the local Node API or update EXPO_PUBLIC_API_BASE_URL.`;
+  }
+
+  return 'Unable to reach the LiveGate backend. Check your connection and server status.';
+}
+
+async function isLiveGateLocalApiAvailable() {
+  if (!apiBaseUrl || !isDevelopmentRuntime || Platform.OS !== 'web') {
+    return true;
+  }
+
+  let originUrl: URL;
+  try {
+    originUrl = new URL(apiBaseUrl);
+  } catch {
+    return false;
+  }
+
+  if (!isLocalHostname(originUrl.hostname)) {
+    return true;
+  }
+
+  const cacheKey = originUrl.origin;
+  if (!localApiProbeCache.has(cacheKey)) {
+    localApiProbeCache.set(
+      cacheKey,
+      (async () => {
+        try {
+          const healthUrl = new URL('/health', `${originUrl.origin}/`).toString();
+          const response = await fetch(healthUrl, {
+            headers: { Accept: 'application/json' },
+            signal: AbortSignal.timeout(2500),
+          });
+
+          if (!response.ok) {
+            return false;
+          }
+
+          const contentType = response.headers.get('content-type') ?? '';
+          if (!contentType.includes('application/json')) {
+            return false;
+          }
+
+          const payload = await response.json().catch(() => null);
+          return Boolean(payload && typeof payload === 'object' && 'status' in payload && 'services' in payload);
+        } catch {
+          return false;
+        }
+      })(),
+    );
+  }
+
+  return localApiProbeCache.get(cacheKey)!;
 }
 
 function shouldUseDemoFallback() {
@@ -369,7 +434,7 @@ async function safeFetch(url: string, options: RequestInit): Promise<Response> {
   try {
     return await fetch(parsedUrl.toString(), secureOptions);
   } catch (error) {
-    throw new MobileApiError('Unable to reach the LiveGate backend. Check your connection and server status.');
+    throw new MobileApiError(getNetworkErrorMessage(parsedUrl));
   }
 }
 
@@ -383,6 +448,13 @@ async function request<T>(
 ) {
   if (!apiBaseUrl) {
     throw new MobileApiError('Set EXPO_PUBLIC_API_BASE_URL before using the mobile app data layer.');
+  }
+
+  if (!(await isLiveGateLocalApiAvailable())) {
+    const apiOrigin = getNodeApiOrigin() || apiBaseUrl;
+    throw new MobileApiError(
+      `Local LiveGate API not detected at ${apiOrigin}. That port is serving a different app or the Node backend is offline.`,
+    );
   }
 
   // Security: Validate the base URL to prevent SSRF

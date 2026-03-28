@@ -19,7 +19,7 @@ const linkGoogleSchema = z.object({
 });
 
 export function AccountLinkingScreen() {
-  const { session } = useSessionStore();
+  const session = useSessionStore((state) => state.session);
   const [linkType, setLinkType] = React.useState<'password' | 'google' | null>(null);
 
   if (!session) {

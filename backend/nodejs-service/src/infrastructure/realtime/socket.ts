@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 
 import { env } from "../../config/env";
 import { logger } from "../../config/logger";
+import { corsCredentials, socketCorsOrigin } from "../../config/cors";
 import { verifyAccessToken } from "../../common/security/jwt";
 import { redis } from "../cache/redis";
 import { prisma } from "../db/prisma";
@@ -11,8 +12,8 @@ import { prisma } from "../db/prisma";
 export function initializeSocket(httpServer: HttpServer) {
   const io = new Server(httpServer, {
     cors: {
-      origin: env.CORS_ORIGIN === "*" ? "*" : env.CORS_ORIGIN,
-      credentials: env.CORS_ORIGIN !== "*"
+      origin: socketCorsOrigin,
+      credentials: corsCredentials
     }
   });
 
