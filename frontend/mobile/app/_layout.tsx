@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import 'react-native-reanimated';
 import { AppProviders } from '@/providers/app-providers';
 import { useAppTheme, useResolvedThemeMode } from '@/theme';
@@ -27,17 +27,26 @@ export default function RootLayout() {
 
   if (!loaded) return null;
 
-  const navigationTheme = {
-    ...DefaultTheme,
-    colors: {
-      ...DefaultTheme.colors,
-      background: appTheme.colors.background,
-      card: appTheme.colors.surface,
-      border: appTheme.colors.border,
-      text: appTheme.colors.text,
-      primary: appTheme.colors.accent,
-    },
-  };
+  const navigationTheme = useMemo(
+    () => ({
+      ...DefaultTheme,
+      colors: {
+        ...DefaultTheme.colors,
+        background: appTheme.colors.background,
+        card: appTheme.colors.surface,
+        border: appTheme.colors.border,
+        text: appTheme.colors.text,
+        primary: appTheme.colors.accent,
+      },
+    }),
+    [
+      appTheme.colors.accent,
+      appTheme.colors.background,
+      appTheme.colors.border,
+      appTheme.colors.surface,
+      appTheme.colors.text,
+    ],
+  );
 
   return (
     <AppProviders>

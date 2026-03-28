@@ -261,14 +261,39 @@ const createStore = () => {
             },
           })),
         setIsDarkMode: (isDarkMode: boolean) =>
-          set({
-            isDarkMode,
-            themePreference: isDarkMode ? 'dark' : 'light',
+          set((state) => {
+            const nextThemePreference = isDarkMode ? 'dark' : 'light';
+
+            if (
+              state.isDarkMode === isDarkMode &&
+              state.themePreference === nextThemePreference
+            ) {
+              return state;
+            }
+
+            return {
+              isDarkMode,
+              themePreference: nextThemePreference,
+            };
           }),
         setThemePreference: (themePreference: ThemePreference) =>
-          set({
-            themePreference: normalizeThemePreference(themePreference),
-            isDarkMode: resolveIsDarkMode(normalizeThemePreference(themePreference)),
+          set((state) => {
+            const normalizedThemePreference = normalizeThemePreference(
+              themePreference,
+            );
+            const nextIsDarkMode = resolveIsDarkMode(normalizedThemePreference);
+
+            if (
+              state.themePreference === normalizedThemePreference &&
+              state.isDarkMode === nextIsDarkMode
+            ) {
+              return state;
+            }
+
+            return {
+              themePreference: normalizedThemePreference,
+              isDarkMode: nextIsDarkMode,
+            };
           }),
         signOut: () =>
           set((state) => ({
@@ -373,14 +398,39 @@ const createStore = () => {
               },
             })),
           setIsDarkMode: (isDarkMode: boolean) =>
-            set({
-              isDarkMode,
-              themePreference: isDarkMode ? 'dark' : 'light',
+            set((state: SessionState) => {
+              const nextThemePreference = isDarkMode ? 'dark' : 'light';
+
+              if (
+                state.isDarkMode === isDarkMode &&
+                state.themePreference === nextThemePreference
+              ) {
+                return state;
+              }
+
+              return {
+                isDarkMode,
+                themePreference: nextThemePreference,
+              };
             }),
           setThemePreference: (themePreference: ThemePreference) =>
-            set({
-              themePreference: normalizeThemePreference(themePreference),
-              isDarkMode: resolveIsDarkMode(normalizeThemePreference(themePreference)),
+            set((state: SessionState) => {
+              const normalizedThemePreference = normalizeThemePreference(
+                themePreference,
+              );
+              const nextIsDarkMode = resolveIsDarkMode(normalizedThemePreference);
+
+              if (
+                state.themePreference === normalizedThemePreference &&
+                state.isDarkMode === nextIsDarkMode
+              ) {
+                return state;
+              }
+
+              return {
+                themePreference: normalizedThemePreference,
+                isDarkMode: nextIsDarkMode,
+              };
             }),
           signOut: () =>
             set((state: SessionState) => ({
@@ -412,10 +462,6 @@ const createStore = () => {
             themePreference: state.themePreference,
           }),
           onRehydrateStorage: () => (state?: SessionState) => {
-            if (state && typeof state.setThemePreference === 'function') {
-              state.setThemePreference(normalizeThemePreference(state.themePreference));
-            }
-
             if (state && typeof state.setHydrated === 'function') {
               state.setHydrated(true);
             }

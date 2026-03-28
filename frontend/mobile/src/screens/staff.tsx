@@ -3,18 +3,19 @@ import { Text, View } from 'react-native';
 import { mobileApi } from '@/api/client';
 import { Button, EmptyState, Heading, LoadingState, Screen, Surface } from '@/components/ui';
 import { useSessionStore } from '@/store/session-store';
+import { theme } from '@/theme';
 
 const statLabel = {
   fontSize: 12,
   letterSpacing: 1.1,
   textTransform: 'uppercase' as const,
-  color: '#60726C',
+  color: theme.colors.textMuted,
 };
 
 const statValue = {
   fontSize: 20,
   fontWeight: '700' as const,
-  color: '#10211D',
+  color: theme.colors.text,
 };
 
 export function StaffDashboardScreen() {
@@ -45,18 +46,18 @@ export function StaffDashboardScreen() {
             ))}
           </View>
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>
               Risk and moderation
             </Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Flagged content: {query.data.flaggedContent} | Suspicious payments: {query.data.suspiciousPayments} | Content creator approvals pending: {query.data.creatorApprovals}
             </Text>
           </Surface>
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>
               Revenue summary
             </Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Revenue: {query.data.totalRevenue} | Platform commission: {query.data.platformCommission}
             </Text>
           </Surface>

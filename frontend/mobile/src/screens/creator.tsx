@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, useMicrophonePermissions, type CameraType } from 'expo-camera';
 import { router } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { z } from 'zod';
 import { mobileApi } from '@/api/client';
@@ -158,7 +158,7 @@ export function CreatorDashboardScreen() {
     <Screen>
       <Heading title="Studio overview" />
       <Surface>
-        <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
+        <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: theme.colors.textMuted }}>
           Quick actions
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
@@ -189,8 +189,8 @@ export function CreatorDashboardScreen() {
           </View>
           <WalletCards wallet={query.data.wallet} />
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Studio posture</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Studio posture</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Your content creator workspace keeps lives, library items, earnings, and payout actions on one surface so
               pricing and access remain legible.
             </Text>
@@ -218,7 +218,7 @@ export function CreatorLivesScreen() {
     <Screen>
       <Heading title="Live sessions" />
       <Surface>
-        <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+        <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
           Use the live builder to set pricing, visibility, and timing before viewers receive access.
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
@@ -253,8 +253,8 @@ export function CreatorLivesScreen() {
             <EmptyState body="Created lives will surface here once inventory exists." title="No live sessions yet" />
           )}
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Content creator guardrails</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Content creator guardrails</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Paid sessions must resolve payment before room access. Private sessions should use invite-driven access
               and clear host notes so moderators and viewers know what to expect.
             </Text>
@@ -296,8 +296,8 @@ export function CreatorLibraryScreen() {
             />
           </View>
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Publishing flow</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Publishing flow</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Keep previews clean, access states intentional, and pricing explicit so users understand what unlocks
               after payment.
             </Text>
@@ -307,7 +307,7 @@ export function CreatorLibraryScreen() {
             </View>
           </Surface>
           <View style={{ gap: 12 }}>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: '#171512' }}>Premium content</Text>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>Premium content</Text>
             {query.data.premiumContent.length ? (
               query.data.premiumContent.map((item) => <ContentCard content={item} key={item.id} />)
             ) : (
@@ -315,7 +315,7 @@ export function CreatorLibraryScreen() {
             )}
           </View>
           <View style={{ gap: 12 }}>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: '#171512' }}>Classes and workshops</Text>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>Classes and workshops</Text>
             {query.data.recommendedClasses.length ? (
               query.data.recommendedClasses.map((item) => <ClassCard classItem={item} key={item.id} />)
             ) : (
@@ -367,8 +367,8 @@ export function CreatorWalletScreen() {
             />
           </View>
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>How money moves</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>How money moves</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               LiveGate keeps 20% of successful transactions while 80% settles to content creator balances. Pending funds stay
               separate until they are eligible for payout.
             </Text>
@@ -393,10 +393,10 @@ export function CreatorProfileScreen() {
     <Screen>
       <Heading title="Content creator profile" />
       <Surface>
-        <Text style={{ fontSize: 20, fontWeight: '700', color: '#10211D' }}>
+        <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>
           {session?.user.fullName ?? 'LiveGate content creator'}
         </Text>
-        <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+        <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
           {session?.user.email ?? 'No email loaded'}
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -471,8 +471,8 @@ export function PayoutsScreen() {
             <TextField label="Note" onChangeText={field.onChange} placeholder="Optional note" value={field.value ?? ''} />
           )}
         />
-        {mutation.isSuccess ? <Text style={{ color: '#205C47' }}>{mutation.data?.message ?? ''}</Text> : null}
-        {mutation.isError ? <Text style={{ color: '#A34734' }}>{(mutation.error as Error).message}</Text> : null}
+        {mutation.isSuccess ? <Text style={{ color: theme.colors.success }}>{mutation.data?.message ?? ''}</Text> : null}
+        {mutation.isError ? <Text style={{ color: theme.colors.danger }}>{(mutation.error as Error).message}</Text> : null}
         <Button
           onPress={form.handleSubmit((values) => mutation.mutate(values))}
           title={mutation.isPending ? 'Submitting payout...' : 'Submit payout request'}
@@ -589,7 +589,7 @@ export function CreateLiveScreen() {
     setFeedback({ tone: 'success', text: 'Live session started in creator preview mode.' });
   };
 
-  const liveStatusTone = isLive ? '#D9534F' : '#205C47';
+  const liveStatusTone = isLive ? theme.colors.danger : theme.colors.success;
   const canShowCameraPreview = cameraEnabled && cameraPermission?.granted;
   const liveAudienceCount = 148;
   const handleSendChatMessage = () => {
@@ -622,7 +622,7 @@ export function CreateLiveScreen() {
               placeholder="March 29, 7:00 PM EAT"
               value={scheduleLabel}
             />
-            <Text style={{ fontSize: 13, color: '#60726C' }}>Category</Text>
+            <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>Category</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {categories.map((item) => (
                 <CategoryChip
@@ -633,7 +633,7 @@ export function CreateLiveScreen() {
                 />
               ))}
             </View>
-            <Text style={{ fontSize: 13, color: '#60726C' }}>Access model</Text>
+            <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>Access model</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {accessModes.map((item) => (
                 <CategoryChip
@@ -644,10 +644,10 @@ export function CreateLiveScreen() {
                 />
               ))}
             </View>
-            <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>
+            <Text style={{ fontSize: 13, lineHeight: 20, color: theme.colors.textSecondary }}>
               {accessModes.find((item) => item.value === accessMode)?.body}
             </Text>
-            <Text style={{ fontSize: 13, color: '#60726C' }}>Visibility</Text>
+            <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>Visibility</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {visibilityModes.map((item) => (
                 <CategoryChip
@@ -658,7 +658,7 @@ export function CreateLiveScreen() {
                 />
               ))}
             </View>
-            <Text style={{ fontSize: 13, lineHeight: 20, color: '#60726C' }}>
+            <Text style={{ fontSize: 13, lineHeight: 20, color: theme.colors.textSecondary }}>
               {visibilityModes.find((item) => item.value === visibility)?.body}
             </Text>
             {accessMode === 'paid' ? (
@@ -696,28 +696,28 @@ export function CreateLiveScreen() {
           </View>
 
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Preview</Text>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#10211D' }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Preview</Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>
               {title.trim() || 'Untitled live session'}
             </Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               {description.trim() || 'Add a session description to clarify what viewers unlock.'}
             </Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Category: {getCategoryTitle(category)}
             </Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Schedule: {scheduleLabel.trim() || 'No schedule entered yet'}
             </Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{accessPolicy}</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>{accessPolicy}</Text>
             {hostNotes.trim() ? (
-              <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>Host note: {hostNotes.trim()}</Text>
+              <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>Host note: {hostNotes.trim()}</Text>
             ) : null}
           </Surface>
 
           {feedback ? (
             <Surface>
-              <Text style={{ fontSize: 14, color: feedback.tone === 'success' ? '#196B59' : '#A64B40' }}>
+              <Text style={{ fontSize: 14, color: feedback.tone === 'success' ? theme.colors.success : theme.colors.danger }}>
                 {feedback.text}
               </Text>
             </Surface>
@@ -725,12 +725,12 @@ export function CreateLiveScreen() {
 
           {createdSession ? (
             <Surface>
-              <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
+              <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: theme.colors.textMuted }}>
                 {createdSession.status === 'published' ? 'Published preview' : 'Draft preview'}
               </Text>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#10211D' }}>{createdSession.title}</Text>
-              <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{createdSession.scheduleLabel}</Text>
-              <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{createdSession.accessPolicy}</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>{createdSession.title}</Text>
+              <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>{createdSession.scheduleLabel}</Text>
+              <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>{createdSession.accessPolicy}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                 <Button onPress={() => router.replace('/(creator)/(tabs)/lives')} title="Return to live sessions" />
                 <Button onPress={() => router.push('/(creator)/(tabs)/library')} title="Open library" variant="secondary" />
@@ -741,13 +741,13 @@ export function CreateLiveScreen() {
           {liveSetupVisible && createdSession?.status === 'published' ? (
         <Surface padding={0} style={{ overflow: 'hidden' }}>
           <View style={{ paddingHorizontal: 20, paddingTop: 20, gap: 8 }}>
-            <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
+            <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: theme.colors.textMuted }}>
               Live setup
             </Text>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: '#10211D' }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>
               {isLive ? 'You are live' : 'Go live now'}
             </Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Switch camera and audio on or off before you start the session.
             </Text>
           </View>
@@ -906,7 +906,7 @@ export function CreateLiveScreen() {
                     paddingHorizontal: 12,
                     paddingVertical: 8,
                     borderRadius: theme.radius.pill,
-                    backgroundColor: '#D9534F',
+                    backgroundColor: theme.colors.danger,
                   }}
                 >
                   <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>LIVE</Text>
@@ -1041,10 +1041,10 @@ export function CreateLiveScreen() {
                     borderRadius: 22,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: '#F0C987',
+                    backgroundColor: theme.colors.accent,
                   }}
                 >
-                  <Ionicons color="#10211D" name="paper-plane-outline" size={20} />
+                  <Ionicons color="#ffffff" name="paper-plane-outline" size={20} />
                 </TouchableOpacity>
               </View>
               <View
@@ -1063,7 +1063,7 @@ export function CreateLiveScreen() {
                   borderRadius: 28,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: micEnabled ? 'rgba(11,21,19,0.68)' : '#D9534F',
+                  backgroundColor: micEnabled ? 'rgba(11,21,19,0.68)' : theme.colors.danger,
                 }}
               >
                 <Ionicons color="#fffaf2" name={micEnabled ? 'mic-outline' : 'mic-off-outline'} size={24} />
@@ -1077,7 +1077,7 @@ export function CreateLiveScreen() {
                   borderRadius: 28,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: cameraEnabled ? 'rgba(11,21,19,0.68)' : '#D9534F',
+                  backgroundColor: cameraEnabled ? 'rgba(11,21,19,0.68)' : theme.colors.danger,
                 }}
               >
                 <Ionicons color="#fffaf2" name={cameraEnabled ? 'videocam-outline' : 'videocam-off-outline'} size={24} />
@@ -1110,7 +1110,7 @@ export function CreateLiveScreen() {
                   borderRadius: 28,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#D9534F',
+                  backgroundColor: theme.colors.danger,
                 }}
               >
                 <Ionicons color="#fffaf2" name="stop-circle-outline" size={24} />
@@ -1179,22 +1179,32 @@ export function CreatorSettingsScreen() {
     },
   });
   const [settings, setSettings] = useState<ProfileSettingsPayload | null>(null);
+  const lastAppliedSettingsAtRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (query.data) {
-      const normalizedTheme = normalizeAppearanceMode(
-        query.data.appearancePreferences.theme,
-      );
-      setSettings({
-        ...query.data,
-        appearancePreferences: {
-          ...query.data.appearancePreferences,
-          theme: normalizedTheme,
-        },
-      });
-      setThemePreference(normalizedTheme);
+    if (!query.data || !query.dataUpdatedAt) {
+      return;
     }
-  }, [query.data, setThemePreference]);
+
+    if (lastAppliedSettingsAtRef.current === query.dataUpdatedAt) {
+      return;
+    }
+
+    lastAppliedSettingsAtRef.current = query.dataUpdatedAt;
+
+    const normalizedTheme = normalizeAppearanceMode(
+      query.data.appearancePreferences.theme,
+    );
+
+    setSettings({
+      ...query.data,
+      appearancePreferences: {
+        ...query.data.appearancePreferences,
+        theme: normalizedTheme,
+      },
+    });
+    setThemePreference(normalizedTheme);
+  }, [query.data, query.dataUpdatedAt, setThemePreference]);
 
   const connectedProviders = session?.user.authProviders?.length
     ? session.user.authProviders.join(', ')

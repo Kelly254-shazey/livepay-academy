@@ -4,7 +4,7 @@ import { categories, DEMO_LIVE_ACCESS_CODE, formatCurrency, getSessionRoles } fr
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { mobileApi } from '@/api/client';
 import {
@@ -244,8 +244,8 @@ export function HomeScreen() {
           overflow: 'hidden',
           borderRadius: theme.radius.xl,
           borderWidth: 1,
-          borderColor: '#d7c5b6',
-          backgroundColor: '#171b24',
+          borderColor: '#27374a',
+          backgroundColor: '#0f172a',
           padding: theme.spacing.lg,
           gap: theme.spacing.lg,
           minHeight: 230,
@@ -260,7 +260,7 @@ export function HomeScreen() {
             width: 170,
             height: 170,
             borderRadius: theme.radius.pill,
-            backgroundColor: '#9a6b42',
+            backgroundColor: '#0ea5e9',
             opacity: 0.28,
           }}
         />
@@ -272,7 +272,7 @@ export function HomeScreen() {
             width: 220,
             height: 150,
             borderRadius: theme.radius.pill,
-            backgroundColor: '#f0c987',
+            backgroundColor: '#38bdf8',
             opacity: 0.18,
           }}
         />
@@ -296,7 +296,7 @@ export function HomeScreen() {
             <Text
               style={{
                 fontSize: theme.typography.sizes.xs,
-                color: '#f0c987',
+                color: '#7dd3fc',
                 textTransform: 'uppercase',
                 letterSpacing: 1.4,
                 fontWeight: theme.typography.weights.medium,
@@ -308,7 +308,7 @@ export function HomeScreen() {
               style={{
                 fontSize: theme.typography.sizes.xl,
                 lineHeight: 29,
-                color: '#f7f0e8',
+                color: '#f8fafc',
                 fontWeight: theme.typography.weights.semibold,
                 fontFamily: theme.typography.displayFontFamily,
               }}
@@ -332,14 +332,14 @@ export function HomeScreen() {
               <Text
                 style={{
                   fontSize: theme.typography.sizes['2xl'],
-                  color: '#f7f0e8',
+                  color: '#f8fafc',
                   fontWeight: theme.typography.weights.bold,
                   fontFamily: theme.typography.displayFontFamily,
                 }}
               >
                 24/7
               </Text>
-              <Text style={{ fontSize: theme.typography.sizes.sm, color: '#d4c7ba', lineHeight: 20 }}>
+              <Text style={{ fontSize: theme.typography.sizes.sm, color: '#cbd5e1', lineHeight: 20 }}>
                 Discovery rhythm
               </Text>
             </View>
@@ -350,7 +350,7 @@ export function HomeScreen() {
                 borderRadius: theme.radius.lg,
                 borderWidth: 1,
                 borderColor: 'rgba(255,255,255,0.12)',
-                backgroundColor: 'rgba(240,201,135,0.16)',
+                backgroundColor: 'rgba(14,165,233,0.18)',
                 padding: theme.spacing.lg,
                 justifyContent: 'space-between',
               }}
@@ -358,14 +358,14 @@ export function HomeScreen() {
               <Text
                 style={{
                   fontSize: theme.typography.sizes['2xl'],
-                  color: '#f7f0e8',
+                  color: '#f8fafc',
                   fontWeight: theme.typography.weights.bold,
                   fontFamily: theme.typography.displayFontFamily,
                 }}
               >
                 1 tap
               </Text>
-              <Text style={{ fontSize: theme.typography.sizes.sm, color: '#d4c7ba', lineHeight: 20 }}>
+              <Text style={{ fontSize: theme.typography.sizes.sm, color: '#cbd5e1', lineHeight: 20 }}>
                 Switch roles later
               </Text>
             </View>
@@ -426,8 +426,8 @@ export function CategoriesScreen() {
       <Heading title="Browse with intent" />
       {categories.map((category) => (
         <Surface key={category.slug}>
-          <Text style={{ fontSize: 18, fontWeight: '600', color: '#171512' }}>{category.title}</Text>
-          <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{category.shortDescription}</Text>
+          <Text style={{ fontSize: 18, fontWeight: '600', color: theme.colors.text }}>{category.title}</Text>
+          <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>{category.shortDescription}</Text>
           <Button onPress={() => router.push(`/(viewer)/category/${category.slug}`)} title="Open category" />
         </Surface>
       ))}
@@ -501,7 +501,7 @@ export function ViewerLibraryScreen() {
       {query.data ? (
         <>
           <Surface>
-            <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: '#60726C' }}>
+            <Text style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: theme.colors.textMuted }}>
               Library actions
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
@@ -527,8 +527,8 @@ export function ViewerLibraryScreen() {
             />
           </View>
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Continue where you left off</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Continue where you left off</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Your library is organized around what you have already paid for, so live joins, content unlocks, and
               enrolled classes stay one tap away.
             </Text>
@@ -678,8 +678,8 @@ export function CreatorProfileScreen() {
           <Surface>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <View style={{ gap: 4 }}>
-                <Text style={{ fontSize: 14, color: '#6E675C' }}>@{query.data.creator.handle}</Text>
-                <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{query.data.creator.headline}</Text>
+                <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>@{query.data.creator.handle}</Text>
+                <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>{query.data.creator.headline}</Text>
               </View>
               <Button onPress={() => undefined} title="Follow content creator" />
             </View>
@@ -709,10 +709,10 @@ export function CreatorProfileScreen() {
               query.data.reviews.items.map((review) => (
                 <Surface key={review.id}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>{review.authorName}</Text>
-                    <Text style={{ fontSize: 13, color: '#6E675C' }}>{review.rating}/5</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>{review.authorName}</Text>
+                    <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>{review.rating}/5</Text>
                   </View>
-                  <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{review.comment}</Text>
+                  <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>{review.comment}</Text>
                 </Surface>
               ))
             ) : (
@@ -813,7 +813,7 @@ export function LiveDetailsScreen() {
             </View>
           </Surface>
           <Surface>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               {restrictionMessage}
             </Text>
             {hasAccess ? (
@@ -1197,7 +1197,7 @@ export function ContentDetailsScreen() {
             </View>
           </Surface>
           <Surface>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               {query.data?.content.accessGranted
                 ? 'Unlocked state active. Attachments or replay access can render here.'
                 : 'Payment is required before this content becomes accessible.'}
@@ -1262,8 +1262,8 @@ export function ClassDetailsScreen() {
             {query.data.classItem.lessons.length ? (
               query.data.classItem.lessons.map((lesson) => (
                 <Surface key={lesson.id}>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>{lesson.title}</Text>
-                  <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{lesson.durationLabel}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>{lesson.title}</Text>
+                  <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>{lesson.durationLabel}</Text>
                 </Surface>
               ))
             ) : (
@@ -1275,7 +1275,7 @@ export function ClassDetailsScreen() {
             {query.data.classItem.materials.length ? (
               query.data.classItem.materials.map((material, index) => (
                 <Surface key={`${material}-${index}`}>
-                  <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>{material}</Text>
+                  <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>{material}</Text>
                 </Surface>
               ))
             ) : (
@@ -1357,8 +1357,8 @@ export function ViewerWalletScreen() {
               />
             </View>
             <Surface>
-              <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Checkout confidence</Text>
-              <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Checkout confidence</Text>
+              <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
                 LiveGate keeps payment, unlocks, and access grants connected so your wallet history explains why an
                 item appears in the library.
               </Text>
@@ -1455,8 +1455,8 @@ export function CheckoutScreen() {
         <>
           <Surface>
             <Text style={getMetaLabelStyle()}>Session id</Text>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: '#10211D' }}>{checkoutQuery.data.id}</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{checkoutQuery.data.accessPolicy}</Text>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>{checkoutQuery.data.id}</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>{checkoutQuery.data.accessPolicy}</Text>
           </Surface>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <SummaryTile
@@ -1481,14 +1481,14 @@ export function CheckoutScreen() {
             />
           </View>
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>{checkoutQuery.data.title}</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>{checkoutQuery.data.title}</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Content creator: {checkoutQuery.data.creatorName ?? 'LiveGate content creator'}
             </Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Product type: {productType}
             </Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Payment confirmation and access grants are resolved by the Node backend before the unlocked state is trusted.
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
@@ -1511,10 +1511,10 @@ export function CheckoutScreen() {
           ) : null}
           {confirmed ? (
             <Surface>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#196B59' }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.success }}>
                 {confirmMutation.data?.idempotent ? 'Existing access confirmed' : 'Payment confirmed'}
               </Text>
-              <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
+              <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
                 Access is active and the relevant viewer surfaces have been refreshed against backend truth.
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
@@ -1569,22 +1569,32 @@ export function SettingsScreen() {
     },
   });
   const [settings, setSettings] = useState<ProfileSettingsPayload | null>(null);
+  const lastAppliedSettingsAtRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (query.data) {
-      const normalizedTheme = normalizeAppearanceMode(
-        query.data.appearancePreferences.theme,
-      );
-      setSettings({
-        ...query.data,
-        appearancePreferences: {
-          ...query.data.appearancePreferences,
-          theme: normalizedTheme,
-        },
-      });
-      setThemePreference(normalizedTheme);
+    if (!query.data || !query.dataUpdatedAt) {
+      return;
     }
-  }, [query.data, setThemePreference]);
+
+    if (lastAppliedSettingsAtRef.current === query.dataUpdatedAt) {
+      return;
+    }
+
+    lastAppliedSettingsAtRef.current = query.dataUpdatedAt;
+
+    const normalizedTheme = normalizeAppearanceMode(
+      query.data.appearancePreferences.theme,
+    );
+
+    setSettings({
+      ...query.data,
+      appearancePreferences: {
+        ...query.data.appearancePreferences,
+        theme: normalizedTheme,
+      },
+    });
+    setThemePreference(normalizedTheme);
+  }, [query.data, query.dataUpdatedAt, setThemePreference]);
 
   const connectedProviders = session?.user.authProviders?.length
     ? session.user.authProviders.join(', ')

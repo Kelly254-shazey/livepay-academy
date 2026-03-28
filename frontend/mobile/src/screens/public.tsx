@@ -1258,8 +1258,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: theme.radius.xl,
     borderWidth: 1,
-    borderColor: '#d7c5b6',
-    backgroundColor: '#171b24',
+    borderColor: '#27374a',
+    backgroundColor: '#0f172a',
     padding: theme.spacing.lg,
     gap: theme.spacing.lg,
     minHeight: 230,
@@ -1272,7 +1272,7 @@ const styles = StyleSheet.create({
     width: 170,
     height: 170,
     borderRadius: theme.radius.pill,
-    backgroundColor: '#9a6b42',
+    backgroundColor: '#0ea5e9',
     opacity: 0.28,
   },
   roleHeroBackdropBottom: {
@@ -1282,7 +1282,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 150,
     borderRadius: theme.radius.pill,
-    backgroundColor: '#f0c987',
+    backgroundColor: '#38bdf8',
     opacity: 0.18,
   },
   roleHeroHeader: {
@@ -1321,11 +1321,11 @@ const styles = StyleSheet.create({
     minHeight: 58,
   },
   roleHeroTileAccent: {
-    backgroundColor: 'rgba(240,201,135,0.16)',
+    backgroundColor: 'rgba(14,165,233,0.18)',
   },
   roleHeroTileKicker: {
     fontSize: theme.typography.sizes.xs,
-    color: '#f0c987',
+    color: '#7dd3fc',
     textTransform: 'uppercase',
     letterSpacing: 1.4,
     fontWeight: theme.typography.weights.medium,
@@ -1333,20 +1333,20 @@ const styles = StyleSheet.create({
   roleHeroTileTitle: {
     fontSize: theme.typography.sizes.xl,
     lineHeight: 29,
-    color: '#f7f0e8',
+    color: '#f8fafc',
     fontWeight: theme.typography.weights.semibold,
     fontFamily: theme.typography.displayFontFamily,
     flexShrink: 1,
   },
   roleHeroMetric: {
     fontSize: theme.typography.sizes['2xl'],
-    color: '#f7f0e8',
+    color: '#f8fafc',
     fontWeight: theme.typography.weights.bold,
     fontFamily: theme.typography.displayFontFamily,
   },
   roleHeroTileCaption: {
     fontSize: theme.typography.sizes.sm,
-    color: '#d4c7ba',
+    color: '#cbd5e1',
     lineHeight: 20,
     flexShrink: 1,
   },
@@ -1414,8 +1414,8 @@ const styles = StyleSheet.create({
   highlightCard: {
     borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderColor: '#ead8c7',
-    backgroundColor: '#faf2ea',
+    borderColor: '#e0f2fe',
+    backgroundColor: '#f8fcff',
     padding: theme.spacing.lg,
     gap: theme.spacing.xs,
   },
@@ -1439,8 +1439,8 @@ const styles = StyleSheet.create({
     fontWeight: theme.typography.weights.medium,
   },
   modeCardActive: {
-    borderColor: '#e0cdbd',
-    backgroundColor: '#f9f2ea',
+    borderColor: '#bae6fd',
+    backgroundColor: '#f0f9ff',
   },
   modeTitle: {
     fontSize: theme.typography.sizes.xl,

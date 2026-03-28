@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button, Heading, Screen, Surface, TextField } from '@/components/ui';
 import { useSessionStore } from '@/store/session-store';
+import { theme } from '@/theme';
 
 interface AssistantMessage {
   id: string;
@@ -71,15 +72,18 @@ export function AssistantScreen() {
             style={{
               backgroundColor:
                 message.role === 'assistant'
-                  ? 'rgba(255,255,255,0.72)'
-                  : '#0D7C74',
+                  ? theme.colors.surface
+                  : theme.colors.accent,
             }}
           >
             <Text
               style={{
                 fontSize: 14,
                 lineHeight: 22,
-                color: message.role === 'assistant' ? '#60726C' : '#F8FFFB',
+                color:
+                  message.role === 'assistant'
+                    ? theme.colors.textSecondary
+                    : '#ffffff',
               }}
             >
               {message.text}
