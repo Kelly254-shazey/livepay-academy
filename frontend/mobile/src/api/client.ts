@@ -76,6 +76,7 @@ function resolveExpoHost() {
 const ALLOWED_DOMAINS = [
   'localhost', // Development only
   '127.0.0.1', // Development only
+  'livepay-academy.vercel.app', // Public production API proxy
   'livepay-academy-production.up.railway.app', // Production Railway backend
   // Add your production API domains here
   // 'api.livegate.com',
@@ -188,6 +189,20 @@ function normalizeApiBaseUrl(baseUrl: string): string {
   }
 }
 
+function normalizeOriginUrl(baseUrl: string): string {
+  const trimmed = baseUrl.trim();
+
+  if (!trimmed) {
+    return '';
+  }
+
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed.replace(/\/+$/, '');
+  }
+}
+
 function isLocalHostname(hostname: string): boolean {
   return ['localhost', '127.0.0.1', '::1'].includes(hostname.toLowerCase());
 }
@@ -200,8 +215,10 @@ function getHostnameFromUrl(value: string): string {
   }
 }
 
-const DEFAULT_PRODUCTION_API_BASE_URL = 'https://livepay-academy-production.up.railway.app/api';
+const DEFAULT_PRODUCTION_API_BASE_URL = 'https://livepay-academy.vercel.app/api';
+const DEFAULT_PRODUCTION_SOCKET_ORIGIN = 'https://livepay-academy-production.up.railway.app';
 const explicitApiBaseUrl = normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL ?? '');
+const explicitSocketOrigin = normalizeOriginUrl(process.env.EXPO_PUBLIC_SOCKET_URL ?? '');
 const inferredApiBaseUrl = (() => {
   const host = resolveExpoHost();
   return host ? `http://${host}:3000/api` : '';
@@ -214,6 +231,11 @@ const apiBaseUrl =
     ? DEFAULT_PRODUCTION_API_BASE_URL
     : explicitApiBaseUrl) ||
   (Platform.OS === 'web' ? '' : inferredApiBaseUrl);
+const socketOrigin =
+  (!isDevelopmentRuntime && (!explicitSocketOrigin || isLocalHostname(getHostnameFromUrl(explicitSocketOrigin)))
+    ? DEFAULT_PRODUCTION_SOCKET_ORIGIN
+    : explicitSocketOrigin) ||
+  (apiBaseUrl ? new URL(apiBaseUrl).origin : '');
 
 export class MobileApiError extends Error {
   constructor(message: string, public readonly statusCode?: number) {
@@ -843,4 +865,8 @@ export function getNodeApiOrigin() {
   } catch {
     return '';
   }
+}
+
+export function getNodeSocketOrigin() {
+  return socketOrigin;
 }

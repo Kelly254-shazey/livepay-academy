@@ -1,6 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
 
-import { getNodeApiOrigin } from '@/api/client';
+import { getNodeSocketOrigin } from '@/api/client';
 import type { LiveChatMessageRecord } from '@/shared';
 
 type LiveRoomSocketHandlers = {
@@ -18,7 +18,7 @@ let socketToken: string | null = null;
 let activeSubscriptions = 0;
 
 function ensureSocket(accessToken: string) {
-  const origin = getNodeApiOrigin();
+  const origin = getNodeSocketOrigin();
 
   if (!origin) {
     throw new Error('Set EXPO_PUBLIC_API_BASE_URL before using live realtime.');
