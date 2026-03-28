@@ -449,6 +449,17 @@ export function Badge({ children, variant = 'default', style }: BadgeProps) {
 export function Dialog({ visible, onClose, title, children }: DialogProps) {
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  React.useEffect(() => {
+    if (visible || Platform.OS !== 'web' || typeof document === 'undefined') {
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement) {
+      activeElement.blur();
+    }
+  }, [visible]);
+
   const handleClose = React.useCallback(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       const activeElement = document.activeElement;
