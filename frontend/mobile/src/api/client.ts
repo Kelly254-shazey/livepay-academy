@@ -490,11 +490,21 @@ async function request<T>(
     throw new MobileApiError('Set EXPO_PUBLIC_API_BASE_URL before using the mobile app data layer.');
   }
 
-  if (!(await isLiveGateLocalApiAvailable())) {
-    const apiOrigin = getNodeApiOrigin() || apiBaseUrl;
-    throw new MobileApiError(
-      `Local LiveGate API not detected at ${apiOrigin}. That port is serving a different app or the Node backend is offline.`,
-    );
+  // In development with a local API, warn if unavailable but continue
+  if (isDevelopmentRuntime && Platform.OS === 'web') {
+    const isAvailable = await isLiveGateLocalApiAvailable();
+    if (!isAvailable) {
+      try {
+        const parsedUrl = new URL(apiBaseUrl);
+        if (isLocalHostname(parsedUrl.hostname)) {
+          console.warn(
+            `Local LiveGate API not detected at ${parsedUrl.origin}. Falling back to production or demo mode.`
+          );
+        }
+      } catch {
+        // Invalid URL, continue with request anyway
+      }
+    }
   }
 
   // Security: Validate the base URL to prevent SSRF
