@@ -1,4 +1,5 @@
-import { Platform, useColorScheme } from 'react-native';
+import { Appearance, Platform, useColorScheme } from 'react-native';
+import { useSessionStore, type ThemePreference } from '@/store/session-store';
 
 function createShadow({
   color,
@@ -59,31 +60,31 @@ const lightColors = {
 };
 
 const darkColors = {
-  background: '#0a0a0a',
-  backgroundAccent: '#1a1a1a',
-  surface: '#1a1a1a',
-  surfaceMuted: '#262626',
-  surfaceElevated: '#2d2d2d',
-  border: '#404040',
-  borderSubtle: '#2d2d2d',
-  text: '#f5f5f5',
-  textSecondary: '#d4d4d4',
-  textMuted: '#a1a1a1',
-  accent: '#14b8a6',
-  accentHover: '#0d9488',
-  accentMuted: '#164e63',
-  primary: '#14b8a6',
-  primarySoft: '#1e5a57',
-  success: '#34d399',
-  successMuted: '#1f3a34',
+  background: '#08110f',
+  backgroundAccent: '#0f1a18',
+  surface: '#101a18',
+  surfaceMuted: '#162321',
+  surfaceElevated: '#16211f',
+  border: '#26403b',
+  borderSubtle: '#1f322f',
+  text: '#eef8f4',
+  textSecondary: '#c7ded7',
+  textMuted: '#8faaa2',
+  accent: '#48d4bd',
+  accentHover: '#2bb7a2',
+  accentMuted: '#103d37',
+  primary: '#48d4bd',
+  primarySoft: '#153a36',
+  success: '#4ade80',
+  successMuted: '#153428',
   warning: '#fbbf24',
-  warningMuted: '#4a3e1f',
-  danger: '#f87171',
-  dangerMuted: '#4a2622',
-  error: '#f87171',
+  warningMuted: '#4a3a12',
+  danger: '#fb7185',
+  dangerMuted: '#431822',
+  error: '#fb7185',
   info: '#60a5fa',
-  infoMuted: '#1f2f5f',
-  overlay: 'rgba(255, 255, 255, 0.1)',
+  infoMuted: '#172d4e',
+  overlay: 'rgba(238, 248, 244, 0.08)',
 };
 
 const createTheme = (colors: typeof lightColors) => ({
@@ -147,5 +148,41 @@ export const darkTheme = createTheme(darkColors);
 
 export type Theme = typeof lightTheme;
 
-// Default to light theme - will be overridden by store
-export const theme = lightTheme;
+function normalizeColorScheme(systemScheme: ReturnType<typeof useColorScheme> | ReturnType<typeof Appearance.getColorScheme>) {
+  return systemScheme === 'dark' || systemScheme === 'light' ? systemScheme : null;
+}
+
+function resolveThemeMode(themePreference: ThemePreference, systemScheme?: 'light' | 'dark' | null) {
+  if (themePreference === 'light' || themePreference === 'dark') {
+    return themePreference;
+  }
+
+  return systemScheme === 'dark' ? 'dark' : 'light';
+}
+
+export function getTheme(themePreference: ThemePreference, systemScheme?: 'light' | 'dark' | null) {
+  return resolveThemeMode(themePreference, systemScheme) === 'dark' ? darkTheme : lightTheme;
+}
+
+export function useAppTheme() {
+  const themePreference = useSessionStore((state) => state.themePreference);
+  const systemScheme = useColorScheme();
+  return getTheme(themePreference, normalizeColorScheme(systemScheme));
+}
+
+export function useResolvedThemeMode() {
+  const themePreference = useSessionStore((state) => state.themePreference);
+  const systemScheme = useColorScheme();
+  return resolveThemeMode(themePreference, normalizeColorScheme(systemScheme));
+}
+
+export const theme = new Proxy(lightTheme, {
+  get(_target, property) {
+    const currentTheme = getTheme(
+      useSessionStore.getState().themePreference,
+      normalizeColorScheme(Appearance.getColorScheme()),
+    );
+
+    return currentTheme[property as keyof Theme];
+  },
+}) as Theme;

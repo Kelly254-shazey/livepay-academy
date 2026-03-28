@@ -90,7 +90,9 @@ export function createAuthRouter(service: AuthService) {
     authenticate,
     validate(emptyBodySchema),
     asyncHandler(async (req, res) => {
-      const result = await service.requestEmailVerification(req.auth!.userId);
+      const result = await service.requestEmailVerification(req.auth!.userId, {
+        ipAddress: req.ip
+      });
       res.json(result);
     })
   );
@@ -99,7 +101,9 @@ export function createAuthRouter(service: AuthService) {
     "/email-verification/confirm",
     validate(emailVerificationConfirmSchema),
     asyncHandler(async (req, res) => {
-      const result = await service.confirmEmailVerification(req.body);
+      const result = await service.confirmEmailVerification(req.body, {
+        ipAddress: req.ip
+      });
       res.json(result);
     })
   );
@@ -108,7 +112,9 @@ export function createAuthRouter(service: AuthService) {
     "/password-reset/request",
     validate(passwordResetRequestSchema),
     asyncHandler(async (req, res) => {
-      const result = await service.requestPasswordReset(req.body.email);
+      const result = await service.requestPasswordReset(req.body.email, {
+        ipAddress: req.ip
+      });
       res.json(result);
     })
   );
@@ -117,7 +123,9 @@ export function createAuthRouter(service: AuthService) {
     "/password-reset/confirm",
     validate(passwordResetConfirmSchema),
     asyncHandler(async (req, res) => {
-      const result = await service.confirmPasswordReset(req.body);
+      const result = await service.confirmPasswordReset(req.body, {
+        ipAddress: req.ip
+      });
       res.json(result);
     })
   );

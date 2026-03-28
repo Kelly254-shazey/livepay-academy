@@ -5,7 +5,21 @@ import {
   type UserRole,
 } from '../shared';
 import { create } from 'zustand';
-import { Platform } from 'react-native';
+import { Appearance, Platform } from 'react-native';
+
+export type ThemePreference = 'system' | 'light' | 'dark';
+
+function resolveIsDarkMode(themePreference: ThemePreference) {
+  if (themePreference === 'dark') {
+    return true;
+  }
+
+  if (themePreference === 'light') {
+    return false;
+  }
+
+  return Appearance.getColorScheme() === 'dark';
+}
 
 export interface DemoLiveChatMessage {
   id: string;
@@ -40,6 +54,8 @@ const initialDemoLiveChats: Record<string, DemoLiveChatMessage[]> = {
 
 interface SessionState {
   hydrated: boolean;
+  authBootstrapStatus: 'idle' | 'restoring' | 'ready';
+  authBootstrapError: string | null;
   hasSeenOnboarding: boolean;
   preferredRole: UserRole;
   preferredRoles: UserRole[];
@@ -47,7 +63,12 @@ interface SessionState {
   unlockedDemoLiveIds: string[];
   demoLiveChats: Record<string, DemoLiveChatMessage[]>;
   isDarkMode: boolean;
+  themePreference: ThemePreference;
   setHydrated: (hydrated: boolean) => void;
+  setAuthBootstrapState: (
+    status: SessionState['authBootstrapStatus'],
+    error?: string | null,
+  ) => void;
   completeOnboarding: () => void;
   setPreferredRole: (role: UserRole) => void;
   setPreferredRoles: (roles: UserRole[], activeRole?: UserRole) => void;
@@ -60,6 +81,7 @@ interface SessionState {
   ) => void;
   resetDemoLiveChat: (liveId: string) => void;
   setIsDarkMode: (isDark: boolean) => void;
+  setThemePreference: (themePreference: ThemePreference) => void;
   signOut: () => void;
 }
 
@@ -70,6 +92,8 @@ const createStore = () => {
     return create<SessionState>((set) => {
       const store: SessionState = {
         hydrated: true,
+        authBootstrapStatus: 'idle',
+        authBootstrapError: null,
         hasSeenOnboarding: false,
         preferredRole: 'viewer',
         preferredRoles: ['viewer'],
@@ -77,7 +101,10 @@ const createStore = () => {
         unlockedDemoLiveIds: [],
         demoLiveChats: initialDemoLiveChats,
         isDarkMode: false,
+        themePreference: 'system',
         setHydrated: (hydrated: boolean) => set({ hydrated }),
+        setAuthBootstrapState: (authBootstrapStatus, authBootstrapError = null) =>
+          set({ authBootstrapStatus, authBootstrapError }),
         completeOnboarding: () => set({ hasSeenOnboarding: true }),
         setPreferredRole: (preferredRole: UserRole) =>
           set((state) => ({
@@ -98,6 +125,7 @@ const createStore = () => {
           })),
         setSession: (session: AuthSession | null) =>
           set((state) => ({
+            authBootstrapError: null,
             session:
               session === null
                 ? null
@@ -126,16 +154,28 @@ const createStore = () => {
               [liveId]: initialDemoLiveChats[liveId] ?? [],
             },
           })),
-        setIsDarkMode: (isDarkMode: boolean) => set({ isDarkMode }),
-        signOut: () =>
+        setIsDarkMode: (isDarkMode: boolean) =>
           set({
+            isDarkMode,
+            themePreference: isDarkMode ? 'dark' : 'light',
+          }),
+        setThemePreference: (themePreference: ThemePreference) =>
+          set({
+            themePreference,
+            isDarkMode: resolveIsDarkMode(themePreference),
+          }),
+        signOut: () =>
+          set((state) => ({
+            themePreference: state.themePreference,
+            isDarkMode: state.isDarkMode,
+            authBootstrapStatus: 'ready',
+            authBootstrapError: null,
             session: null,
             preferredRole: 'viewer',
             preferredRoles: ['viewer'],
             unlockedDemoLiveIds: [],
             demoLiveChats: initialDemoLiveChats,
-            isDarkMode: false,
-          }),
+          })),
       };
       return store;
     });
@@ -148,6 +188,8 @@ const createStore = () => {
       persist(
         (set: any) => ({
           hydrated: false,
+          authBootstrapStatus: 'idle',
+          authBootstrapError: null,
           hasSeenOnboarding: false,
           preferredRole: 'viewer',
           preferredRoles: ['viewer'],
@@ -155,7 +197,10 @@ const createStore = () => {
           unlockedDemoLiveIds: [],
           demoLiveChats: initialDemoLiveChats,
           isDarkMode: false,
+          themePreference: 'system',
           setHydrated: (hydrated: boolean) => set({ hydrated }),
+          setAuthBootstrapState: (authBootstrapStatus: SessionState['authBootstrapStatus'], authBootstrapError: string | null = null) =>
+            set({ authBootstrapStatus, authBootstrapError }),
           completeOnboarding: () => set({ hasSeenOnboarding: true }),
           setPreferredRole: (preferredRole: UserRole) =>
             set((state: SessionState) => ({
@@ -176,6 +221,7 @@ const createStore = () => {
             })),
           setSession: (session: AuthSession | null) =>
             set((state: SessionState) => ({
+              authBootstrapError: null,
               session:
                 session === null
                   ? null
@@ -204,16 +250,28 @@ const createStore = () => {
                 [liveId]: initialDemoLiveChats[liveId] ?? [],
               },
             })),
-          setIsDarkMode: (isDarkMode: boolean) => set({ isDarkMode }),
-          signOut: () =>
+          setIsDarkMode: (isDarkMode: boolean) =>
             set({
+              isDarkMode,
+              themePreference: isDarkMode ? 'dark' : 'light',
+            }),
+          setThemePreference: (themePreference: ThemePreference) =>
+            set({
+              themePreference,
+              isDarkMode: resolveIsDarkMode(themePreference),
+            }),
+          signOut: () =>
+            set((state: SessionState) => ({
+              themePreference: state.themePreference,
+              isDarkMode: state.isDarkMode,
+              authBootstrapStatus: 'ready',
+              authBootstrapError: null,
               session: null,
               preferredRole: 'viewer',
               preferredRoles: ['viewer'],
               unlockedDemoLiveIds: [],
               demoLiveChats: initialDemoLiveChats,
-              isDarkMode: false,
-            }),
+            })),
         }),
         {
           name: 'livegate-mobile-session',
@@ -226,8 +284,15 @@ const createStore = () => {
             unlockedDemoLiveIds: state.unlockedDemoLiveIds,
             demoLiveChats: state.demoLiveChats,
             isDarkMode: state.isDarkMode,
+            themePreference: state.themePreference,
           }),
           onRehydrateStorage: () => (state?: SessionState) => {
+            if (state?.themePreference === 'system' && state.isDarkMode) {
+              state.setThemePreference('dark');
+            } else if (state) {
+              state.setThemePreference(state.themePreference);
+            }
+
             state?.setHydrated(true);
           },
         },

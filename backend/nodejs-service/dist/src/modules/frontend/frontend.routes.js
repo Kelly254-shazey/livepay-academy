@@ -53,19 +53,27 @@ function createFrontendRouter(service) {
         res.json(result);
     }));
     router.post("/auth/verify-email", (0, validate_1.validate)(frontend_schemas_1.frontendVerifyEmailSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
-        const result = await service.verifyEmail(req.body);
+        const result = await service.verifyEmail(req.body, {
+            ipAddress: req.ip
+        });
         res.json(result);
     }));
     router.post("/auth/verify-email/resend", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.emptyBodySchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
-        const result = await service.resendEmailVerification(req.auth);
+        const result = await service.resendEmailVerification(req.auth, {
+            ipAddress: req.ip
+        });
         res.json(result);
     }));
     router.post("/auth/forgot-password", (0, validate_1.validate)(frontend_schemas_1.frontendForgotPasswordSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
-        const result = await service.forgotPassword(req.body.email);
+        const result = await service.forgotPassword(req.body.email, {
+            ipAddress: req.ip
+        });
         res.json(result);
     }));
     router.post("/auth/reset-password", (0, validate_1.validate)(frontend_schemas_1.frontendResetPasswordSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
-        const result = await service.resetPassword(req.body);
+        const result = await service.resetPassword(req.body, {
+            ipAddress: req.ip
+        });
         res.json(result);
     }));
     router.post("/auth/complete-profile", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.frontendCompleteProfileSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
@@ -80,6 +88,14 @@ function createFrontendRouter(service) {
         const result = await service.linkPasswordAccount(req.auth, req.body.password);
         res.json(result);
     }));
+    router.get("/users/settings", authenticate_1.authenticate, (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.getProfileSettings(req.auth);
+        res.json(result);
+    }));
+    router.put("/users/settings", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.profileSettingsSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.saveProfileSettings(req.auth, req.body);
+        res.json(result);
+    }));
     router.get("/home", (0, async_handler_1.asyncHandler)(async (_req, res) => res.json(await service.getHomeFeed())));
     router.get("/categories/:slug", (0, validate_1.validate)(frontend_schemas_1.categorySlugParamsSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
         const result = await service.getCategoryDetail((0, params_1.getStringParam)(req.params.slug));
@@ -89,8 +105,8 @@ function createFrontendRouter(service) {
         const result = await service.getCreatorProfile((0, params_1.getStringParam)(req.params.creatorId));
         res.json(result);
     }));
-    router.get("/lives/:liveId", (0, validate_1.validate)(frontend_schemas_1.liveIdParamsSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
-        const result = await service.getLiveDetail((0, params_1.getStringParam)(req.params.liveId));
+    router.get("/lives/:liveId", authenticate_1.optionalAuthenticate, (0, validate_1.validate)(frontend_schemas_1.liveIdParamsSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.getLiveDetail((0, params_1.getStringParam)(req.params.liveId), req.auth);
         res.json(result);
     }));
     router.get("/lives/:liveId/room", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.liveIdParamsSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {

@@ -15,6 +15,8 @@ exports.logger = (0, pino_1.default)({
             "req.headers.authorization",
             "req.headers.x-internal-api-key",
             "req.body.code",
+            "req.body.email",
+            "req.body.identifier",
             "req.body.idToken",
             "req.body.password",
             "req.body.refreshToken",

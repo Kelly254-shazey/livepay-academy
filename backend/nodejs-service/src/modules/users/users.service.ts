@@ -44,7 +44,12 @@ export class UsersService {
   }
 
   async getRecommendations(userId: string) {
-    return this.pythonClient.getCreatorRecommendations(userId);
+    return this.pythonClient.getCreatorRecommendations(userId).catch(() => ({
+      user_id: userId,
+      generated_at: new Date().toISOString(),
+      results: {
+        creators: []
+      }
+    }));
   }
 }
-

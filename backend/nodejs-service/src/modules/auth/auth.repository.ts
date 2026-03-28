@@ -196,6 +196,14 @@ export class AuthRepository {
     });
   }
 
+  findRefreshTokenByHash(tokenHash: string) {
+    return this.db.refreshToken.findFirst({
+      where: {
+        tokenHash
+      }
+    });
+  }
+
   revokeRefreshToken(id: string) {
     return this.db.refreshToken.update({
       where: { id },

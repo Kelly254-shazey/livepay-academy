@@ -22,5 +22,7 @@ export const COMMISSION_RULE = {
 export const ACCESS_TARGETS = ["live_session", "premium_content", "class", "lesson", "private_live_invite"] as const satisfies readonly AccessGrantTargetType[];
 
 export const INTERNAL_API_KEY_HEADER = "x-internal-api-key";
+export const REQUEST_ID_HEADER = "x-request-id";
+export const SOURCE_SERVICE_HEADER = "x-source-service";
+export const REQUEST_TIMESTAMP_HEADER = "x-request-timestamp";
 export const API_PREFIX = "/api/v1";
-

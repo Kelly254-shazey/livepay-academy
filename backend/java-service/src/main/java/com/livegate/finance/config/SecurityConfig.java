@@ -14,6 +14,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final InternalApiKeyFilter internalApiKeyFilter;
+    private final RequestTracingFilter requestTracingFilter;
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -25,8 +26,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(requestTracingFilter, InternalApiKeyFilter.class)
                 .addFilterBefore(internalApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 }
-

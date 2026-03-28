@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ProfileSettingsPayload } from '../shared';
 import { categories, formatCurrency, getSessionRoles } from '../shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, useMicrophonePermissions, type CameraType } from 'expo-camera';
 import { router } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
@@ -20,6 +20,8 @@ import {
   WalletCards,
 } from '@/components/cards';
 import {
+  Avatar,
+  Badge,
   Button,
   EmptyState,
   Heading,
@@ -28,6 +30,7 @@ import {
   Surface,
   TextField,
 } from '@/components/ui';
+import { queryKeys } from '@/services/query-keys';
 import { useSessionStore } from '@/store/session-store';
 import { theme } from '@/theme';
 
@@ -84,11 +87,13 @@ function SettingsToggle({
   body,
   value,
   onChange,
+  disabled = false,
 }: {
   title: string;
   body: string;
   value: boolean;
   onChange: (value: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <Surface style={{ flexBasis: '47%', flexGrow: 1, backgroundColor: theme.colors.surface }}>
@@ -96,8 +101,9 @@ function SettingsToggle({
       <Text style={{ fontSize: 13, lineHeight: 20, color: theme.colors.textSecondary }}>{body}</Text>
       <Button
         onPress={() => onChange(!value)}
-        title={value ? 'Enabled' : 'Disabled'}
+        title={disabled ? 'Required' : value ? 'Enabled' : 'Disabled'}
         variant={value ? 'primary' : 'secondary'}
+        disabled={disabled}
       />
     </Surface>
   );
@@ -130,11 +136,11 @@ export function CreatorDashboardScreen() {
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
   const roles = getSessionRoles(session);
   const query = useQuery({
-    queryKey: ['mobile-creator-dashboard'],
+    queryKey: queryKeys.creator.dashboard,
     queryFn: mobileApi.getCreatorDashboard,
   });
   const studioQuery = useQuery({
-    queryKey: ['mobile-creator-studio-feed'],
+    queryKey: queryKeys.creator.home,
     queryFn: mobileApi.getHomeFeed,
   });
   const liveCount = studioQuery.data?.trendingLives.length ?? 0;
@@ -196,7 +202,7 @@ export function CreatorDashboardScreen() {
 
 export function CreatorLivesScreen() {
   const query = useQuery({
-    queryKey: ['mobile-creator-lives'],
+    queryKey: queryKeys.creator.lives,
     queryFn: mobileApi.getHomeFeed,
   });
 
@@ -253,7 +259,7 @@ export function CreatorLivesScreen() {
 
 export function CreatorLibraryScreen() {
   const query = useQuery({
-    queryKey: ['mobile-creator-library'],
+    queryKey: queryKeys.creator.library,
     queryFn: mobileApi.getHomeFeed,
   });
 
@@ -316,7 +322,7 @@ export function CreatorLibraryScreen() {
 
 export function CreatorWalletScreen() {
   const query = useQuery({
-    queryKey: ['mobile-creator-wallet'],
+    queryKey: queryKeys.creator.dashboard,
     queryFn: mobileApi.getCreatorDashboard,
   });
 
@@ -415,6 +421,7 @@ export function CreatorProfileScreen() {
 }
 
 export function PayoutsScreen() {
+  const queryClient = useQueryClient();
   const form = useForm<z.infer<typeof payoutSchema>>({
     resolver: zodResolver(payoutSchema),
     defaultValues: { amount: 0, method: '', note: '' },
@@ -422,6 +429,13 @@ export function PayoutsScreen() {
 
   const mutation = useMutation({
     mutationFn: mobileApi.requestPayout,
+    onSuccess: async () => {
+      form.reset({ amount: 0, method: '', note: '' });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.creator.dashboard }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.creator.notifications }),
+      ]);
+    },
   });
 
   return (
@@ -451,7 +465,12 @@ export function PayoutsScreen() {
         />
         {mutation.isSuccess ? <Text style={{ color: '#205C47' }}>{mutation.data?.message ?? ''}</Text> : null}
         {mutation.isError ? <Text style={{ color: '#A34734' }}>{(mutation.error as Error).message}</Text> : null}
-        <Button onPress={form.handleSubmit((values) => mutation.mutate(values))} title="Submit payout request" />
+        <Button
+          onPress={form.handleSubmit((values) => mutation.mutate(values))}
+          title={mutation.isPending ? 'Submitting payout...' : 'Submit payout request'}
+          loading={mutation.isPending}
+          disabled={mutation.isPending}
+        />
       </Surface>
     </Screen>
   );
@@ -1099,7 +1118,7 @@ export function CreateLiveScreen() {
 
 export function CreatorNotificationsScreen() {
   const query = useQuery({
-    queryKey: ['mobile-creator-notifications'],
+    queryKey: queryKeys.creator.notifications,
     queryFn: mobileApi.getNotifications,
   });
 
@@ -1114,17 +1133,20 @@ export function CreatorNotificationsScreen() {
 }
 
 export function CreatorSettingsScreen() {
+  const queryClient = useQueryClient();
   const session = useSessionStore((state) => state.session);
   const setSession = useSessionStore((state) => state.setSession);
   const setPreferredRoles = useSessionStore((state) => state.setPreferredRoles);
+  const themePreference = useSessionStore((state) => state.themePreference);
+  const setThemePreference = useSessionStore((state) => state.setThemePreference);
   const query = useQuery({
-    queryKey: ['mobile-profile-settings', session?.user.id, 'creator'],
+    queryKey: [...queryKeys.profile.settings, session?.user.id, 'creator'],
     queryFn: mobileApi.getProfileSettings,
     enabled: Boolean(session),
   });
   const saveMutation = useMutation({
     mutationFn: mobileApi.saveProfileSettings,
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (!session || !result) return;
 
       setPreferredRoles(result.settings.roles, result.settings.defaultRole);
@@ -1139,6 +1161,11 @@ export function CreatorSettingsScreen() {
           roles: result.settings.roles,
         },
       });
+      setThemePreference(result.settings.appearancePreferences.theme);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.profile.settings }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.creator.dashboard }),
+      ]);
     },
   });
   const [settings, setSettings] = useState<ProfileSettingsPayload | null>(null);
@@ -1146,16 +1173,50 @@ export function CreatorSettingsScreen() {
   useEffect(() => {
     if (query.data) {
       setSettings(query.data);
+      setThemePreference(query.data.appearancePreferences.theme);
     }
-  }, [query.data]);
+  }, [query.data, setThemePreference]);
+
+  const connectedProviders = session?.user.authProviders?.length
+    ? session.user.authProviders.join(', ')
+    : 'local';
 
   return (
     <Screen>
-      <Heading title="Content creator settings" />
+      <Heading
+        title="Content creator settings"
+        eyebrow="Profile, payouts, and security"
+        body="These preferences now persist against the shared backend used by both mobile and web."
+      />
       {query.isLoading ? <LoadingState label="Loading content creator settings..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Settings unavailable" /> : null}
       {settings ? (
         <>
+          <Surface>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Avatar name={session?.user.fullName} size="lg" />
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold as any, color: theme.colors.text, fontFamily: theme.typography.displayFontFamily }}>
+                  {session?.user.fullName ?? settings.fullName}
+                </Text>
+                <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textSecondary }}>
+                  {session?.user.email ?? settings.email}
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <Badge variant={session?.user.emailVerified ? 'success' : 'warning'}>
+                {session?.user.emailVerified ? 'Email verified' : 'Email verification needed'}
+              </Badge>
+              <Badge variant={settings.privacyPreferences.publicCreatorProfile ? 'primary' : 'warning'}>
+                {settings.privacyPreferences.publicCreatorProfile ? 'Public creator profile' : 'Private creator profile'}
+              </Badge>
+              <Badge variant="primary">Theme {themePreference}</Badge>
+            </View>
+            <Text style={{ fontSize: theme.typography.sizes.sm, lineHeight: 22, color: theme.colors.textSecondary }}>
+              Connected sign-in methods: {connectedProviders}. Session tokens stay in secure storage on supported devices.
+            </Text>
+          </Surface>
           <Surface>
             <TextField
               label="Full name"
@@ -1164,9 +1225,13 @@ export function CreatorSettingsScreen() {
             />
             <TextField
               label="Email"
+              editable={false}
               onChangeText={(value) => setSettings((current) => (current ? { ...current, email: value } : current))}
               value={settings.email}
             />
+            <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>
+              Email changes are locked here and should go through a dedicated verified change flow.
+            </Text>
             <TextField
               label="Preferred payout method"
               onChangeText={(value) =>
@@ -1201,7 +1266,7 @@ export function CreatorSettingsScreen() {
               }
               value={settings.payoutPreferences?.note ?? ''}
             />
-            <Text style={{ fontSize: 13, color: '#60726C' }}>Default role</Text>
+            <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>Default role</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {settings.roles.map((role) => (
                 <CategoryChip
@@ -1212,13 +1277,14 @@ export function CreatorSettingsScreen() {
                 />
               ))}
             </View>
-            <Text style={{ fontSize: 13, color: '#60726C' }}>Appearance</Text>
+            <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>Appearance</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {appearanceModes.map((mode) => (
                 <CategoryChip
                   active={settings.appearancePreferences.theme === mode}
                   key={mode}
-                  onPress={() =>
+                  onPress={() => {
+                    setThemePreference(mode);
                     setSettings((current) =>
                       current
                         ? {
@@ -1229,8 +1295,8 @@ export function CreatorSettingsScreen() {
                             },
                           }
                         : current,
-                    )
-                  }
+                    );
+                  }}
                   title={mode}
                 />
               ))}
@@ -1283,19 +1349,11 @@ export function CreatorSettingsScreen() {
               value={settings.notificationPreferences.creatorAnnouncements}
             />
             <SettingsToggle
-              body="Keep security and system notices turned on."
-              onChange={(value) =>
-                setSettings((current) =>
-                  current
-                    ? {
-                        ...current,
-                        notificationPreferences: { ...current.notificationPreferences, systemAlerts: value },
-                      }
-                    : current,
-                )
-              }
+              body="Critical security and system notices stay locked on."
+              onChange={() => undefined}
               title="System alerts"
               value={settings.notificationPreferences.systemAlerts}
+              disabled
             />
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
@@ -1346,20 +1404,32 @@ export function CreatorSettingsScreen() {
             />
           </View>
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Current profile posture</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Current profile posture</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Default role: {formatRoleLabel(settings.defaultRole)}. Theme: {settings.appearancePreferences.theme}. Public content creator
               profile: {settings.privacyPreferences.publicCreatorProfile ? 'enabled' : 'disabled'}.
             </Text>
           </Surface>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SummaryTile
+              body="Fast read on how your content creator presence appears to the platform."
+              label="Discovery"
+              value={settings.privacyPreferences.communityVisibility ? 'Visible' : 'Limited'}
+            />
+            <SummaryTile
+              body="Current payout routing stored in your account settings."
+              label="Payout rail"
+              value={settings.payoutPreferences?.method || 'Not set'}
+            />
+          </View>
           {saveMutation.isSuccess ? (
             <Surface>
-              <Text style={{ fontSize: 14, color: '#196B59' }}>{saveMutation.data?.message ?? ''}</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.success }}>{saveMutation.data?.message ?? ''}</Text>
             </Surface>
           ) : null}
           {saveMutation.isError ? (
             <Surface>
-              <Text style={{ fontSize: 14, color: '#A64B40' }}>{(saveMutation.error as Error).message}</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.danger }}>{(saveMutation.error as Error).message}</Text>
             </Surface>
           ) : null}
           <Button

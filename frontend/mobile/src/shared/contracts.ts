@@ -115,14 +115,26 @@ export interface LiveSessionSummary {
   startTime: string;
   endTime?: string;
   isLive: boolean;
+  visibility?: 'public' | 'followers_only' | 'private';
   viewerCount: number;
   accessGranted: boolean;
 }
 
 export interface LiveRoomPayload {
   live: LiveSessionSummary;
+  roomAccessToken?: string;
+  roomId?: string;
   hostNotes?: string[];
   chatEnabled: boolean;
+}
+
+export interface LiveChatMessageRecord {
+  id: string;
+  body: string;
+  senderId: string;
+  authorName: string;
+  sentAt: string;
+  status?: string;
 }
 
 export interface PremiumContentSummary {
@@ -199,6 +211,16 @@ export interface ProfileSettingsPayload {
 export interface SaveProfileSettingsResponse {
   message: string;
   settings: ProfileSettingsPayload;
+}
+
+export interface ConfirmPurchaseResponse {
+  idempotent?: boolean;
+  grant?: {
+    id: string;
+    targetType: string;
+    targetId: string;
+    status: string;
+  };
 }
 
 export interface TransactionRecord {

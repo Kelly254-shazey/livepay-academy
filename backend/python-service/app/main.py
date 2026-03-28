@@ -1,6 +1,9 @@
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, Depends, FastAPI
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from app.api.routes.analytics import router as analytics_router
 from app.api.routes.fraud import router as fraud_router
@@ -62,6 +65,35 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="LiveGate Python Service", version="1.0.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def attach_request_context(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid4())
+    source_service = request.headers.get("x-source-service", "unknown")
+    request.state.request_id = request_id
+    request.state.source_service = source_service
+
+    try:
+        response = await call_next(request)
+    except Exception as error:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": str(error),
+                "traceId": request_id,
+            },
+            headers={
+                "x-request-id": request_id,
+                "x-source-service": "python-intelligence-service",
+            },
+        )
+
+    response.headers["x-request-id"] = request_id
+    response.headers["x-source-service"] = "python-intelligence-service"
+    return response
+
+
 app.include_router(health_router)
 
 internal_router = APIRouter(dependencies=[Depends(require_internal_api_key)])

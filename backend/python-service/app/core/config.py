@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     port: int = 8000
     database_url: str = "mysql+aiomysql://livegate:livegate@mysql:3306/livegate_python"
     source_database_url: str = "mysql+aiomysql://livegate:livegate@mysql:3306/livegate_nodejs"
-    redis_url: str = "redis://redis:6379/0"
+    redis_url: str | None = None
     internal_api_key: str = ""  # Must be set via environment variable
     cache_ttl_seconds: int = 300
     log_level: str = "INFO"

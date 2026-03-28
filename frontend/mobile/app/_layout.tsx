@@ -1,27 +1,18 @@
 import { ThemeProvider, DefaultTheme } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { AppProviders } from '@/providers/app-providers';
-import { theme } from '@/theme';
+import { useAppTheme, useResolvedThemeMode } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
 
-const navigationTheme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    background: theme.colors.background,
-    card: theme.colors.surface,
-    border: theme.colors.border,
-    text: theme.colors.text,
-    primary: theme.colors.accent,
-  },
-};
-
 export default function RootLayout() {
+  const appTheme = useAppTheme();
+  const resolvedThemeMode = useResolvedThemeMode();
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
@@ -36,8 +27,21 @@ export default function RootLayout() {
 
   if (!loaded) return null;
 
+  const navigationTheme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      background: appTheme.colors.background,
+      card: appTheme.colors.surface,
+      border: appTheme.colors.border,
+      text: appTheme.colors.text,
+      primary: appTheme.colors.accent,
+    },
+  };
+
   return (
     <AppProviders>
+      <StatusBar style={resolvedThemeMode === 'dark' ? 'light' : 'dark'} />
       <ThemeProvider value={navigationTheme}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />

@@ -2,9 +2,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ProfileSettingsPayload } from '../shared';
 import { categories, DEMO_LIVE_ACCESS_CODE, formatCurrency, getSessionRoles } from '../shared';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { mobileApi } from '@/api/client';
 import {
@@ -27,30 +27,38 @@ import {
   Badge,
   Avatar
 } from '@/components/ui';
+import { useLiveRoomRealtime } from '@/hooks/use-live-room-realtime';
+import { queryKeys } from '@/services/query-keys';
 import { useSessionStore } from '@/store/session-store';
 import { theme } from '@/theme';
 
-const sectionTitleStyle = { 
-  fontSize: theme.typography.sizes.xl, 
-  fontWeight: theme.typography.weights.bold as any, 
-  color: theme.colors.text,
-  marginBottom: theme.spacing.md,
-  fontFamily: theme.typography.displayFontFamily,
-};
+function getSectionTitleStyle() {
+  return {
+    fontSize: theme.typography.sizes.xl,
+    fontWeight: theme.typography.weights.bold as any,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
+    fontFamily: theme.typography.displayFontFamily,
+  };
+}
 
-const metaLabelStyle = { 
-  fontSize: theme.typography.sizes.xs, 
-  fontWeight: theme.typography.weights.medium as any,
-  color: theme.colors.textMuted,
-  textTransform: 'uppercase' as const,
-  letterSpacing: 1
-};
+function getMetaLabelStyle() {
+  return {
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: theme.typography.weights.medium as any,
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 1,
+  };
+}
 
-const metaValueStyle = { 
-  fontSize: theme.typography.sizes.lg, 
-  fontWeight: theme.typography.weights.semibold as any, 
-  color: theme.colors.text 
-};
+function getMetaValueStyle() {
+  return {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: theme.typography.weights.semibold as any,
+    color: theme.colors.text,
+  };
+}
 
 const searchFilters = [
   { title: 'All', value: 'all' },
@@ -88,6 +96,8 @@ const demoLiveVideoSources: Record<string, string> = {
 };
 
 const appearanceModes = ['system', 'light', 'dark'] as const;
+type ViewerCheckoutProductType = 'live' | 'content' | 'class';
+type AccessTargetType = 'live_session' | 'premium_content' | 'class';
 
 function formatRoleLabel(role: string) {
   if (role === 'creator') return 'Content Creator';
@@ -97,16 +107,71 @@ function formatRoleLabel(role: string) {
   return role;
 }
 
+function mapProductTypeToAccessTarget(productType: ViewerCheckoutProductType): AccessTargetType {
+  if (productType === 'live') return 'live_session';
+  if (productType === 'content') return 'premium_content';
+  return 'class';
+}
+
+function createPurchaseAttempt(productType: ViewerCheckoutProductType, productId: string) {
+  const nonce = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    providerReference: `mobile-${productType}-${productId}-${nonce}`,
+    idempotencyKey: `mobile-confirm-${productType}-${productId}-${nonce}`,
+  };
+}
+
+function getUnlockedRoute(
+  productType: ViewerCheckoutProductType,
+  productId: string,
+): `/(viewer)/live/${string}/room` | `/(viewer)/content/${string}` | `/(viewer)/class/${string}` {
+  if (productType === 'live') {
+    return `/(viewer)/live/${productId}/room`;
+  }
+
+  if (productType === 'content') {
+    return `/(viewer)/content/${productId}`;
+  }
+
+  return `/(viewer)/class/${productId}`;
+}
+
+function getUnlockedLabel(productType: ViewerCheckoutProductType) {
+  if (productType === 'live') {
+    return 'Enter live room';
+  }
+
+  if (productType === 'content') {
+    return 'Open content';
+  }
+
+  return 'Open class';
+}
+
+function getDetailQueryKey(productType: ViewerCheckoutProductType, productId: string) {
+  if (productType === 'live') {
+    return queryKeys.viewer.live(productId);
+  }
+
+  if (productType === 'content') {
+    return queryKeys.viewer.content(productId);
+  }
+
+  return queryKeys.viewer.classItem(productId);
+}
+
 function SettingsToggle({
   title,
   body,
   value,
   onChange,
+  disabled = false,
 }: {
   title: string;
   body: string;
   value: boolean;
   onChange: (value: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <Surface style={{ flex: 1, minWidth: '45%', backgroundColor: theme.colors.surface }}>
@@ -118,8 +183,9 @@ function SettingsToggle({
       </Text>
       <Button 
         onPress={() => onChange(!value)} 
-        title={value ? 'Enabled' : 'Disabled'} 
+        title={disabled ? 'Required' : value ? 'Enabled' : 'Disabled'} 
         variant={value ? 'primary' : 'secondary'} 
+        disabled={disabled}
       />
     </Surface>
   );
@@ -140,7 +206,7 @@ function SummaryTile({
 }) {
   return (
     <Surface style={{ flex: 1, minWidth: '45%', backgroundColor: theme.colors.surface }}>
-      <Text style={metaLabelStyle}>{label}</Text>
+      <Text style={getMetaLabelStyle()}>{label}</Text>
       <Text style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold as any, color: theme.colors.text, marginVertical: theme.spacing.xs }}>
         {value}
       </Text>
@@ -155,7 +221,7 @@ export function HomeScreen() {
   const session = useSessionStore((state) => state.session);
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
   const query = useQuery({
-    queryKey: ['mobile-home'],
+    queryKey: queryKeys.viewer.home,
     queryFn: mobileApi.getHomeFeed,
   });
   const sessionRoles = getSessionRoles(session);
@@ -304,7 +370,7 @@ export function HomeScreen() {
       
       {query.data && (
         <View style={{ gap: theme.spacing.md }}>
-          <Text style={sectionTitleStyle}>Watch now</Text>
+          <Text style={getSectionTitleStyle()}>Watch now</Text>
           {onlineLives.length ? (
             onlineLives.map((item) => (
               <Surface key={item.id} style={{ backgroundColor: theme.colors.surface }}>
@@ -320,12 +386,12 @@ export function HomeScreen() {
                 </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
                   <View style={{ gap: 4 }}>
-                    <Text style={metaLabelStyle}>Watching now</Text>
-                    <Text style={metaValueStyle}>{item.viewerCount}</Text>
+                    <Text style={getMetaLabelStyle()}>Watching now</Text>
+                    <Text style={getMetaValueStyle()}>{item.viewerCount}</Text>
                   </View>
                   <View style={{ gap: 4 }}>
-                    <Text style={metaLabelStyle}>Price</Text>
-                    <Text style={metaValueStyle}>{formatCurrency(item.price)}</Text>
+                    <Text style={getMetaLabelStyle()}>Price</Text>
+                    <Text style={getMetaValueStyle()}>{formatCurrency(item.price)}</Text>
                   </View>
                 </View>
                 <Button onPress={() => router.push(`/(viewer)/live/${item.id}`)} title="Watch this live" />
@@ -335,7 +401,7 @@ export function HomeScreen() {
             <EmptyState title="No one is live right now" body="Come back shortly to see content creators streaming live." />
           )}
           <View style={{ gap: theme.spacing.md }}>
-            <Text style={sectionTitleStyle}>Upcoming next</Text>
+            <Text style={getSectionTitleStyle()}>Upcoming next</Text>
             {query.data.trendingLives.filter((item) => !item.isLive).slice(0, 2).map((item) => (
               <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
             ))}
@@ -365,7 +431,7 @@ export function SearchScreen() {
   const [query, setQuery] = useState('');
   const [type, setType] = useState<(typeof searchFilters)[number]['value']>('all');
   const searchQuery = useQuery({
-    queryKey: ['mobile-search', query, type],
+    queryKey: queryKeys.viewer.search(query.trim(), type),
     queryFn: () => mobileApi.search({ query, type }),
     enabled: query.trim().length > 1,
   });
@@ -410,7 +476,7 @@ export function SearchScreen() {
 
 export function ViewerLibraryScreen() {
   const query = useQuery({
-    queryKey: ['viewer-dashboard-mobile'],
+    queryKey: queryKeys.viewer.dashboard,
     queryFn: mobileApi.getViewerDashboard,
   });
 
@@ -460,7 +526,7 @@ export function ViewerLibraryScreen() {
             </Text>
           </Surface>
           <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Purchased lives</Text>
+            <Text style={getSectionTitleStyle()}>Purchased lives</Text>
             {query.data.purchasedLives.items.length ? (
               query.data.purchasedLives.items.map((item) => (
                 <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
@@ -470,7 +536,7 @@ export function ViewerLibraryScreen() {
             )}
           </View>
           <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Saved premium content</Text>
+            <Text style={getSectionTitleStyle()}>Saved premium content</Text>
             {query.data.purchasedContent.items.length ? (
               query.data.purchasedContent.items.map((item) => (
                 <ContentCard content={item} key={item.id} onPress={() => router.push(`/(viewer)/content/${item.id}`)} />
@@ -480,7 +546,7 @@ export function ViewerLibraryScreen() {
             )}
           </View>
           <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Enrolled classes</Text>
+            <Text style={getSectionTitleStyle()}>Enrolled classes</Text>
             {query.data.enrolledClasses.items.length ? (
               query.data.enrolledClasses.items.map((item) => (
                 <ClassCard classItem={item} key={item.id} onPress={() => router.push(`/(viewer)/class/${item.id}`)} />
@@ -490,7 +556,7 @@ export function ViewerLibraryScreen() {
             )}
           </View>
           <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Followed Content Creators</Text>
+            <Text style={getSectionTitleStyle()}>Followed Content Creators</Text>
             {query.data.followedCreators.items.length ? (
               query.data.followedCreators.items.map((item) => (
                 <CreatorCard creator={item} key={item.id} onPress={() => router.push(`/(viewer)/creator/${item.id}`)} />
@@ -556,7 +622,7 @@ export function ViewerProfileScreen() {
 export function CategoryDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const query = useQuery({
-    queryKey: ['mobile-category', slug],
+    queryKey: queryKeys.viewer.category(slug ?? 'unknown'),
     queryFn: () => mobileApi.getCategoryDetail(slug),
     enabled: Boolean(slug),
   });
@@ -589,7 +655,7 @@ export function CategoryDetailScreen() {
 export function CreatorProfileScreen() {
   const { creatorId } = useLocalSearchParams<{ creatorId: string }>();
   const query = useQuery({
-    queryKey: ['mobile-creator', creatorId],
+    queryKey: queryKeys.viewer.creator(creatorId ?? 'unknown'),
     queryFn: () => mobileApi.getCreatorProfile(creatorId),
     enabled: Boolean(creatorId),
   });
@@ -616,21 +682,21 @@ export function CreatorProfileScreen() {
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Followers</Text>
-                <Text style={metaValueStyle}>{query.data.creator.followerCount}</Text>
+                <Text style={getMetaLabelStyle()}>Followers</Text>
+                <Text style={getMetaValueStyle()}>{query.data.creator.followerCount}</Text>
               </View>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Reviews</Text>
-                <Text style={metaValueStyle}>{query.data.creator.reviewCount}</Text>
+                <Text style={getMetaLabelStyle()}>Reviews</Text>
+                <Text style={getMetaValueStyle()}>{query.data.creator.reviewCount}</Text>
               </View>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Status</Text>
-                <Text style={metaValueStyle}>{query.data.creator.verificationStatus}</Text>
+                <Text style={getMetaLabelStyle()}>Status</Text>
+                <Text style={getMetaValueStyle()}>{query.data.creator.verificationStatus}</Text>
               </View>
             </View>
           </Surface>
           <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Reviews</Text>
+            <Text style={getSectionTitleStyle()}>Reviews</Text>
             {query.data.reviews.items.length ? (
               query.data.reviews.items.map((review) => (
                 <Surface key={review.id}>
@@ -646,7 +712,7 @@ export function CreatorProfileScreen() {
             )}
           </View>
           <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Upcoming lives</Text>
+            <Text style={getSectionTitleStyle()}>Upcoming lives</Text>
             {query.data.upcomingLives.items.length ? (
               query.data.upcomingLives.items.map((item) => (
                 <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
@@ -656,7 +722,7 @@ export function CreatorProfileScreen() {
             )}
           </View>
           <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Premium content</Text>
+            <Text style={getSectionTitleStyle()}>Premium content</Text>
             {query.data.premiumContent.items.length ? (
               query.data.premiumContent.items.map((item) => (
                 <ContentCard content={item} key={item.id} onPress={() => router.push(`/(viewer)/content/${item.id}`)} />
@@ -666,7 +732,7 @@ export function CreatorProfileScreen() {
             )}
           </View>
           <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Classes</Text>
+            <Text style={getSectionTitleStyle()}>Classes</Text>
             {query.data.classes.items.length ? (
               query.data.classes.items.map((item) => (
                 <ClassCard classItem={item} key={item.id} onPress={() => router.push(`/(viewer)/class/${item.id}`)} />
@@ -683,12 +749,14 @@ export function CreatorProfileScreen() {
 
 export function LiveDetailsScreen() {
   const { liveId } = useLocalSearchParams<{ liveId: string }>();
+  const session = useSessionStore((state) => state.session);
   const unlockedDemoLiveIds = useSessionStore((state) => state.unlockedDemoLiveIds);
   const unlockDemoLiveAccess = useSessionStore((state) => state.unlockDemoLiveAccess);
   const [accessCode, setAccessCode] = useState('');
   const [accessMessage, setAccessMessage] = useState<string | null>(null);
+  const isDemoSession = session?.isDemo === true;
   const query = useQuery({
-    queryKey: ['mobile-live', liveId],
+    queryKey: queryKeys.viewer.live(liveId ?? 'unknown'),
     queryFn: () => mobileApi.getLiveDetail(liveId),
     enabled: Boolean(liveId),
   });
@@ -701,84 +769,95 @@ export function LiveDetailsScreen() {
         <>
           {(() => {
             const hasAccess =
-              query.data.live.accessGranted || (liveId ? unlockedDemoLiveIds.includes(liveId) : false);
+              query.data.live.accessGranted || (isDemoSession && liveId ? unlockedDemoLiveIds.includes(liveId) : false);
+            const restrictionMessage = hasAccess
+              ? 'Access confirmed. Enter the live room now.'
+              : isDemoSession
+                ? `Choose one option to continue: make payment, or enter your M-Pesa/payment code if you already paid. For testing, use ${DEMO_LIVE_ACCESS_CODE}.`
+                : 'Live access is enforced by payment and visibility rules. Complete any required payment, follow the creator if required, or wait for a private invite, then refresh access.';
 
             return (
               <>
           <Surface>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Host</Text>
-                <Text style={metaValueStyle}>{query.data.live.creator.displayName}</Text>
+                <Text style={getMetaLabelStyle()}>Host</Text>
+                <Text style={getMetaValueStyle()}>{query.data.live.creator.displayName}</Text>
               </View>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Category</Text>
-                <Text style={metaValueStyle}>{getCategoryTitle(query.data.live.category)}</Text>
+                <Text style={getMetaLabelStyle()}>Category</Text>
+                <Text style={getMetaValueStyle()}>{getCategoryTitle(query.data.live.category)}</Text>
               </View>
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Starts</Text>
-                <Text style={metaValueStyle}>{query.data.live.startTime}</Text>
+                <Text style={getMetaLabelStyle()}>Starts</Text>
+                <Text style={getMetaValueStyle()}>{query.data.live.startTime}</Text>
               </View>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Price</Text>
-                <Text style={metaValueStyle}>{formatCurrency(query.data.live.price)}</Text>
+                <Text style={getMetaLabelStyle()}>Price</Text>
+                <Text style={getMetaValueStyle()}>{formatCurrency(query.data.live.price)}</Text>
               </View>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Watching now</Text>
-                <Text style={metaValueStyle}>{query.data.live.viewerCount} viewers</Text>
+                <Text style={getMetaLabelStyle()}>Watching now</Text>
+                <Text style={getMetaValueStyle()}>{query.data.live.viewerCount} viewers</Text>
               </View>
             </View>
           </Surface>
           <Surface>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
-              {hasAccess
-                ? 'Access confirmed. Enter the live room now.'
-                : `Choose one option to continue: make payment, or enter your M-Pesa/payment code if you already paid. For testing, use ${DEMO_LIVE_ACCESS_CODE}.`}
+              {restrictionMessage}
             </Text>
             {hasAccess ? (
               <Button onPress={() => router.replace(`/(viewer)/live/${liveId}/room`)} title="Enter live now" />
             ) : null}
             {!hasAccess ? (
               <>
-                <Button
-                  onPress={() =>
-                    router.push({
-                      pathname: '/(viewer)/checkout',
-                      params: { productId: liveId, productType: 'live' },
-                    })
-                  }
-                  title="Make payment"
-                />
-                <TextField
-                  label="M-Pesa or payment code"
-                  onChangeText={(value) => {
-                    setAccessCode(value);
-                    if (accessMessage) setAccessMessage(null);
-                  }}
-                  placeholder="Enter payment code"
-                  value={accessCode}
-                />
-                {accessMessage ? (
-                  <Text style={{ color: accessMessage.includes('granted') ? theme.colors.success : theme.colors.danger }}>
-                    {accessMessage}
-                  </Text>
-                ) : null}
-                <Button
-                  onPress={() => {
-                    if (accessCode.trim() === DEMO_LIVE_ACCESS_CODE) {
-                      unlockDemoLiveAccess(liveId);
-                      setAccessMessage('Payment code accepted. Opening live now.');
-                      router.replace(`/(viewer)/live/${liveId}/room`);
-                      return;
+                {query.data.live.price > 0 ? (
+                  <Button
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(viewer)/checkout',
+                        params: { productId: liveId, productType: 'live' },
+                      })
                     }
+                    title="Make payment"
+                  />
+                ) : null}
+                {isDemoSession ? (
+                  <>
+                    <TextField
+                      label="M-Pesa or payment code"
+                      onChangeText={(value) => {
+                        setAccessCode(value);
+                        if (accessMessage) setAccessMessage(null);
+                      }}
+                      placeholder="Enter payment code"
+                      value={accessCode}
+                    />
+                    {accessMessage ? (
+                      <Text style={{ color: accessMessage.includes('granted') ? theme.colors.success : theme.colors.danger }}>
+                        {accessMessage}
+                      </Text>
+                    ) : null}
+                    <Button
+                      onPress={() => {
+                        if (accessCode.trim() === DEMO_LIVE_ACCESS_CODE) {
+                          unlockDemoLiveAccess(liveId);
+                          setAccessMessage('Payment code accepted. Opening live now.');
+                          router.replace(`/(viewer)/live/${liveId}/room`);
+                          return;
+                        }
 
-                    setAccessMessage('Invalid payment code. Use 12345 for testing.');
-                  }}
-                  title="Enter with payment code"
-                  variant="secondary"
-                />
+                        setAccessMessage('Invalid payment code. Use 12345 for testing.');
+                      }}
+                      title="Enter with payment code"
+                      variant="secondary"
+                    />
+                  </>
+                ) : (
+                  <Button onPress={() => void query.refetch()} title="Refresh access" variant="secondary" />
+                )}
               </>
             ) : null}
           </Surface>
@@ -795,14 +874,27 @@ export function LiveRoomScreen() {
   const { liveId } = useLocalSearchParams<{ liveId: string }>();
   const unlockedDemoLiveIds = useSessionStore((state) => state.unlockedDemoLiveIds);
   const session = useSessionStore((state) => state.session);
-  const liveChatMessages = useSessionStore((state) => (liveId ? state.demoLiveChats[liveId] ?? [] : []));
+  const demoLiveChatMessages = useSessionStore((state) => (liveId ? state.demoLiveChats[liveId] ?? [] : []));
   const sendDemoLiveChatMessage = useSessionStore((state) => state.sendDemoLiveChatMessage);
   const [showChat, setShowChat] = useState(false);
   const [chatDraft, setChatDraft] = useState('');
+  const [chatFeedback, setChatFeedback] = useState<string | null>(null);
+  const isDemoSession = session?.isDemo === true;
   const query = useQuery({
-    queryKey: ['mobile-live-room', liveId],
+    queryKey: queryKeys.viewer.liveRoom(liveId ?? 'unknown'),
     queryFn: () => mobileApi.getLiveRoom(liveId),
     enabled: Boolean(liveId),
+  });
+  const realtime = useLiveRoomRealtime({
+    liveId,
+    enabled: Boolean(
+      liveId &&
+        query.data?.live.accessGranted &&
+        query.data?.roomAccessToken &&
+        !isDemoSession,
+    ),
+    roomAccessToken: query.data?.roomAccessToken,
+    initialViewerCount: query.data?.live.viewerCount ?? 0,
   });
   const videoPlayer = useVideoPlayer(
     demoLiveVideoSources[liveId ?? ''] ?? 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
@@ -819,15 +911,18 @@ export function LiveRoomScreen() {
       {query.data ? (
         <>
           {(() => {
+            const isDemoSession = session?.isDemo === true;
             const hasAccess =
-              query.data.live.accessGranted || (liveId ? unlockedDemoLiveIds.includes(liveId) : false);
+              query.data.live.accessGranted || (isDemoSession && liveId ? unlockedDemoLiveIds.includes(liveId) : false);
 
             if (!hasAccess) {
               return (
                 <Surface>
                   <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Live room is locked</Text>
                   <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
-                    Return to the live details screen to complete payment or enter the demo access code.
+                    {isDemoSession
+                      ? 'Return to the live details screen to complete payment or enter the demo access code.'
+                      : 'Return to the live details screen to complete any required payment or satisfy the live visibility rules.'}
                   </Text>
                   <Button onPress={() => router.replace(`/(viewer)/live/${liveId}`)} title="Back to live details" />
                 </Surface>
@@ -835,15 +930,55 @@ export function LiveRoomScreen() {
             }
 
             const scenes = demoStreamScenes[liveId ?? ''] ?? [];
+            const liveMessages = isDemoSession
+              ? demoLiveChatMessages.map((message, index) => ({
+                  id: message.id,
+                  authorName: message.author,
+                  body: message.body,
+                  senderId: `${message.role}-${index}`,
+                  sentAt: new Date(Date.now() - (demoLiveChatMessages.length - index) * 60_000).toISOString(),
+                }))
+              : realtime.messages;
+            const viewerCount = isDemoSession ? query.data.live.viewerCount : realtime.viewerCount;
+            const connectionMessage = !isDemoSession
+              ? realtime.connectionError ??
+                (realtime.connectionState === 'connecting'
+                  ? 'Connecting to secure live chat...'
+                  : realtime.connectionState === 'disconnected'
+                    ? 'Live connection dropped. Reconnecting when available.'
+                    : null)
+              : null;
             const handleSendChatMessage = () => {
               if (!liveId || !chatDraft.trim()) return;
 
-              sendDemoLiveChatMessage(liveId, {
-                author: session?.user.fullName ?? 'Viewer',
-                body: chatDraft.trim(),
-                role: 'viewer',
-              });
-              setChatDraft('');
+              if (isDemoSession) {
+                sendDemoLiveChatMessage(liveId, {
+                  author: session?.user.fullName ?? 'Viewer',
+                  body: chatDraft.trim(),
+                  role: 'viewer',
+                });
+                setChatDraft('');
+                setChatFeedback(null);
+                return;
+              }
+
+              if (!query.data.chatEnabled) {
+                setChatFeedback('Chat is paused until this live session is fully active.');
+                return;
+              }
+
+              if (realtime.connectionState !== 'connected') {
+                setChatFeedback('Live chat is still connecting. Try again in a moment.');
+                return;
+              }
+
+              try {
+                realtime.sendMessage(chatDraft.trim());
+                setChatDraft('');
+                setChatFeedback(null);
+              } catch (error) {
+                setChatFeedback(error instanceof Error ? error.message : 'Unable to send message right now.');
+              }
             };
 
             return (
@@ -861,7 +996,7 @@ export function LiveRoomScreen() {
                       <Badge variant="danger">Live</Badge>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(11,21,19,0.58)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: theme.radius.pill }}>
                         <Ionicons color="#fffaf2" name="eye-outline" size={16} />
-                        <Text style={{ color: '#fffaf2', fontSize: 13, fontWeight: '600' }}>{query.data.live.viewerCount}</Text>
+                        <Text style={{ color: '#fffaf2', fontSize: 13, fontWeight: '600' }}>{viewerCount}</Text>
                       </View>
                     </View>
 
@@ -885,7 +1020,7 @@ export function LiveRoomScreen() {
                           gap: 8,
                         }}
                       >
-                        {liveChatMessages.slice(-3).map((message) => (
+                        {liveMessages.slice(-3).map((message) => (
                           <View
                             key={message.id}
                             style={{
@@ -898,7 +1033,7 @@ export function LiveRoomScreen() {
                             }}
                           >
                             <Text style={{ color: '#b8d8cf', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
-                              {message.author}
+                              {message.authorName}
                             </Text>
                             <Text style={{ color: '#fffaf2', fontSize: 13, lineHeight: 18 }}>{message.body}</Text>
                           </View>
@@ -911,7 +1046,7 @@ export function LiveRoomScreen() {
                         <View style={{ width: 52, height: 52, borderRadius: theme.radius.pill, backgroundColor: 'rgba(11,21,19,0.62)', alignItems: 'center', justifyContent: 'center' }}>
                           <Ionicons color="#fffaf2" name="people-outline" size={22} />
                         </View>
-                        <Text style={{ color: '#fffaf2', fontSize: 12, fontWeight: '600' }}>{query.data.live.viewerCount}</Text>
+                        <Text style={{ color: '#fffaf2', fontSize: 12, fontWeight: '600' }}>{viewerCount}</Text>
                       </View>
                       <View style={{ alignItems: 'center', gap: 6 }}>
                         <View style={{ width: 52, height: 52, borderRadius: theme.radius.pill, backgroundColor: 'rgba(11,21,19,0.62)', alignItems: 'center', justifyContent: 'center' }}>
@@ -942,6 +1077,12 @@ export function LiveRoomScreen() {
                     </View>
                   </View>
 
+                  {connectionMessage ? (
+                    <Surface style={{ backgroundColor: theme.colors.surface }}>
+                      <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>{connectionMessage}</Text>
+                    </Surface>
+                  ) : null}
+
                   <Surface style={{ backgroundColor: theme.colors.surface }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <View style={{ flex: 1 }}>
@@ -951,9 +1092,26 @@ export function LiveRoomScreen() {
                           value={chatDraft}
                         />
                       </View>
-                      <Button onPress={handleSendChatMessage} title="Send" size="sm" />
+                      <Button
+                        onPress={handleSendChatMessage}
+                        title="Send"
+                        size="sm"
+                        disabled={
+                          !chatDraft.trim() ||
+                          (!isDemoSession &&
+                            (!query.data.chatEnabled || realtime.connectionState !== 'connected'))
+                        }
+                      />
                     </View>
-                    {liveChatMessages.slice(-5).map((message) => (
+                    {chatFeedback ? (
+                      <Text style={{ fontSize: 13, color: theme.colors.warning }}>{chatFeedback}</Text>
+                    ) : null}
+                    {!query.data.chatEnabled ? (
+                      <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>
+                        Chat is unavailable until the host has fully started the session.
+                      </Text>
+                    ) : null}
+                    {liveMessages.slice(-5).map((message) => (
                       <View
                         key={message.id}
                         style={{
@@ -964,7 +1122,7 @@ export function LiveRoomScreen() {
                         }}
                       >
                         <Text style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: theme.colors.textMuted }}>
-                          {message.author}
+                          {message.authorName}
                         </Text>
                         <Text style={{ fontSize: 14, lineHeight: 21, color: theme.colors.text }}>
                           {message.body}
@@ -975,7 +1133,7 @@ export function LiveRoomScreen() {
 
                   {query.data.hostNotes?.length ? (
                     <Surface style={{ backgroundColor: theme.colors.surface }}>
-                      <Text style={sectionTitleStyle}>Host notes</Text>
+                      <Text style={getSectionTitleStyle()}>Host notes</Text>
                       {query.data.hostNotes.map((note, index) => (
                         <Text key={`${note}-${index}`} style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
                           {note}
@@ -996,7 +1154,7 @@ export function LiveRoomScreen() {
 export function ContentDetailsScreen() {
   const { contentId } = useLocalSearchParams<{ contentId: string }>();
   const query = useQuery({
-    queryKey: ['mobile-content', contentId],
+    queryKey: queryKeys.viewer.content(contentId ?? 'unknown'),
     queryFn: () => mobileApi.getPremiumContentDetail(contentId),
     enabled: Boolean(contentId),
   });
@@ -1011,22 +1169,22 @@ export function ContentDetailsScreen() {
           <Surface>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Content Creator</Text>
-                <Text style={metaValueStyle}>{query.data.content.creator.displayName}</Text>
+                <Text style={getMetaLabelStyle()}>Content Creator</Text>
+                <Text style={getMetaValueStyle()}>{query.data.content.creator.displayName}</Text>
               </View>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Category</Text>
-                <Text style={metaValueStyle}>{getCategoryTitle(query.data.content.category)}</Text>
+                <Text style={getMetaLabelStyle()}>Category</Text>
+                <Text style={getMetaValueStyle()}>{getCategoryTitle(query.data.content.category)}</Text>
               </View>
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Price</Text>
-                <Text style={metaValueStyle}>{formatCurrency(query.data.content.price)}</Text>
+                <Text style={getMetaLabelStyle()}>Price</Text>
+                <Text style={getMetaValueStyle()}>{formatCurrency(query.data.content.price)}</Text>
               </View>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Attachments</Text>
-                <Text style={metaValueStyle}>{query.data.content.attachmentCount}</Text>
+                <Text style={getMetaLabelStyle()}>Attachments</Text>
+                <Text style={getMetaValueStyle()}>{query.data.content.attachmentCount}</Text>
               </View>
             </View>
           </Surface>
@@ -1039,13 +1197,13 @@ export function ContentDetailsScreen() {
             <Button
               onPress={() =>
                 query.data?.content.accessGranted
-                  ? undefined
+                  ? router.push('/(viewer)/(tabs)/library')
                   : router.push({
                       pathname: '/(viewer)/checkout',
                       params: { productId: contentId, productType: 'content' },
                     })
               }
-              title={query.data?.content.accessGranted ? 'Open content' : 'Continue to checkout'}
+              title={query.data?.content.accessGranted ? 'Open library' : 'Continue to checkout'}
             />
           </Surface>
         </>
@@ -1057,7 +1215,7 @@ export function ContentDetailsScreen() {
 export function ClassDetailsScreen() {
   const { classId } = useLocalSearchParams<{ classId: string }>();
   const query = useQuery({
-    queryKey: ['mobile-class', classId],
+    queryKey: queryKeys.viewer.classItem(classId ?? 'unknown'),
     queryFn: () => mobileApi.getClassDetail(classId),
     enabled: Boolean(classId),
   });
@@ -1072,27 +1230,27 @@ export function ClassDetailsScreen() {
           <Surface>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Teacher</Text>
-                <Text style={metaValueStyle}>{query.data.classItem.creator.displayName}</Text>
+                <Text style={getMetaLabelStyle()}>Teacher</Text>
+                <Text style={getMetaValueStyle()}>{query.data.classItem.creator.displayName}</Text>
               </View>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Category</Text>
-                <Text style={metaValueStyle}>{getCategoryTitle(query.data.classItem.category)}</Text>
+                <Text style={getMetaLabelStyle()}>Category</Text>
+                <Text style={getMetaValueStyle()}>{getCategoryTitle(query.data.classItem.category)}</Text>
               </View>
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Schedule</Text>
-                <Text style={metaValueStyle}>{query.data.classItem.scheduleLabel}</Text>
+                <Text style={getMetaLabelStyle()}>Schedule</Text>
+                <Text style={getMetaValueStyle()}>{query.data.classItem.scheduleLabel}</Text>
               </View>
               <View style={{ gap: 4 }}>
-                <Text style={metaLabelStyle}>Price</Text>
-                <Text style={metaValueStyle}>{formatCurrency(query.data.classItem.price)}</Text>
+                <Text style={getMetaLabelStyle()}>Price</Text>
+                <Text style={getMetaValueStyle()}>{formatCurrency(query.data.classItem.price)}</Text>
               </View>
             </View>
           </Surface>
           <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Lessons</Text>
+            <Text style={getSectionTitleStyle()}>Lessons</Text>
             {query.data.classItem.lessons.length ? (
               query.data.classItem.lessons.map((lesson) => (
                 <Surface key={lesson.id}>
@@ -1105,7 +1263,7 @@ export function ClassDetailsScreen() {
             )}
           </View>
           <View style={{ gap: 12 }}>
-            <Text style={sectionTitleStyle}>Materials</Text>
+            <Text style={getSectionTitleStyle()}>Materials</Text>
             {query.data.classItem.materials.length ? (
               query.data.classItem.materials.map((material, index) => (
                 <Surface key={`${material}-${index}`}>
@@ -1119,13 +1277,13 @@ export function ClassDetailsScreen() {
           <Button
             onPress={() =>
               query.data?.classItem.accessGranted
-                ? undefined
+                ? router.push('/(viewer)/(tabs)/library')
                 : router.push({
                     pathname: '/(viewer)/checkout',
                     params: { productId: classId, productType: 'class' },
                   })
             }
-            title={query.data?.classItem.accessGranted ? 'Continue class' : 'Continue to checkout'}
+            title={query.data?.classItem.accessGranted ? 'Open library' : 'Continue to checkout'}
           />
         </>
       ) : null}
@@ -1135,7 +1293,7 @@ export function ClassDetailsScreen() {
 
 export function NotificationsScreen() {
   const query = useQuery({
-    queryKey: ['mobile-notifications'],
+    queryKey: queryKeys.viewer.notifications,
     queryFn: mobileApi.getNotifications,
   });
 
@@ -1157,7 +1315,7 @@ export function NotificationsScreen() {
 
 export function ViewerWalletScreen() {
   const query = useQuery({
-    queryKey: ['mobile-viewer-transactions'],
+    queryKey: queryKeys.viewer.dashboard,
     queryFn: mobileApi.getViewerDashboard,
   });
 
@@ -1216,17 +1374,62 @@ export function ViewerWalletScreen() {
 export function CheckoutScreen() {
   const { productId, productType } = useLocalSearchParams<{
     productId: string;
-    productType: 'live' | 'content' | 'class';
+    productType: ViewerCheckoutProductType;
   }>();
+  const queryClient = useQueryClient();
   const [confirmed, setConfirmed] = useState(false);
-  const mutation = useQuery({
-    queryKey: ['mobile-checkout', productId, productType],
+  const checkoutQuery = useQuery({
+    queryKey: queryKeys.viewer.checkout(productId ?? 'unknown', productType ?? 'unknown'),
     queryFn: () =>
       mobileApi.createCheckout({
         productId,
         productType,
       }),
     enabled: Boolean(productId && productType),
+  });
+  const purchaseAttempt = useMemo(
+    () => (productId && productType ? createPurchaseAttempt(productType, productId) : null),
+    [productId, productType],
+  );
+  const confirmMutation = useMutation({
+    mutationFn: async () => {
+      if (!productId || !productType || !purchaseAttempt) {
+        throw new Error('Select a live, premium content item, or class before confirming payment.');
+      }
+
+      const targetType = mapProductTypeToAccessTarget(productType);
+      const result = await mobileApi.confirmPurchase({
+        targetType,
+        targetId: productId,
+        providerReference: purchaseAttempt.providerReference,
+        idempotencyKey: purchaseAttempt.idempotencyKey,
+      });
+
+      const accessState = await mobileApi.getAccessGrantStatus(targetType, productId);
+      if (!accessState.allowed) {
+        throw new Error('Payment was recorded but access is not active yet. Refresh and try again.');
+      }
+
+      return result;
+    },
+    onSuccess: async () => {
+      if (!productId || !productType) {
+        return;
+      }
+
+      setConfirmed(true);
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.viewer.home }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.viewer.dashboard }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.viewer.notifications }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.viewer.transactions }),
+        queryClient.invalidateQueries({ queryKey: getDetailQueryKey(productType, productId) }),
+        ...(productType === 'live'
+          ? [queryClient.invalidateQueries({ queryKey: queryKeys.viewer.liveRoom(productId) })]
+          : []),
+      ]);
+    },
   });
 
   return (
@@ -1238,63 +1441,80 @@ export function CheckoutScreen() {
           title="No product selected"
         />
       ) : null}
-      {mutation.isLoading ? <LoadingState label="Creating checkout session..." /> : null}
-      {mutation.isError ? <EmptyState body={(mutation.error as Error).message} title="Checkout unavailable" /> : null}
-      {mutation.data ? (
+      {checkoutQuery.isLoading ? <LoadingState label="Creating checkout session..." /> : null}
+      {checkoutQuery.isError ? <EmptyState body={(checkoutQuery.error as Error).message} title="Checkout unavailable" /> : null}
+      {checkoutQuery.data ? (
         <>
           <Surface>
-            <Text style={metaLabelStyle}>Session id</Text>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: '#10211D' }}>{mutation.data.id}</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{mutation.data.accessPolicy}</Text>
+            <Text style={getMetaLabelStyle()}>Session id</Text>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: '#10211D' }}>{checkoutQuery.data.id}</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>{checkoutQuery.data.accessPolicy}</Text>
           </Surface>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <SummaryTile
               body="What the buyer is charged at checkout."
               label="Total"
-              value={formatCurrency(mutation.data.totalAmount ?? mutation.data.amount, mutation.data.currency)}
+              value={formatCurrency(checkoutQuery.data.totalAmount ?? checkoutQuery.data.amount, checkoutQuery.data.currency)}
             />
             <SummaryTile
               body="Platform share retained after successful payment."
               label="Platform commission"
-              value={formatCurrency(mutation.data.platformCommissionAmount ?? 0, mutation.data.currency)}
+              value={formatCurrency(checkoutQuery.data.platformCommissionAmount ?? 0, checkoutQuery.data.currency)}
             />
             <SummaryTile
               body="Content creator share after LiveGate commission."
               label="Content creator earnings"
-              value={formatCurrency(mutation.data.creatorEarningsAmount ?? 0, mutation.data.currency)}
+              value={formatCurrency(checkoutQuery.data.creatorEarningsAmount ?? 0, checkoutQuery.data.currency)}
             />
             <SummaryTile
               body="Category connected to the item being unlocked."
               label="Category"
-              value={mutation.data.category ? getCategoryTitle(mutation.data.category) : 'General'}
+              value={checkoutQuery.data.category ? getCategoryTitle(checkoutQuery.data.category) : 'General'}
             />
           </View>
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>{mutation.data.title}</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#10211D' }}>{checkoutQuery.data.title}</Text>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
-              Content creator: {mutation.data.creatorName ?? 'LiveGate content creator'}
+              Content creator: {checkoutQuery.data.creatorName ?? 'LiveGate content creator'}
             </Text>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
               Product type: {productType}
             </Text>
             <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
-              Once payment succeeds, LiveGate verifies access before the item appears in your library.
+              Payment confirmation and access grants are resolved by the Node backend before the unlocked state is trusted.
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-              <Button onPress={() => setConfirmed(true)} title="Confirm payment preview" />
+              <Button
+                onPress={() => confirmMutation.mutate()}
+                title={confirmMutation.isPending ? 'Confirming payment...' : 'Confirm payment'}
+                loading={confirmMutation.isPending}
+                disabled={confirmMutation.isPending || confirmed}
+              />
               <Button onPress={() => router.replace('/(viewer)/(tabs)/library')} title="Return to library" variant="secondary" />
               <Button onPress={() => router.back()} title="Back" variant="ghost" />
             </View>
           </Surface>
+          {confirmMutation.isError ? (
+            <Surface>
+              <Text style={{ fontSize: 14, color: theme.colors.danger }}>
+                {(confirmMutation.error as Error).message}
+              </Text>
+            </Surface>
+          ) : null}
           {confirmed ? (
             <Surface>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#196B59' }}>Payment preview completed</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#196B59' }}>
+                {confirmMutation.data?.idempotent ? 'Existing access confirmed' : 'Payment confirmed'}
+              </Text>
               <Text style={{ fontSize: 14, lineHeight: 22, color: '#60726C' }}>
-                This demo flow simulates a successful payment state. In production, the backend verifies the transaction
-                before room join, content unlock, or class enrollment becomes active.
+                Access is active and the relevant viewer surfaces have been refreshed against backend truth.
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                <Button onPress={() => router.replace('/(viewer)/(tabs)/library')} title="Go to library" />
+                <Button
+                  onPress={() => router.replace(getUnlockedRoute(productType, productId))}
+                  title={getUnlockedLabel(productType)}
+                />
+                <Button onPress={() => router.replace('/(viewer)/(tabs)/library')} title="Go to library" variant="secondary" />
                 <Button onPress={() => router.push('/(viewer)/notifications')} title="Open notifications" variant="secondary" />
               </View>
             </Surface>
@@ -1306,17 +1526,20 @@ export function CheckoutScreen() {
 }
 
 export function SettingsScreen() {
+  const queryClient = useQueryClient();
   const session = useSessionStore((state) => state.session);
   const setSession = useSessionStore((state) => state.setSession);
   const setPreferredRoles = useSessionStore((state) => state.setPreferredRoles);
+  const themePreference = useSessionStore((state) => state.themePreference);
+  const setThemePreference = useSessionStore((state) => state.setThemePreference);
   const query = useQuery({
-    queryKey: ['mobile-profile-settings', session?.user.id, 'viewer'],
+    queryKey: [...queryKeys.profile.settings, session?.user.id, 'viewer'],
     queryFn: mobileApi.getProfileSettings,
     enabled: Boolean(session),
   });
   const saveMutation = useMutation({
     mutationFn: mobileApi.saveProfileSettings,
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (!session || !result) return;
 
       setPreferredRoles(result.settings.roles, result.settings.defaultRole);
@@ -1331,6 +1554,8 @@ export function SettingsScreen() {
           roles: result.settings.roles,
         },
       });
+      setThemePreference(result.settings.appearancePreferences.theme);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.profile.settings });
     },
   });
   const [settings, setSettings] = useState<ProfileSettingsPayload | null>(null);
@@ -1338,16 +1563,50 @@ export function SettingsScreen() {
   useEffect(() => {
     if (query.data) {
       setSettings(query.data);
+      setThemePreference(query.data.appearancePreferences.theme);
     }
-  }, [query.data]);
+  }, [query.data, setThemePreference]);
+
+  const connectedProviders = session?.user.authProviders?.length
+    ? session.user.authProviders.join(', ')
+    : 'local';
 
   return (
     <Screen>
-      <Heading title="Preferences" />
+      <Heading
+        title="Preferences"
+        eyebrow="Profile and security"
+        body="Your viewer workspace now stores real profile, privacy, notification, and appearance settings against the shared backend."
+      />
       {query.isLoading ? <LoadingState label="Loading settings..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Settings unavailable" /> : null}
       {settings ? (
         <>
+          <Surface>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Avatar name={session?.user.fullName} size="lg" />
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold as any, color: theme.colors.text, fontFamily: theme.typography.displayFontFamily }}>
+                  {session?.user.fullName ?? settings.fullName}
+                </Text>
+                <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textSecondary }}>
+                  {session?.user.email ?? settings.email}
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <Badge variant={session?.user.emailVerified ? 'success' : 'warning'}>
+                {session?.user.emailVerified ? 'Email verified' : 'Email verification needed'}
+              </Badge>
+              <Badge variant={session?.user.profileCompleted ? 'success' : 'warning'}>
+                {session?.user.profileCompleted ? 'Profile complete' : 'Profile incomplete'}
+              </Badge>
+              <Badge variant="primary">Theme {themePreference}</Badge>
+            </View>
+            <Text style={{ fontSize: theme.typography.sizes.sm, lineHeight: 22, color: theme.colors.textSecondary }}>
+              Connected sign-in methods: {connectedProviders}. Secure token storage is active on supported devices.
+            </Text>
+          </Surface>
           <Surface>
             <TextField
               label="Full name"
@@ -1356,10 +1615,14 @@ export function SettingsScreen() {
             />
             <TextField
               label="Email"
+              editable={false}
               onChangeText={(value) => setSettings((current) => (current ? { ...current, email: value } : current))}
               value={settings.email}
             />
-            <Text style={{ fontSize: 13, color: '#60726C' }}>Default role</Text>
+            <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>
+              Email changes are intentionally locked here and should go through a verified recovery flow.
+            </Text>
+            <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>Default role</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {settings.roles.map((role) => (
                 <CategoryChip
@@ -1372,13 +1635,14 @@ export function SettingsScreen() {
                 />
               ))}
             </View>
-            <Text style={{ fontSize: 13, color: '#60726C' }}>Appearance</Text>
+            <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>Appearance</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {appearanceModes.map((mode) => (
                 <CategoryChip
                   active={settings.appearancePreferences.theme === mode}
                   key={mode}
-                  onPress={() =>
+                  onPress={() => {
+                    setThemePreference(mode);
                     setSettings((current) =>
                       current
                         ? {
@@ -1389,8 +1653,8 @@ export function SettingsScreen() {
                             },
                           }
                         : current,
-                    )
-                  }
+                    );
+                  }}
                   title={mode}
                 />
               ))}
@@ -1443,19 +1707,11 @@ export function SettingsScreen() {
               value={settings.notificationPreferences.creatorAnnouncements}
             />
             <SettingsToggle
-              body="Keep security and system notices turned on."
-              onChange={(value) =>
-                setSettings((current) =>
-                  current
-                    ? {
-                        ...current,
-                        notificationPreferences: { ...current.notificationPreferences, systemAlerts: value },
-                      }
-                    : current,
-                )
-              }
+              body="Critical security and system notices stay locked on."
+              onChange={() => undefined}
               title="System alerts"
               value={settings.notificationPreferences.systemAlerts}
+              disabled
             />
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
@@ -1491,20 +1747,32 @@ export function SettingsScreen() {
             />
           </View>
           <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#171512' }}>Current profile posture</Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: '#6E675C' }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Current profile posture</Text>
+            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Default role: {formatRoleLabel(settings.defaultRole)}. Theme: {settings.appearancePreferences.theme}. Compact mode:{' '}
               {settings.appearancePreferences.compactMode ? 'enabled' : 'disabled'}.
             </Text>
           </Surface>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SummaryTile
+              body="Signed-in access state checked from the active session."
+              label="Auth posture"
+              value={session?.user.emailVerified ? 'Verified' : 'Pending'}
+            />
+            <SummaryTile
+              body="Controls how dense dashboard surfaces feel."
+              label="Layout"
+              value={settings.appearancePreferences.compactMode ? 'Compact' : 'Comfort'}
+            />
+          </View>
           {saveMutation.isSuccess ? (
             <Surface>
-              <Text style={{ fontSize: 14, color: '#196B59' }}>{saveMutation.data?.message ?? ''}</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.success }}>{saveMutation.data?.message ?? ''}</Text>
             </Surface>
           ) : null}
           {saveMutation.isError ? (
             <Surface>
-              <Text style={{ fontSize: 14, color: '#A64B40' }}>{(saveMutation.error as Error).message}</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.danger }}>{(saveMutation.error as Error).message}</Text>
             </Surface>
           ) : null}
           <Button

@@ -75,6 +75,19 @@ function initializeSocket(httpServer) {
                         liveSessionId,
                         senderId: socket.data.viewer.sub,
                         body: trimmedBody
+                    },
+                    include: {
+                        sender: {
+                            select: {
+                                firstName: true,
+                                lastName: true,
+                                creatorProfile: {
+                                    select: {
+                                        displayName: true
+                                    }
+                                }
+                            }
+                        }
                     }
                 });
                 io.to(roomName).emit("chat:message", {
@@ -82,6 +95,9 @@ function initializeSocket(httpServer) {
                     liveSessionId,
                     body: message.body,
                     senderId: message.senderId,
+                    authorName: message.sender?.creatorProfile?.displayName ??
+                        `${message.sender?.firstName ?? ""} ${message.sender?.lastName ?? ""}`.trim() ??
+                        "Viewer",
                     status: message.status,
                     sentAt: message.createdAt.toISOString()
                 });

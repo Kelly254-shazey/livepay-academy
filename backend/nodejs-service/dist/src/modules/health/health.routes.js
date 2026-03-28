@@ -23,6 +23,10 @@ function createHealthRouter(db, redis, dependencies) {
                 cache,
                 javaFinance,
                 pythonIntelligence
+            },
+            circuits: {
+                javaFinance: dependencies?.javaFinance?.getIntegrationStatus?.() ?? null,
+                pythonIntelligence: dependencies?.pythonIntelligence?.getIntegrationStatus?.() ?? null
             }
         });
     });

@@ -36,4 +36,10 @@ export const apiRoutes = {
   creatorDashboard: '/creator/dashboard',
   creatorPayouts: '/creator/payouts',
   adminDashboard: '/admin/dashboard',
+  accessConfirmPurchase: '/v1/access/transactions/confirm',
+  accessGrantStatus: (targetType: 'live_session' | 'premium_content' | 'class' | 'lesson' | 'private_live_invite', targetId: string) =>
+    `/v1/access/grants/${targetType}/${targetId}`,
+  liveJoinCheck: (id: string) => `/v1/lives/${id}/join-check`,
+  liveChatHistory: (id: string, limit = 40) => `/v1/lives/${id}/chat?limit=${limit}`,
+  liveAttendance: (id: string) => `/v1/lives/${id}/attendance`,
 } as const;

@@ -3,9 +3,10 @@ import { useSessionStore } from '@/store/session-store';
 
 export default function StaffLayout() {
   const hydrated = useSessionStore((state) => state.hydrated);
+  const authBootstrapStatus = useSessionStore((state) => state.authBootstrapStatus);
   const session = useSessionStore((state) => state.session);
 
-  if (!hydrated) {
+  if (!hydrated || authBootstrapStatus !== 'ready') {
     return null;
   }
 

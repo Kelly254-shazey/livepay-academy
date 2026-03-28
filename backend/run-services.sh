@@ -19,6 +19,9 @@ export PYTHON_DATABASE_URL=${PYTHON_DATABASE_URL:-}
 export PYTHON_SOURCE_DATABASE_URL=${PYTHON_SOURCE_DATABASE_URL:-}
 
 PIDS=()
+LAST_STARTED_PID=""
+PRIMARY_PID=""
+PYTHON_STARTED=0
 
 cleanup() {
   local exit_code=${1:-0}
@@ -60,13 +63,14 @@ start_java() {
     cd /app/java-service
     exec java -Dserver.port="${SERVER_PORT}" -Dserver.address=127.0.0.1 -jar target/java-service-1.0.0.jar
   ) &
-  PIDS+=($!)
+  LAST_STARTED_PID=$!
+  PIDS+=($LAST_STARTED_PID)
 }
 
 start_python() {
   if [ -z "${PYTHON_DATABASE_URL}" ]; then
-    echo "PYTHON_DATABASE_URL must be set for the Python service"
-    exit 1
+    echo "Skipping Python service because PYTHON_DATABASE_URL is not set"
+    return 0
   fi
 
   if [ -z "${PYTHON_SOURCE_DATABASE_URL}" ] && [ -n "${DATABASE_URL:-}" ]; then
@@ -74,8 +78,8 @@ start_python() {
   fi
 
   if [ -z "${PYTHON_SOURCE_DATABASE_URL}" ]; then
-    echo "PYTHON_SOURCE_DATABASE_URL must be set for the Python service"
-    exit 1
+    echo "Skipping Python service because PYTHON_SOURCE_DATABASE_URL is not set"
+    return 0
   fi
 
   echo "Starting Python service on port ${PYTHON_SERVICE_PORT}..."
@@ -86,7 +90,9 @@ start_python() {
     export SOURCE_DATABASE_URL="${PYTHON_SOURCE_DATABASE_URL}"
     exec python -m uvicorn app.main:app --host 127.0.0.1 --port "${PYTHON_SERVICE_PORT}"
   ) &
-  PIDS+=($!)
+  LAST_STARTED_PID=$!
+  PYTHON_STARTED=1
+  PIDS+=($LAST_STARTED_PID)
 }
 
 start_node() {
@@ -95,7 +101,8 @@ start_node() {
     cd /app/nodejs-service
     exec npm run start
   ) &
-  PIDS+=($!)
+  LAST_STARTED_PID=$!
+  PIDS+=($LAST_STARTED_PID)
 }
 
 case "$SERVICE_TYPE" in
@@ -103,17 +110,23 @@ case "$SERVICE_TYPE" in
     start_java
     start_python
     wait_for_port "Java service" "${SERVER_PORT}" || true
-    wait_for_port "Python service" "${PYTHON_SERVICE_PORT}" || true
+    if [ "${PYTHON_STARTED}" -eq 1 ]; then
+      wait_for_port "Python service" "${PYTHON_SERVICE_PORT}" || true
+    fi
     start_node
+    PRIMARY_PID="${LAST_STARTED_PID}"
     ;;
   "java")
     start_java
+    PRIMARY_PID="${LAST_STARTED_PID}"
     ;;
   "python")
     start_python
+    PRIMARY_PID="${LAST_STARTED_PID}"
     ;;
   "nodejs")
     start_node
+    PRIMARY_PID="${LAST_STARTED_PID}"
     ;;
   *)
     echo "Unknown SERVICE_TYPE: ${SERVICE_TYPE}"
@@ -121,4 +134,8 @@ case "$SERVICE_TYPE" in
     ;;
 esac
 
-wait -n
+if [ -n "${PRIMARY_PID}" ]; then
+  wait "${PRIMARY_PID}"
+else
+  wait -n
+fi

@@ -10,6 +10,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { EmailService } from "../../infrastructure/communications/email.service";
 import { GoogleAuthService } from "../../infrastructure/auth/google-auth.service";
 import { AuthRepository } from "./auth.repository";
+import { AuthSecurityService } from "./auth-security.service";
 
 type AuthUser = NonNullable<Awaited<ReturnType<AuthRepository["findUserById"]>>>;
 
@@ -61,7 +62,8 @@ export class AuthService {
     private readonly repository: AuthRepository,
     private readonly auditService: AuditService,
     private readonly emailService: EmailService,
-    private readonly googleAuthService: GoogleAuthService
+    private readonly googleAuthService: GoogleAuthService,
+    private readonly authSecurityService: AuthSecurityService
   ) {}
 
   async register(input: {
@@ -80,6 +82,9 @@ export class AuthService {
     const username = this.requireUsername(input.username);
     const dateOfBirth = this.requireDateOfBirth(input.dateOfBirth);
     const gender = this.requireGender(input.gender, input.customGender);
+    await this.authSecurityService.assertRegistrationAllowed(input.ipAddress);
+    await this.authSecurityService.recordRegistrationAttempt(input.ipAddress);
+    this.requireStrongPassword(input.password, [email, username, input.fullName]);
 
     const [existingEmail, existingUsername] = await Promise.all([
       this.repository.findUserByEmail(email),
@@ -133,8 +138,12 @@ export class AuthService {
   }
 
   async login(input: { identifier: string; password: string; ipAddress?: string; userAgent?: string }) {
-    const user = await this.findUserByIdentifier(input.identifier);
+    const normalizedIdentifier = input.identifier.trim().toLowerCase();
+    await this.authSecurityService.assertLoginAllowed(normalizedIdentifier, input.ipAddress);
+
+    const user = await this.findUserByIdentifier(normalizedIdentifier);
     if (!user || !user.passwordHash || !(await verifyPassword(user.passwordHash, input.password))) {
+      await this.authSecurityService.recordLoginFailure(normalizedIdentifier, input.ipAddress);
       throw new AppError("Invalid credentials.", 401);
     }
 
@@ -142,6 +151,7 @@ export class AuthService {
       throw new AppError("Account is suspended.", 403);
     }
 
+    await this.authSecurityService.clearLoginFailures(normalizedIdentifier, input.ipAddress);
     await this.repository.updateLastLogin(user.id);
     const tokens = await this.issueTokens(user.id, user.email, user.role, input.ipAddress, input.userAgent);
 
@@ -249,8 +259,26 @@ export class AuthService {
       throw new AppError("Refresh token is invalid.", 401);
     }
 
-    const matched = await this.repository.findActiveRefreshTokenByHash(sha256(refreshToken));
+    const refreshTokenHash = sha256(refreshToken);
+    const matched = await this.repository.findActiveRefreshTokenByHash(refreshTokenHash);
     if (!matched || matched.userId !== payload.sub) {
+      const existing = await this.repository.findRefreshTokenByHash(refreshTokenHash);
+      if (
+        existing &&
+        existing.userId === payload.sub &&
+        existing.revokedAt &&
+        existing.expiresAt > new Date()
+      ) {
+        await this.repository.revokeAllRefreshTokensForUser(existing.userId);
+        await this.auditService.record({
+          actorId: existing.userId,
+          action: "auth.refresh_token.reuse_detected",
+          resource: "refresh_token",
+          resourceId: existing.id,
+          ipAddress: context?.ipAddress
+        });
+      }
+
       throw new AppError("Refresh token is invalid.", 401);
     }
 
@@ -290,7 +318,7 @@ export class AuthService {
     }
   }
 
-  async requestEmailVerification(userId: string) {
+  async requestEmailVerification(userId: string, context?: { ipAddress?: string }) {
     const user = await this.repository.findUserById(userId);
     if (!user) {
       throw new AppError("User not found.", 404);
@@ -303,6 +331,8 @@ export class AuthService {
       };
     }
 
+    await this.authSecurityService.assertEmailVerificationRequestAllowed(userId, context?.ipAddress);
+    await this.authSecurityService.recordEmailVerificationRequest(userId, context?.ipAddress);
     const result = await this.sendEmailVerificationCode(user);
     return {
       accepted: true,
@@ -311,13 +341,18 @@ export class AuthService {
     };
   }
 
-  async confirmEmailVerification(input: { email: string; code: string }) {
-    const user = await this.repository.findUserByEmail(input.email.trim().toLowerCase());
+  async confirmEmailVerification(input: { email: string; code: string }, context?: { ipAddress?: string }) {
+    const normalizedEmail = input.email.trim().toLowerCase();
+    await this.authSecurityService.assertEmailVerificationConfirmationAllowed(normalizedEmail, context?.ipAddress);
+
+    const user = await this.repository.findUserByEmail(normalizedEmail);
     if (!user) {
+      await this.authSecurityService.recordEmailVerificationConfirmationFailure(normalizedEmail, context?.ipAddress);
       throw new AppError("Verification code is invalid or expired.", 400);
     }
 
     if (user.emailVerifiedAt) {
+      await this.authSecurityService.clearEmailVerificationConfirmationFailures(normalizedEmail, context?.ipAddress);
       return {
         accepted: true,
         message: "Email is already verified.",
@@ -333,11 +368,13 @@ export class AuthService {
     );
 
     if (!matching) {
+      await this.authSecurityService.recordEmailVerificationConfirmationFailure(normalizedEmail, context?.ipAddress);
       throw new AppError("Verification code is invalid or expired.", 400);
     }
 
     await this.repository.consumeOneTimeCode(matching.id);
     const updatedUser = await this.repository.updateEmailVerification(user.id, new Date());
+    await this.authSecurityService.clearEmailVerificationConfirmationFailures(normalizedEmail, context?.ipAddress);
 
     await this.auditService.record({
       actorId: updatedUser.id,
@@ -355,8 +392,12 @@ export class AuthService {
     };
   }
 
-  async requestPasswordReset(email: string) {
-    const user = await this.repository.findUserByEmail(email.trim().toLowerCase());
+  async requestPasswordReset(email: string, context?: { ipAddress?: string }) {
+    const normalizedEmail = email.trim().toLowerCase();
+    await this.authSecurityService.assertPasswordResetRequestAllowed(normalizedEmail, context?.ipAddress);
+    await this.authSecurityService.recordPasswordResetRequest(normalizedEmail, context?.ipAddress);
+
+    const user = await this.repository.findUserByEmail(normalizedEmail);
     if (!user) {
       return {
         accepted: true,
@@ -381,9 +422,13 @@ export class AuthService {
     };
   }
 
-  async confirmPasswordReset(input: { email: string; code: string; password: string }) {
-    const user = await this.repository.findUserByEmail(input.email.trim().toLowerCase());
+  async confirmPasswordReset(input: { email: string; code: string; password: string }, context?: { ipAddress?: string }) {
+    const normalizedEmail = input.email.trim().toLowerCase();
+    await this.authSecurityService.assertPasswordResetConfirmationAllowed(normalizedEmail, context?.ipAddress);
+
+    const user = await this.repository.findUserByEmail(normalizedEmail);
     if (!user) {
+      await this.authSecurityService.recordPasswordResetConfirmationFailure(normalizedEmail, context?.ipAddress);
       throw new AppError("Password reset code is invalid or expired.", 400);
     }
 
@@ -394,14 +439,21 @@ export class AuthService {
     );
 
     if (!matching) {
+      await this.authSecurityService.recordPasswordResetConfirmationFailure(normalizedEmail, context?.ipAddress);
       throw new AppError("Password reset code is invalid or expired.", 400);
     }
 
+    this.requireStrongPassword(input.password, [
+      user.email,
+      user.username,
+      `${user.firstName} ${user.lastName}`.trim()
+    ]);
     const passwordHash = await hashPassword(input.password);
     await this.repository.updatePassword(user.id, passwordHash);
     await this.ensureLocalIdentity(user);
     await this.repository.consumeOneTimeCode(matching.id);
     await this.repository.revokeAllRefreshTokensForUser(user.id);
+    await this.authSecurityService.clearPasswordResetConfirmationFailures(normalizedEmail, context?.ipAddress);
 
     const updatedUser = await this.repository.findUserById(user.id);
     if (!updatedUser) {
@@ -529,6 +581,11 @@ export class AuthService {
       throw new AppError("Password sign-in is already enabled for this account.", 409);
     }
 
+    this.requireStrongPassword(password, [
+      user.email,
+      user.username,
+      `${user.firstName} ${user.lastName}`.trim()
+    ]);
     await this.repository.updatePassword(user.id, await hashPassword(password));
     if (!existingLocalIdentity) {
       await this.repository.linkIdentity(user.id, {
@@ -748,6 +805,34 @@ export class AuthService {
       gender: normalized,
       customGender: null
     };
+  }
+
+  private requireStrongPassword(password: string, disallowedValues: string[] = []) {
+    if (
+      password.length < 12 ||
+      password.length > 72 ||
+      !/[a-z]/.test(password) ||
+      !/[A-Z]/.test(password) ||
+      !/\d/.test(password) ||
+      !/[^A-Za-z0-9]/.test(password)
+    ) {
+      throw new AppError(
+        "Password must be 12-72 characters and include uppercase, lowercase, number, and symbol.",
+        400
+      );
+    }
+
+    const normalizedPassword = password.toLowerCase();
+    const forbiddenFragments = disallowedValues
+      .flatMap((value) => value.split(/[^a-zA-Z0-9]+/))
+      .map((value) => value.trim().toLowerCase())
+      .filter((value) => value.length >= 3);
+
+    for (const fragment of forbiddenFragments) {
+      if (normalizedPassword.includes(fragment)) {
+        throw new AppError("Password must not contain your name, email, or username.", 400);
+      }
+    }
   }
 
   private async findUserByIdentifier(identifier: string) {

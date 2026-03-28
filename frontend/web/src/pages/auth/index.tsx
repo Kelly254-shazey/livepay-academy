@@ -125,13 +125,22 @@ function DemoAccountPanel({
 
 const signInSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(1).max(256),
 });
+
+const passwordSchema = z
+  .string()
+  .min(12, 'Use at least 12 characters.')
+  .max(72, 'Use 72 characters or fewer.')
+  .regex(/[a-z]/, 'Include a lowercase letter.')
+  .regex(/[A-Z]/, 'Include an uppercase letter.')
+  .regex(/\d/, 'Include a number.')
+  .regex(/[^A-Za-z0-9]/, 'Include a symbol.');
 
 const signUpSchema = z.object({
   fullName: z.string().min(2),
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
 });
 
 const forgotSchema = z.object({
@@ -141,7 +150,7 @@ const forgotSchema = z.object({
 const resetSchema = z.object({
   email: z.string().email(),
   code: z.string().trim().length(6),
-  password: z.string().min(8),
+  password: passwordSchema,
 });
 
 export function RoleSelectionPage() {

@@ -25,6 +25,9 @@ function listResponse(items) {
         pageSize: items.length
     };
 }
+function isRecord(value) {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 function toNumber(value) {
     if (typeof value === "number") {
         return value;
@@ -44,6 +47,12 @@ function splitFullName(fullName) {
         firstName: firstName || "LiveGate",
         lastName: rest.join(" ") || "User"
     };
+}
+function readBoolean(value, fallback) {
+    return typeof value === "boolean" ? value : fallback;
+}
+function readString(value, fallback = "") {
+    return typeof value === "string" ? value : fallback;
 }
 function normalizeCategorySlug(value) {
     if (!value) {
@@ -112,6 +121,9 @@ function formatScheduleLabel(startsAt, endsAt) {
     }
     return "Schedule to be announced";
 }
+function getAllowedSettingsRoles(role) {
+    return [role];
+}
 class FrontendService {
     db;
     authService;
@@ -159,21 +171,21 @@ class FrontendService {
         });
         return { message: "Signed out successfully." };
     }
-    async resendEmailVerification(actor) {
-        const result = await this.authService.requestEmailVerification(actor.userId);
+    async resendEmailVerification(actor, context) {
+        const result = await this.authService.requestEmailVerification(actor.userId, context);
         return {
             message: result.message,
             verification: "verification" in result ? result.verification : undefined
         };
     }
-    async verifyEmail(input) {
-        return this.authService.confirmEmailVerification(input);
+    async verifyEmail(input, context) {
+        return this.authService.confirmEmailVerification(input, context);
     }
-    async forgotPassword(email) {
-        return this.authService.requestPasswordReset(email);
+    async forgotPassword(email, context) {
+        return this.authService.requestPasswordReset(email, context);
     }
-    async resetPassword(input) {
-        return this.authService.confirmPasswordReset(input);
+    async resetPassword(input, context) {
+        return this.authService.confirmPasswordReset(input, context);
     }
     async completeProfile(actor, input) {
         return this.authService.completeProfile(actor.userId, input);
@@ -183,6 +195,108 @@ class FrontendService {
     }
     async linkPasswordAccount(actor, password) {
         return this.authService.linkPassword(actor.userId, password);
+    }
+    async getProfileSettings(actor) {
+        const user = await this.db.user.findUnique({
+            where: { id: actor.userId },
+            include: { creatorProfile: true }
+        });
+        if (!user) {
+            throw new app_error_1.AppError("Account is unavailable.", 403);
+        }
+        const allowedRoles = getAllowedSettingsRoles(user.role);
+        const settings = isRecord(user.settings) ? user.settings : {};
+        const appearance = isRecord(settings.appearancePreferences) ? settings.appearancePreferences : {};
+        const privacy = isRecord(settings.privacyPreferences) ? settings.privacyPreferences : {};
+        const payout = isRecord(settings.payoutPreferences) ? settings.payoutPreferences : {};
+        const notifications = isRecord(user.notificationPreferences) ? user.notificationPreferences : {};
+        return {
+            fullName: `${user.firstName} ${user.lastName}`.trim(),
+            email: user.email,
+            roles: allowedRoles,
+            defaultRole: allowedRoles.includes(settings.defaultRole)
+                ? settings.defaultRole
+                : allowedRoles[0],
+            notificationPreferences: {
+                liveReminders: readBoolean(notifications.liveReminders, true),
+                purchaseUpdates: readBoolean(notifications.purchaseUpdates, true),
+                creatorAnnouncements: readBoolean(notifications.creatorAnnouncements, true),
+                systemAlerts: true
+            },
+            appearancePreferences: {
+                theme: appearance.theme === "light" || appearance.theme === "dark" || appearance.theme === "system"
+                    ? appearance.theme
+                    : "system",
+                compactMode: readBoolean(appearance.compactMode, false)
+            },
+            privacyPreferences: {
+                publicCreatorProfile: readBoolean(privacy.publicCreatorProfile, Boolean(user.creatorProfile)),
+                communityVisibility: readBoolean(privacy.communityVisibility, true)
+            },
+            payoutPreferences: user.role === "creator" || user.role === "admin"
+                ? {
+                    method: readString(payout.method, "Bank transfer"),
+                    note: readString(payout.note).trim() || undefined
+                }
+                : undefined
+        };
+    }
+    async saveProfileSettings(actor, input) {
+        const user = await this.db.user.findUnique({
+            where: { id: actor.userId },
+            include: { creatorProfile: true }
+        });
+        if (!user) {
+            throw new app_error_1.AppError("Account is unavailable.", 403);
+        }
+        const normalizedEmail = input.email.trim().toLowerCase();
+        if (normalizedEmail !== user.email) {
+            throw new app_error_1.AppError("Email changes require a dedicated verification flow.", 400);
+        }
+        const allowedRoles = getAllowedSettingsRoles(user.role);
+        if (input.roles.length !== allowedRoles.length ||
+            input.roles.some((role) => !allowedRoles.includes(role))) {
+            throw new app_error_1.AppError("Account roles cannot be changed from profile settings.", 403);
+        }
+        if (!allowedRoles.includes(input.defaultRole)) {
+            throw new app_error_1.AppError("Default role is invalid for this account.", 400);
+        }
+        const names = splitFullName(input.fullName);
+        const payoutPreferences = user.role === "creator" || user.role === "admin"
+            ? {
+                method: input.payoutPreferences?.method?.trim() || "Bank transfer",
+                note: input.payoutPreferences?.note?.trim() || undefined
+            }
+            : undefined;
+        await this.db.user.update({
+            where: { id: user.id },
+            data: {
+                firstName: names.firstName,
+                lastName: names.lastName,
+                settings: {
+                    defaultRole: input.defaultRole,
+                    appearancePreferences: {
+                        theme: input.appearancePreferences.theme,
+                        compactMode: input.appearancePreferences.compactMode
+                    },
+                    privacyPreferences: {
+                        publicCreatorProfile: input.privacyPreferences.publicCreatorProfile,
+                        communityVisibility: input.privacyPreferences.communityVisibility
+                    },
+                    payoutPreferences
+                },
+                notificationPreferences: {
+                    liveReminders: input.notificationPreferences.liveReminders,
+                    purchaseUpdates: input.notificationPreferences.purchaseUpdates,
+                    creatorAnnouncements: input.notificationPreferences.creatorAnnouncements,
+                    systemAlerts: true
+                }
+            }
+        });
+        return {
+            message: "Profile settings saved successfully.",
+            settings: await this.getProfileSettings(actor)
+        };
     }
     async getHomeFeed() {
         const [creators, lives, content, classes] = await Promise.all([
@@ -424,7 +538,7 @@ class FrontendService {
             classes: listResponse(await Promise.all(classes.map((item) => this.toClassSummary(item))))
         };
     }
-    async getLiveDetail(liveId) {
+    async getLiveDetail(liveId, actor) {
         const live = await this.db.liveSession.findUnique({
             where: { id: liveId },
             include: {
@@ -456,12 +570,12 @@ class FrontendService {
             take: 6
         });
         return {
-            live: (await this.toLiveSummaries([live]))[0],
-            relatedLives: listResponse(await this.toLiveSummaries(related))
+            live: (await this.toLiveSummaries([live], actor))[0],
+            relatedLives: listResponse(await this.toLiveSummaries(related, actor))
         };
     }
     async getLiveRoom(actor, liveId) {
-        await this.accessService.assertLiveJoinAccess(actor.userId, actor.role, liveId);
+        const joinAccess = await this.accessService.assertLiveJoinAccess(actor.userId, actor.role, liveId);
         const live = await this.db.liveSession.findUnique({
             where: { id: liveId },
             include: {
@@ -474,13 +588,15 @@ class FrontendService {
         if (!live) {
             throw new app_error_1.AppError("Live unavailable.", 404);
         }
-        const liveSummary = (await this.toLiveSummaries([live], actor.userId))[0];
+        const liveSummary = (await this.toLiveSummaries([live], actor))[0];
         const roomMetadata = live.roomMetadata;
         return {
             live: {
                 ...liveSummary,
                 accessGranted: true
             },
+            roomAccessToken: joinAccess.roomAccessToken,
+            roomId: live.roomId,
             hostNotes: Array.isArray(roomMetadata?.hostNotes)
                 ? roomMetadata.hostNotes.filter((item) => typeof item === "string")
                 : undefined,
@@ -617,7 +733,7 @@ class FrontendService {
             purchasedLives: listResponse(await this.toLiveSummaries(grants
                 .filter((item) => item.targetType === "live_session")
                 .map((item) => liveById.get(item.targetId))
-                .filter((item) => Boolean(item)), actor.userId)),
+                .filter((item) => Boolean(item)), actor)),
             purchasedContent: listResponse(await Promise.all(grants
                 .filter((item) => item.targetType === "premium_content")
                 .map((item) => contentById.get(item.targetId))
@@ -935,9 +1051,21 @@ class FrontendService {
         throw new app_error_1.AppError("Unsupported checkout product.", 400);
     }
     async requestPayout(actor, input) {
+        if (actor.role !== "admin") {
+            const creatorProfile = await this.db.creatorProfile.findUnique({
+                where: { userId: actor.userId },
+                select: { verificationStatus: true, payoutEligible: true }
+            });
+            if (!creatorProfile) {
+                throw new app_error_1.AppError("Complete your creator profile before requesting payouts.", 403);
+            }
+            if (creatorProfile.verificationStatus !== "approved" || !creatorProfile.payoutEligible) {
+                throw new app_error_1.AppError("Creator verification must be approved before requesting payouts.", 403);
+            }
+        }
         await this.walletsService.requestPayout({ userId: actor.userId, role: actor.role }, input.amount, env_1.env.DEFAULT_CURRENCY);
         return {
-            message: `Payout request submitted via ${input.method}.`
+            message: "Payout request submitted successfully."
         };
     }
     async getViewerTransactions(userId) {
@@ -1112,10 +1240,12 @@ class FrontendService {
         }
         return "Video live";
     }
-    async toLiveSummaries(lives, actorUserId) {
+    async toLiveSummaries(lives, actor) {
         const liveIds = lives.map((item) => item.id);
         const creatorIds = Array.from(new Set(lives.map((item) => item.creator.id)));
-        const [viewerCounts, creatorStats, grants] = await Promise.all([
+        const actorUserId = actor?.userId;
+        const actorRole = actor?.role;
+        const [viewerCounts, creatorStats, grants, follows, privateInvites] = await Promise.all([
             liveIds.length
                 ? this.db.liveParticipant.groupBy({
                     by: ["liveSessionId"],
@@ -1138,23 +1268,57 @@ class FrontendService {
                         status: "active"
                     }
                 })
+                : Promise.resolve([]),
+            actorUserId && creatorIds.length
+                ? this.db.follow.findMany({
+                    where: {
+                        followerId: actorUserId,
+                        creatorId: { in: creatorIds }
+                    },
+                    select: { creatorId: true }
+                })
+                : Promise.resolve([]),
+            actorUserId && liveIds.length
+                ? this.db.accessGrant.findMany({
+                    where: {
+                        userId: actorUserId,
+                        targetId: { in: liveIds },
+                        status: "active",
+                        targetType: "private_live_invite"
+                    },
+                    select: { targetId: true }
+                })
                 : Promise.resolve([])
         ]);
         const viewerCountById = new Map(viewerCounts.map((item) => [item.liveSessionId, item._count._all]));
         const grantedIds = new Set(grants.map((item) => item.targetId));
-        return lives.map((item) => ({
-            id: item.id,
-            title: item.title,
-            description: item.description ?? "",
-            creator: this.toCreatorSummary(item.creator, creatorStats.get(item.creator.id)),
-            category: normalizeCategorySlug(item.category?.slug ?? item.category?.name),
-            price: toNumber(item.price),
-            startTime: (item.startedAt ?? item.scheduledFor ?? item.createdAt).toISOString(),
-            endTime: item.endedAt?.toISOString(),
-            isLive: item.status === "live",
-            viewerCount: viewerCountById.get(item.id) ?? 0,
-            accessGranted: item.creatorId === actorUserId || !item.isPaid || grantedIds.has(item.id)
-        }));
+        const followedCreatorIds = new Set(follows.map((item) => item.creatorId));
+        const privateInviteIds = new Set(privateInvites.map((item) => item.targetId));
+        return lives.map((item) => {
+            const visibilityGranted = item.visibility === "public"
+                ? true
+                : item.visibility === "followers_only"
+                    ? followedCreatorIds.has(item.creatorId)
+                    : privateInviteIds.has(item.id) || grantedIds.has(item.id);
+            const paymentGranted = !item.isPaid || grantedIds.has(item.id);
+            return {
+                id: item.id,
+                title: item.title,
+                description: item.description ?? "",
+                creator: this.toCreatorSummary(item.creator, creatorStats.get(item.creator.id)),
+                category: normalizeCategorySlug(item.category?.slug ?? item.category?.name),
+                price: toNumber(item.price),
+                startTime: (item.startedAt ?? item.scheduledFor ?? item.createdAt).toISOString(),
+                endTime: item.endedAt?.toISOString(),
+                isLive: item.status === "live",
+                visibility: item.visibility,
+                viewerCount: viewerCountById.get(item.id) ?? 0,
+                accessGranted: actorRole === "admin" ||
+                    actorRole === "moderator" ||
+                    item.creatorId === actorUserId ||
+                    (visibilityGranted && paymentGranted)
+            };
+        });
     }
     async toPremiumContentSummary(content, actorUserId) {
         const grant = actorUserId && content.isPaid

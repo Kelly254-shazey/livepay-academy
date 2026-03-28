@@ -150,6 +150,13 @@ class AuthRepository {
             }
         });
     }
+    findRefreshTokenByHash(tokenHash) {
+        return this.db.refreshToken.findFirst({
+            where: {
+                tokenHash
+            }
+        });
+    }
     revokeRefreshToken(id) {
         return this.db.refreshToken.update({
             where: { id },

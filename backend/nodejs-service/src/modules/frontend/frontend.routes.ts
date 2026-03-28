@@ -3,7 +3,7 @@ import { Router } from "express";
 import { asyncHandler } from "../../common/http/async-handler";
 import { getStringParam } from "../../common/http/params";
 import { validate } from "../../common/http/validate";
-import { authenticate } from "../../common/middleware/authenticate";
+import { authenticate, optionalAuthenticate } from "../../common/middleware/authenticate";
 import { authorize } from "../../common/middleware/authorize";
 import {
   categorySlugParamsSchema,
@@ -15,6 +15,7 @@ import {
   frontendForgotPasswordSchema,
   frontendGoogleAuthSchema,
   frontendLinkPasswordSchema,
+  profileSettingsSchema,
   frontendRefreshSchema,
   frontendVerifyEmailSchema,
   frontendCompleteProfileSchema,
@@ -107,7 +108,9 @@ export function createFrontendRouter(service: FrontendService) {
     "/auth/verify-email",
     validate(frontendVerifyEmailSchema),
     asyncHandler(async (req, res) => {
-      const result = await service.verifyEmail(req.body);
+      const result = await service.verifyEmail(req.body, {
+        ipAddress: req.ip
+      });
       res.json(result);
     })
   );
@@ -117,7 +120,9 @@ export function createFrontendRouter(service: FrontendService) {
     authenticate,
     validate(emptyBodySchema),
     asyncHandler(async (req, res) => {
-      const result = await service.resendEmailVerification(req.auth!);
+      const result = await service.resendEmailVerification(req.auth!, {
+        ipAddress: req.ip
+      });
       res.json(result);
     })
   );
@@ -126,7 +131,9 @@ export function createFrontendRouter(service: FrontendService) {
     "/auth/forgot-password",
     validate(frontendForgotPasswordSchema),
     asyncHandler(async (req, res) => {
-      const result = await service.forgotPassword(req.body.email);
+      const result = await service.forgotPassword(req.body.email, {
+        ipAddress: req.ip
+      });
       res.json(result);
     })
   );
@@ -135,7 +142,9 @@ export function createFrontendRouter(service: FrontendService) {
     "/auth/reset-password",
     validate(frontendResetPasswordSchema),
     asyncHandler(async (req, res) => {
-      const result = await service.resetPassword(req.body);
+      const result = await service.resetPassword(req.body, {
+        ipAddress: req.ip
+      });
       res.json(result);
     })
   );
@@ -170,6 +179,25 @@ export function createFrontendRouter(service: FrontendService) {
     })
   );
 
+  router.get(
+    "/users/settings",
+    authenticate,
+    asyncHandler(async (req, res) => {
+      const result = await service.getProfileSettings(req.auth!);
+      res.json(result);
+    })
+  );
+
+  router.put(
+    "/users/settings",
+    authenticate,
+    validate(profileSettingsSchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.saveProfileSettings(req.auth!, req.body);
+      res.json(result);
+    })
+  );
+
   router.get("/home", asyncHandler(async (_req, res) => res.json(await service.getHomeFeed())));
 
   router.get(
@@ -192,9 +220,10 @@ export function createFrontendRouter(service: FrontendService) {
 
   router.get(
     "/lives/:liveId",
+    optionalAuthenticate,
     validate(liveIdParamsSchema),
     asyncHandler(async (req, res) => {
-      const result = await service.getLiveDetail(getStringParam(req.params.liveId));
+      const result = await service.getLiveDetail(getStringParam(req.params.liveId), req.auth);
       res.json(result);
     })
   );

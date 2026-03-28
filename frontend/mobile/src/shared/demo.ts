@@ -74,6 +74,7 @@ const live = (
   startTime: overrides.startTime ?? NOW,
   endTime: overrides.endTime,
   isLive: overrides.isLive ?? true,
+  visibility: overrides.visibility ?? 'public',
   viewerCount: overrides.viewerCount ?? 126,
   accessGranted: overrides.accessGranted ?? true,
 });

@@ -5,16 +5,6 @@ exports.connectRedis = connectRedis;
 const redis_1 = require("redis");
 const env_1 = require("../../config/env");
 const logger_1 = require("../../config/logger");
-const redisClient = (0, redis_1.createClient)({
-    url: env_1.env.REDIS_URL,
-    socket: {
-        connectTimeout: 1000,
-        reconnectStrategy: false
-    }
-});
-redisClient.on("error", (error) => {
-    logger_1.logger.error({ error }, "Redis client error.");
-});
 class MemoryRedisClient {
     store = new Map();
     get isOpen() {
@@ -40,13 +30,15 @@ class MemoryRedisClient {
         return deleted;
     }
     async incr(key) {
+        const existing = this.read(key);
         const next = this.readCounter(key) + 1;
-        this.store.set(key, { value: String(next) });
+        this.store.set(key, { value: String(next), expiresAt: existing?.expiresAt });
         return next;
     }
     async decr(key) {
+        const existing = this.read(key);
         const next = this.readCounter(key) - 1;
-        this.store.set(key, { value: String(next) });
+        this.store.set(key, { value: String(next), expiresAt: existing?.expiresAt });
         return next;
     }
     async ping() {
@@ -72,7 +64,25 @@ class MemoryRedisClient {
         return Number.isFinite(value) ? value : 0;
     }
 }
-let activeClient = redisClient;
+function createMemoryFallback(reason, error) {
+    logger_1.logger.warn({ error }, reason);
+    return new MemoryRedisClient();
+}
+const redisClient = env_1.env.REDIS_URL
+    ? (0, redis_1.createClient)({
+        url: env_1.env.REDIS_URL,
+        socket: {
+            connectTimeout: 1000,
+            reconnectStrategy: false
+        }
+    })
+    : null;
+redisClient?.on("error", (error) => {
+    logger_1.logger.error({ error }, "Redis client error.");
+});
+let activeClient = redisClient
+    ? redisClient
+    : createMemoryFallback("REDIS_URL is not configured. Falling back to in-memory cache.");
 exports.redis = {
     get isOpen() {
         return activeClient.isOpen;
@@ -103,6 +113,9 @@ exports.redis = {
     }
 };
 async function connectRedis() {
+    if (!redisClient) {
+        return;
+    }
     if (activeClient.isOpen) {
         return;
     }
@@ -110,7 +123,6 @@ async function connectRedis() {
         await redisClient.connect();
     }
     catch (error) {
-        activeClient = new MemoryRedisClient();
-        logger_1.logger.warn({ error }, "Redis unavailable. Falling back to in-memory cache.");
+        activeClient = createMemoryFallback("Redis unavailable. Falling back to in-memory cache.", error);
     }
 }

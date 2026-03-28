@@ -48,19 +48,27 @@ function createAuthRouter(service) {
         res.status(204).send();
     }));
     router.post("/email-verification/request", authenticate_1.authenticate, (0, validate_1.validate)(auth_schemas_1.emptyBodySchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
-        const result = await service.requestEmailVerification(req.auth.userId);
+        const result = await service.requestEmailVerification(req.auth.userId, {
+            ipAddress: req.ip
+        });
         res.json(result);
     }));
     router.post("/email-verification/confirm", (0, validate_1.validate)(auth_schemas_1.emailVerificationConfirmSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
-        const result = await service.confirmEmailVerification(req.body);
+        const result = await service.confirmEmailVerification(req.body, {
+            ipAddress: req.ip
+        });
         res.json(result);
     }));
     router.post("/password-reset/request", (0, validate_1.validate)(auth_schemas_1.passwordResetRequestSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
-        const result = await service.requestPasswordReset(req.body.email);
+        const result = await service.requestPasswordReset(req.body.email, {
+            ipAddress: req.ip
+        });
         res.json(result);
     }));
     router.post("/password-reset/confirm", (0, validate_1.validate)(auth_schemas_1.passwordResetConfirmSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
-        const result = await service.confirmPasswordReset(req.body);
+        const result = await service.confirmPasswordReset(req.body, {
+            ipAddress: req.ip
+        });
         res.json(result);
     }));
     router.post("/profile/complete", authenticate_1.authenticate, (0, validate_1.validate)(auth_schemas_1.completeProfileSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {

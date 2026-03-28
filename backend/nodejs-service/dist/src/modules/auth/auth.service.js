@@ -45,17 +45,22 @@ class AuthService {
     auditService;
     emailService;
     googleAuthService;
-    constructor(repository, auditService, emailService, googleAuthService) {
+    authSecurityService;
+    constructor(repository, auditService, emailService, googleAuthService, authSecurityService) {
         this.repository = repository;
         this.auditService = auditService;
         this.emailService = emailService;
         this.googleAuthService = googleAuthService;
+        this.authSecurityService = authSecurityService;
     }
     async register(input) {
         const email = input.email.trim().toLowerCase();
         const username = this.requireUsername(input.username);
         const dateOfBirth = this.requireDateOfBirth(input.dateOfBirth);
         const gender = this.requireGender(input.gender, input.customGender);
+        await this.authSecurityService.assertRegistrationAllowed(input.ipAddress);
+        await this.authSecurityService.recordRegistrationAttempt(input.ipAddress);
+        this.requireStrongPassword(input.password, [email, username, input.fullName]);
         const [existingEmail, existingUsername] = await Promise.all([
             this.repository.findUserByEmail(email),
             this.repository.findUserByUsername(username)
@@ -101,13 +106,17 @@ class AuthService {
         return this.buildSessionResponse(user, tokens, verification);
     }
     async login(input) {
-        const user = await this.findUserByIdentifier(input.identifier);
+        const normalizedIdentifier = input.identifier.trim().toLowerCase();
+        await this.authSecurityService.assertLoginAllowed(normalizedIdentifier, input.ipAddress);
+        const user = await this.findUserByIdentifier(normalizedIdentifier);
         if (!user || !user.passwordHash || !(await (0, password_1.verifyPassword)(user.passwordHash, input.password))) {
+            await this.authSecurityService.recordLoginFailure(normalizedIdentifier, input.ipAddress);
             throw new app_error_1.AppError("Invalid credentials.", 401);
         }
         if (user.isSuspended) {
             throw new app_error_1.AppError("Account is suspended.", 403);
         }
+        await this.authSecurityService.clearLoginFailures(normalizedIdentifier, input.ipAddress);
         await this.repository.updateLastLogin(user.id);
         const tokens = await this.issueTokens(user.id, user.email, user.role, input.ipAddress, input.userAgent);
         await this.auditService.record({
@@ -195,8 +204,23 @@ class AuthService {
         catch {
             throw new app_error_1.AppError("Refresh token is invalid.", 401);
         }
-        const matched = await this.repository.findActiveRefreshTokenByHash(sha256(refreshToken));
+        const refreshTokenHash = sha256(refreshToken);
+        const matched = await this.repository.findActiveRefreshTokenByHash(refreshTokenHash);
         if (!matched || matched.userId !== payload.sub) {
+            const existing = await this.repository.findRefreshTokenByHash(refreshTokenHash);
+            if (existing &&
+                existing.userId === payload.sub &&
+                existing.revokedAt &&
+                existing.expiresAt > new Date()) {
+                await this.repository.revokeAllRefreshTokensForUser(existing.userId);
+                await this.auditService.record({
+                    actorId: existing.userId,
+                    action: "auth.refresh_token.reuse_detected",
+                    resource: "refresh_token",
+                    resourceId: existing.id,
+                    ipAddress: context?.ipAddress
+                });
+            }
             throw new app_error_1.AppError("Refresh token is invalid.", 401);
         }
         await this.repository.revokeRefreshToken(matched.id);
@@ -230,7 +254,7 @@ class AuthService {
             });
         }
     }
-    async requestEmailVerification(userId) {
+    async requestEmailVerification(userId, context) {
         const user = await this.repository.findUserById(userId);
         if (!user) {
             throw new app_error_1.AppError("User not found.", 404);
@@ -241,6 +265,8 @@ class AuthService {
                 message: "Email is already verified."
             };
         }
+        await this.authSecurityService.assertEmailVerificationRequestAllowed(userId, context?.ipAddress);
+        await this.authSecurityService.recordEmailVerificationRequest(userId, context?.ipAddress);
         const result = await this.sendEmailVerificationCode(user);
         return {
             accepted: true,
@@ -248,12 +274,16 @@ class AuthService {
             ...result
         };
     }
-    async confirmEmailVerification(input) {
-        const user = await this.repository.findUserByEmail(input.email.trim().toLowerCase());
+    async confirmEmailVerification(input, context) {
+        const normalizedEmail = input.email.trim().toLowerCase();
+        await this.authSecurityService.assertEmailVerificationConfirmationAllowed(normalizedEmail, context?.ipAddress);
+        const user = await this.repository.findUserByEmail(normalizedEmail);
         if (!user) {
+            await this.authSecurityService.recordEmailVerificationConfirmationFailure(normalizedEmail, context?.ipAddress);
             throw new app_error_1.AppError("Verification code is invalid or expired.", 400);
         }
         if (user.emailVerifiedAt) {
+            await this.authSecurityService.clearEmailVerificationConfirmationFailures(normalizedEmail, context?.ipAddress);
             return {
                 accepted: true,
                 message: "Email is already verified.",
@@ -263,10 +293,12 @@ class AuthService {
         }
         const matching = await this.repository.findValidOneTimeCode(user.id, "email_verification", sha256(input.code.trim()));
         if (!matching) {
+            await this.authSecurityService.recordEmailVerificationConfirmationFailure(normalizedEmail, context?.ipAddress);
             throw new app_error_1.AppError("Verification code is invalid or expired.", 400);
         }
         await this.repository.consumeOneTimeCode(matching.id);
         const updatedUser = await this.repository.updateEmailVerification(user.id, new Date());
+        await this.authSecurityService.clearEmailVerificationConfirmationFailures(normalizedEmail, context?.ipAddress);
         await this.auditService.record({
             actorId: updatedUser.id,
             actorRole: updatedUser.role,
@@ -281,8 +313,11 @@ class AuthService {
             nextStep: this.getNextStep(updatedUser)
         };
     }
-    async requestPasswordReset(email) {
-        const user = await this.repository.findUserByEmail(email.trim().toLowerCase());
+    async requestPasswordReset(email, context) {
+        const normalizedEmail = email.trim().toLowerCase();
+        await this.authSecurityService.assertPasswordResetRequestAllowed(normalizedEmail, context?.ipAddress);
+        await this.authSecurityService.recordPasswordResetRequest(normalizedEmail, context?.ipAddress);
+        const user = await this.repository.findUserByEmail(normalizedEmail);
         if (!user) {
             return {
                 accepted: true,
@@ -303,20 +338,30 @@ class AuthService {
             ...result
         };
     }
-    async confirmPasswordReset(input) {
-        const user = await this.repository.findUserByEmail(input.email.trim().toLowerCase());
+    async confirmPasswordReset(input, context) {
+        const normalizedEmail = input.email.trim().toLowerCase();
+        await this.authSecurityService.assertPasswordResetConfirmationAllowed(normalizedEmail, context?.ipAddress);
+        const user = await this.repository.findUserByEmail(normalizedEmail);
         if (!user) {
+            await this.authSecurityService.recordPasswordResetConfirmationFailure(normalizedEmail, context?.ipAddress);
             throw new app_error_1.AppError("Password reset code is invalid or expired.", 400);
         }
         const matching = await this.repository.findValidOneTimeCode(user.id, "password_reset", sha256(input.code.trim()));
         if (!matching) {
+            await this.authSecurityService.recordPasswordResetConfirmationFailure(normalizedEmail, context?.ipAddress);
             throw new app_error_1.AppError("Password reset code is invalid or expired.", 400);
         }
+        this.requireStrongPassword(input.password, [
+            user.email,
+            user.username,
+            `${user.firstName} ${user.lastName}`.trim()
+        ]);
         const passwordHash = await (0, password_1.hashPassword)(input.password);
         await this.repository.updatePassword(user.id, passwordHash);
         await this.ensureLocalIdentity(user);
         await this.repository.consumeOneTimeCode(matching.id);
         await this.repository.revokeAllRefreshTokensForUser(user.id);
+        await this.authSecurityService.clearPasswordResetConfirmationFailures(normalizedEmail, context?.ipAddress);
         const updatedUser = await this.repository.findUserById(user.id);
         if (!updatedUser) {
             throw new app_error_1.AppError("User not found.", 404);
@@ -416,6 +461,11 @@ class AuthService {
         if (existingLocalIdentity && user.passwordHash) {
             throw new app_error_1.AppError("Password sign-in is already enabled for this account.", 409);
         }
+        this.requireStrongPassword(password, [
+            user.email,
+            user.username,
+            `${user.firstName} ${user.lastName}`.trim()
+        ]);
         await this.repository.updatePassword(user.id, await (0, password_1.hashPassword)(password));
         if (!existingLocalIdentity) {
             await this.repository.linkIdentity(user.id, {
@@ -585,6 +635,26 @@ class AuthService {
             gender: normalized,
             customGender: null
         };
+    }
+    requireStrongPassword(password, disallowedValues = []) {
+        if (password.length < 12 ||
+            password.length > 72 ||
+            !/[a-z]/.test(password) ||
+            !/[A-Z]/.test(password) ||
+            !/\d/.test(password) ||
+            !/[^A-Za-z0-9]/.test(password)) {
+            throw new app_error_1.AppError("Password must be 12-72 characters and include uppercase, lowercase, number, and symbol.", 400);
+        }
+        const normalizedPassword = password.toLowerCase();
+        const forbiddenFragments = disallowedValues
+            .flatMap((value) => value.split(/[^a-zA-Z0-9]+/))
+            .map((value) => value.trim().toLowerCase())
+            .filter((value) => value.length >= 3);
+        for (const fragment of forbiddenFragments) {
+            if (normalizedPassword.includes(fragment)) {
+                throw new app_error_1.AppError("Password must not contain your name, email, or username.", 400);
+            }
+        }
     }
     async findUserByIdentifier(identifier) {
         const normalized = identifier.trim().toLowerCase();

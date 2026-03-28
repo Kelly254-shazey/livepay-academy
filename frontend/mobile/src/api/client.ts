@@ -15,10 +15,12 @@ import type {
   AuthSession,
   CategoryDetailPayload,
   CheckoutSummary,
+  ConfirmPurchaseResponse,
   ClassDetailPayload,
   CreatorDashboardPayload,
   CreatorProfilePayload,
   HomeFeedPayload,
+  LiveChatMessageRecord,
   LiveRoomPayload,
   LiveSessionDetailPayload,
   NotificationRecord,
@@ -52,6 +54,7 @@ import {
   searchDemo,
   signInWithDemo,
   signUpWithDemo,
+  normalizeAuthSession,
   type UserRole,
 } from '../shared';
 import { useSessionStore } from '@/store/session-store';
@@ -142,6 +145,10 @@ function sanitizePath(path: string): string {
   return path;
 }
 
+function createClientRequestId() {
+  return `mobile-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 // Security: Validate ID parameters to prevent injection
 function validateId(id: string, paramName: string): string {
   if (!id || typeof id !== 'string') {
@@ -158,22 +165,113 @@ function validateId(id: string, paramName: string): string {
   return sanitized;
 }
 
-const explicitApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ?? '';
+function normalizeApiBaseUrl(baseUrl: string): string {
+  const trimmed = baseUrl.trim();
+
+  if (!trimmed) {
+    return '';
+  }
+
+  try {
+    const url = new URL(trimmed);
+    const normalizedPath = url.pathname.replace(/\/+$/, '');
+
+    if (!normalizedPath) {
+      url.pathname = '/api';
+    } else {
+      url.pathname = normalizedPath;
+    }
+
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return trimmed.replace(/\/$/, '');
+  }
+}
+
+function isLocalHostname(hostname: string): boolean {
+  return ['localhost', '127.0.0.1', '::1'].includes(hostname.toLowerCase());
+}
+
+function getHostnameFromUrl(value: string): string {
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+const DEFAULT_PRODUCTION_API_BASE_URL = 'https://livepay-academy-production.up.railway.app/api';
+const explicitApiBaseUrl = normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL ?? '');
 const inferredApiBaseUrl = (() => {
   const host = resolveExpoHost();
   return host ? `http://${host}:3000/api` : '';
 })();
+const isDevelopmentRuntime = __DEV__ || process.env.NODE_ENV === 'development';
+const explicitApiHostname = getHostnameFromUrl(explicitApiBaseUrl);
 
 const apiBaseUrl =
-  explicitApiBaseUrl ||
+  (!isDevelopmentRuntime && (!explicitApiBaseUrl || isLocalHostname(explicitApiHostname))
+    ? DEFAULT_PRODUCTION_API_BASE_URL
+    : explicitApiBaseUrl) ||
   (Platform.OS === 'web' ? '' : inferredApiBaseUrl);
 
-export class MobileApiError extends Error {}
+export class MobileApiError extends Error {
+  constructor(message: string, public readonly statusCode?: number) {
+    super(message);
+    this.name = 'MobileApiError';
+  }
+}
+
+let inFlightRefresh: Promise<string | null> | null = null;
+
+function getResponseErrorMessage(statusCode: number, fallback?: string | null) {
+  if (fallback?.trim()) {
+    return fallback;
+  }
+
+  if (statusCode === 401) {
+    return 'Session expired. Sign in again.';
+  }
+
+  if (statusCode === 429) {
+    return 'Too many requests. Wait a moment and try again.';
+  }
+
+  if ([502, 503, 504].includes(statusCode)) {
+    return 'LiveGate backend is temporarily unavailable. Retry in a moment.';
+  }
+
+  if (statusCode >= 500) {
+    return 'LiveGate backend failed to process the request. Retry in a moment.';
+  }
+
+  return 'Request failed.';
+}
+
+function shouldUseDemoFallback() {
+  if (!isDevelopmentRuntime) {
+    return false;
+  }
+
+  if (!apiBaseUrl) {
+    return true;
+  }
+
+  try {
+    return isLocalHostname(new URL(apiBaseUrl).hostname);
+  } catch {
+    return false;
+  }
+}
 
 async function withDemoFallback<T>(run: () => Promise<T>, fallback: () => T | Promise<T>) {
   try {
     return await run();
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback()) {
+      throw error;
+    }
+
     return fallback();
   }
 }
@@ -249,13 +347,17 @@ async function safeFetch(url: string, options: RequestInit): Promise<Response> {
   try {
     return await fetch(parsedUrl.toString(), secureOptions);
   } catch (error) {
-    throw new MobileApiError('Network request failed');
+    throw new MobileApiError('Unable to reach the LiveGate backend. Check your connection and server status.');
   }
 }
 
 async function request<T>(
   path: string,
-  options: Omit<RequestInit, 'body'> & { body?: unknown; authenticated?: boolean } = {},
+  options: Omit<RequestInit, 'body'> & {
+    body?: unknown;
+    authenticated?: boolean;
+    retryOnAuthFailure?: boolean;
+  } = {},
 ) {
   if (!apiBaseUrl) {
     throw new MobileApiError('Set EXPO_PUBLIC_API_BASE_URL before using the mobile app data layer.');
@@ -271,6 +373,18 @@ async function request<T>(
 
   const token = useSessionStore.getState().session?.tokens.accessToken;
   const headers = new Headers(options.headers);
+
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json');
+  }
+
+  if (!headers.has('x-request-id')) {
+    headers.set('x-request-id', createClientRequestId());
+  }
+
+  if (!headers.has('x-source-service')) {
+    headers.set('x-source-service', 'mobile-app');
+  }
 
   if (!headers.has('Content-Type') && options.body !== undefined) {
     headers.set('Content-Type', 'application/json');
@@ -299,18 +413,83 @@ async function request<T>(
 
   const json = await response.json().catch(() => null);
 
+  if (
+    response.status === 401 &&
+    options.authenticated !== false &&
+    options.retryOnAuthFailure !== false
+  ) {
+    const refreshedAccessToken = await refreshStoredSession();
+
+    if (refreshedAccessToken) {
+      return request<T>(path, {
+        ...options,
+        retryOnAuthFailure: false,
+      });
+    }
+  }
+
   if (!response.ok) {
-    throw new MobileApiError(json?.message ?? 'Request failed.');
+    if (response.status === 401 && options.authenticated !== false) {
+      throw new MobileApiError('Session expired. Sign in again.', response.status);
+    }
+
+    throw new MobileApiError(getResponseErrorMessage(response.status, json?.message), response.status);
   }
 
   return (json?.data ?? json) as T;
 }
 
+async function refreshStoredSession() {
+  if (inFlightRefresh) {
+    return inFlightRefresh;
+  }
+
+  inFlightRefresh = (async () => {
+    const store = useSessionStore.getState();
+    const refreshToken = store.session?.tokens.refreshToken;
+
+    if (!refreshToken) {
+      store.signOut();
+      return null;
+    }
+
+    try {
+      const refreshedSession = await request<AuthSession>(apiRoutes.auth.refresh, {
+        method: 'POST',
+        body: { refreshToken },
+        authenticated: false,
+        retryOnAuthFailure: false,
+      });
+
+      const normalizedSession = normalizeAuthSession(
+        refreshedSession,
+        store.preferredRoles,
+        store.preferredRole,
+      );
+
+      store.setSession(normalizedSession);
+      return normalizedSession.tokens.accessToken;
+    } catch {
+      store.signOut();
+      return null;
+    } finally {
+      inFlightRefresh = null;
+    }
+  })();
+
+  return inFlightRefresh;
+}
+
 export const mobileApi = {
-  signIn: (body: { email: string; password: string; role: string; roles?: UserRole[] }) =>
+  signIn: (body: { identifier: string; password: string; role: string; roles?: UserRole[] }) =>
     withDemoFallback(
       () => request<AuthSession>(apiRoutes.auth.signIn, { method: 'POST', body, authenticated: false }),
-      () => signInWithDemo({ ...body, activeRole: body.role as UserRole }),
+      () =>
+        signInWithDemo({
+          email: body.identifier.includes('@') ? body.identifier : `${body.identifier}@demo.local`,
+          activeRole: body.role as UserRole,
+          roles: body.roles,
+        }),
     ),
   signUp: (body: {
     fullName: string;
@@ -336,6 +515,29 @@ export const mobileApi = {
     withDemoFallback(
       () => request<AuthSession>(apiRoutes.auth.refresh, { method: 'POST', body, authenticated: false }),
       () => ({ tokens: { accessToken: 'demo', refreshToken: 'demo' }, user: { id: 'demo', email: 'demo@demo.local', fullName: 'Demo', role: 'viewer' as UserRole, roles: ['viewer'] as UserRole[] } } as never),
+    ),
+  getCurrentSession: () =>
+    withDemoFallback(
+      async () => {
+        const currentTokens = useSessionStore.getState().session?.tokens;
+        const currentSession = await request<AuthSession>(apiRoutes.auth.session);
+
+        return {
+          ...currentSession,
+          tokens:
+            currentSession.tokens?.accessToken || currentSession.tokens?.refreshToken
+              ? currentSession.tokens
+              : currentTokens ?? currentSession.tokens,
+        };
+      },
+      async () => {
+        const session = useSessionStore.getState().session;
+        if (!session) {
+          throw new MobileApiError('No active session.');
+        }
+
+        return session;
+      },
     ),
   logout: (body: { refreshToken: string }) =>
     withDemoFallback(
@@ -434,7 +636,7 @@ export const mobileApi = {
     withDemoFallback(
       () => {
         const validatedId = validateId(id, 'live session ID');
-        return request<LiveSessionDetailPayload>(apiRoutes.liveDetail(validatedId), { authenticated: false });
+        return request<LiveSessionDetailPayload>(apiRoutes.liveDetail(validatedId));
       },
       () => getDemoLiveDetail(id),
     ),
@@ -538,6 +740,71 @@ export const mobileApi = {
       },
       () => requestDemoPayout(body),
     ),
+  confirmPurchase: (body: {
+    targetType: 'live_session' | 'premium_content' | 'class';
+    targetId: string;
+    providerReference: string;
+    idempotencyKey: string;
+  }) =>
+    withDemoFallback(
+      () =>
+        request<ConfirmPurchaseResponse>(apiRoutes.accessConfirmPurchase, {
+          method: 'POST',
+          body,
+        }),
+      async () => ({ idempotent: false }),
+    ),
+  getAccessGrantStatus: (
+    targetType: 'live_session' | 'premium_content' | 'class' | 'lesson' | 'private_live_invite',
+    targetId: string,
+  ) =>
+    withDemoFallback(
+      () => request<{ allowed: boolean }>(apiRoutes.accessGrantStatus(targetType, targetId)),
+      async () => ({ allowed: true }),
+    ),
+  getLiveChatMessages: (liveId: string, limit = 40) =>
+    withDemoFallback(
+      async () => {
+        const messages = await request<
+          Array<{
+            id: string;
+            body: string;
+            status?: string;
+            createdAt: string;
+            senderId: string;
+            sender?: {
+              firstName?: string;
+              lastName?: string;
+              creatorProfile?: {
+                displayName?: string | null;
+              } | null;
+            } | null;
+          }>
+        >(apiRoutes.liveChatHistory(validateId(liveId, 'liveId'), limit));
+
+        return messages.map<LiveChatMessageRecord>((message) => ({
+          id: message.id,
+          body: message.body,
+          senderId: message.senderId,
+          authorName:
+            message.sender?.creatorProfile?.displayName?.trim() ||
+            `${message.sender?.firstName ?? ''} ${message.sender?.lastName ?? ''}`.trim() ||
+            'Viewer',
+          sentAt: message.createdAt,
+          status: message.status,
+        }));
+      },
+      async () => [],
+    ),
+  recordLiveAttendance: (liveId: string, attendanceSeconds: number) =>
+    withDemoFallback(
+      () =>
+        request<{ updated: boolean }>(apiRoutes.liveAttendance(validateId(liveId, 'liveId')), {
+          method: 'POST',
+          body: { attendanceSeconds },
+        }),
+      async () => ({ updated: true }),
+    ),
   getProfileSettings: () =>
     withDemoFallback(
       () => request<ProfileSettingsPayload>(apiRoutes.profileSettings),
@@ -561,3 +828,19 @@ export const mobileApi = {
       () => saveDemoProfileSettings(body),
     ),
 };
+
+export function getNodeApiBaseUrl() {
+  return apiBaseUrl;
+}
+
+export function getNodeApiOrigin() {
+  if (!apiBaseUrl) {
+    return '';
+  }
+
+  try {
+    return new URL(apiBaseUrl).origin;
+  } catch {
+    return '';
+  }
+}

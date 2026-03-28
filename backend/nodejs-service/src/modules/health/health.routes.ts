@@ -5,6 +5,7 @@ import type { AppRedisClient } from "../../infrastructure/cache/redis";
 
 type DependencyPinger = {
   ping: () => Promise<unknown>;
+  getIntegrationStatus?: () => unknown;
 };
 
 export function createHealthRouter(
@@ -38,6 +39,10 @@ export function createHealthRouter(
         cache,
         javaFinance,
         pythonIntelligence
+      },
+      circuits: {
+        javaFinance: dependencies?.javaFinance?.getIntegrationStatus?.() ?? null,
+        pythonIntelligence: dependencies?.pythonIntelligence?.getIntegrationStatus?.() ?? null
       }
     });
   });

@@ -46,6 +46,18 @@ export class AccessService {
       throw new AppError("Creators already own access to their own resources.", 409);
     }
 
+    if (input.targetType === "live_session") {
+      const live = await this.db.liveSession.findUnique({
+        where: { id: input.targetId }
+      });
+
+      if (!live) {
+        throw new AppError("Live session not found.", 404);
+      }
+
+      await this.assertLiveVisibilityAccess(live, userId, role, false);
+    }
+
     const existing = await this.db.accessGrant.findUnique({
       where: { sourceReference: input.providerReference }
     });
@@ -285,44 +297,9 @@ export class AccessService {
       throw new AppError("Live session not found.", 404);
     }
 
-    const blockedStates = requireJoinable
-      ? ["draft", "ended", "cancelled", "suspended"]
-      : ["draft", "cancelled", "suspended"];
-    if (blockedStates.includes(live.status)) {
-      throw new AppError(requireJoinable ? "Live session is not joinable." : "Live session is not accessible.", 409);
-    }
+    await this.assertLiveVisibilityAccess(live, userId, role, requireJoinable);
 
     if (role !== "admin" && role !== "moderator" && live.creatorId !== userId) {
-      if (live.visibility === "followers_only") {
-        const follow = await this.db.follow.findUnique({
-          where: {
-            followerId_creatorId: {
-              followerId: userId,
-              creatorId: live.creatorId
-            }
-          }
-        });
-
-        if (!follow) {
-          throw new AppError("You must follow the creator to access this live.", 403);
-        }
-      }
-
-      if (live.visibility === "private") {
-        const invite = await this.db.accessGrant.findFirst({
-          where: {
-            userId,
-            targetId: live.id,
-            status: "active",
-            targetType: { in: ["private_live_invite", "live_session"] }
-          }
-        });
-
-        if (!invite) {
-          throw new AppError("Private live access is required.", 403);
-        }
-      }
-
       if (live.isPaid) {
         const grant = await this.findActiveGrant(userId, "live_session", live.id);
         if (!grant) {
@@ -332,6 +309,59 @@ export class AccessService {
     }
 
     return live;
+  }
+
+  private async assertLiveVisibilityAccess(
+    live: {
+      id: string;
+      creatorId: string;
+      status: string;
+      visibility: "public" | "followers_only" | "private";
+    },
+    userId: string,
+    role: UserRole,
+    requireJoinable: boolean
+  ) {
+    const blockedStates = requireJoinable
+      ? ["draft", "ended", "cancelled", "suspended"]
+      : ["draft", "cancelled", "suspended"];
+    if (blockedStates.includes(live.status)) {
+      throw new AppError(requireJoinable ? "Live session is not joinable." : "Live session is not accessible.", 409);
+    }
+
+    if (role === "admin" || role === "moderator" || live.creatorId === userId) {
+      return;
+    }
+
+    if (live.visibility === "followers_only") {
+      const follow = await this.db.follow.findUnique({
+        where: {
+          followerId_creatorId: {
+            followerId: userId,
+            creatorId: live.creatorId
+          }
+        }
+      });
+
+      if (!follow) {
+        throw new AppError("You must follow the creator to access this live.", 403);
+      }
+    }
+
+    if (live.visibility === "private") {
+      const invite = await this.db.accessGrant.findFirst({
+        where: {
+          userId,
+          targetId: live.id,
+          status: "active",
+          targetType: { in: ["private_live_invite", "live_session"] }
+        }
+      });
+
+      if (!invite) {
+        throw new AppError("Private live access is required.", 403);
+      }
+    }
   }
 
   private async resolveTarget(targetType: SupportedPurchaseTarget, targetId: string): Promise<ResolvedTarget> {

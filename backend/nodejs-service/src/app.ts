@@ -21,6 +21,7 @@ import { StreamingProviderClient } from "./infrastructure/integrations/streaming
 import { createHealthRouter } from "./modules/health/health.routes";
 import { AuthRepository } from "./modules/auth/auth.repository";
 import { AuthService } from "./modules/auth/auth.service";
+import { AuthSecurityService } from "./modules/auth/auth-security.service";
 import { createAuthRouter } from "./modules/auth/auth.routes";
 import { UsersRepository } from "./modules/users/users.repository";
 import { UsersService } from "./modules/users/users.service";
@@ -65,10 +66,17 @@ export function createApp() {
   const auditService = new AuditService(prisma);
   const emailService = new EmailService();
   const googleAuthService = new GoogleAuthService();
+  const authSecurityService = new AuthSecurityService(redis);
   const javaFinanceClient = new JavaFinanceClient();
   const pythonClient = new PythonIntelligenceClient();
   const streamingProviderClient = new StreamingProviderClient();
-  const authService = new AuthService(new AuthRepository(prisma), auditService, emailService, googleAuthService);
+  const authService = new AuthService(
+    new AuthRepository(prisma),
+    auditService,
+    emailService,
+    googleAuthService,
+    authSecurityService
+  );
   const accessService = new AccessService(prisma, auditService, javaFinanceClient, pythonClient);
   const usersService = new UsersService(new UsersRepository(prisma), auditService, pythonClient);
   const creatorsService = new CreatorsService(new CreatorsRepository(prisma), auditService, pythonClient);
@@ -102,6 +110,8 @@ export function createApp() {
   const corsOrigin = env.CORS_ORIGIN === "*" ? "*" : env.CORS_ORIGIN;
   const corsCredentials = env.CORS_ORIGIN !== "*";
 
+  // Railway/Vercel sit behind a reverse proxy, and auth throttling depends on the original client IP.
+  app.set("trust proxy", 1);
   app.use(requestContext);
   app.use(httpLogger);
   app.use(

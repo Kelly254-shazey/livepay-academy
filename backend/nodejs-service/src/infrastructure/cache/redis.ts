@@ -19,18 +19,6 @@ export type AppRedisClient = {
   quit: () => Promise<void>;
 };
 
-const redisClient = createClient({
-  url: env.REDIS_URL,
-  socket: {
-    connectTimeout: 1000,
-    reconnectStrategy: false
-  }
-});
-
-redisClient.on("error", (error) => {
-  logger.error({ error }, "Redis client error.");
-});
-
 class MemoryRedisClient implements AppRedisClient {
   private readonly store = new Map<string, { value: string; expiresAt?: number }>();
 
@@ -63,14 +51,16 @@ class MemoryRedisClient implements AppRedisClient {
   }
 
   async incr(key: string) {
+    const existing = this.read(key);
     const next = this.readCounter(key) + 1;
-    this.store.set(key, { value: String(next) });
+    this.store.set(key, { value: String(next), expiresAt: existing?.expiresAt });
     return next;
   }
 
   async decr(key: string) {
+    const existing = this.read(key);
     const next = this.readCounter(key) - 1;
-    this.store.set(key, { value: String(next) });
+    this.store.set(key, { value: String(next), expiresAt: existing?.expiresAt });
     return next;
   }
 
@@ -105,7 +95,28 @@ class MemoryRedisClient implements AppRedisClient {
   }
 }
 
-let activeClient: AppRedisClient = redisClient as unknown as AppRedisClient;
+function createMemoryFallback(reason: string, error?: unknown) {
+  logger.warn({ error }, reason);
+  return new MemoryRedisClient();
+}
+
+const redisClient = env.REDIS_URL
+  ? createClient({
+      url: env.REDIS_URL,
+      socket: {
+        connectTimeout: 1000,
+        reconnectStrategy: false
+      }
+    })
+  : null;
+
+redisClient?.on("error", (error) => {
+  logger.error({ error }, "Redis client error.");
+});
+
+let activeClient: AppRedisClient = redisClient
+  ? redisClient as unknown as AppRedisClient
+  : createMemoryFallback("REDIS_URL is not configured. Falling back to in-memory cache.");
 
 export const redis: AppRedisClient = {
   get isOpen() {
@@ -138,6 +149,10 @@ export const redis: AppRedisClient = {
 };
 
 export async function connectRedis() {
+  if (!redisClient) {
+    return;
+  }
+
   if (activeClient.isOpen) {
     return;
   }
@@ -145,7 +160,6 @@ export async function connectRedis() {
   try {
     await redisClient.connect();
   } catch (error) {
-    activeClient = new MemoryRedisClient();
-    logger.warn({ error }, "Redis unavailable. Falling back to in-memory cache.");
+    activeClient = createMemoryFallback("Redis unavailable. Falling back to in-memory cache.", error);
   }
 }

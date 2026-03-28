@@ -87,6 +87,19 @@ export function initializeSocket(httpServer: HttpServer) {
             liveSessionId,
             senderId: socket.data.viewer.sub,
             body: trimmedBody
+          },
+          include: {
+            sender: {
+              select: {
+                firstName: true,
+                lastName: true,
+                creatorProfile: {
+                  select: {
+                    displayName: true
+                  }
+                }
+              }
+            }
           }
         });
 
@@ -95,6 +108,10 @@ export function initializeSocket(httpServer: HttpServer) {
           liveSessionId,
           body: message.body,
           senderId: message.senderId,
+          authorName:
+            message.sender?.creatorProfile?.displayName ??
+            `${message.sender?.firstName ?? ""} ${message.sender?.lastName ?? ""}`.trim() ??
+            "Viewer",
           status: message.status,
           sentAt: message.createdAt.toISOString()
         });

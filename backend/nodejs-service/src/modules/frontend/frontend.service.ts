@@ -52,6 +52,10 @@ function listResponse<T>(items: T[]) {
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 function toNumber(value: unknown) {
   if (typeof value === "number") {
     return value;
@@ -76,6 +80,14 @@ function splitFullName(fullName: string) {
     firstName: firstName || "LiveGate",
     lastName: rest.join(" ") || "User"
   };
+}
+
+function readBoolean(value: unknown, fallback: boolean) {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function readString(value: unknown, fallback = "") {
+  return typeof value === "string" ? value : fallback;
 }
 
 function normalizeCategorySlug(value: string | null | undefined) {
@@ -166,6 +178,10 @@ function formatScheduleLabel(startsAt?: Date | null, endsAt?: Date | null) {
   return "Schedule to be announced";
 }
 
+function getAllowedSettingsRoles(role: UserRole) {
+  return [role];
+}
+
 export class FrontendService {
   constructor(
     private readonly db: PrismaClient,
@@ -229,24 +245,24 @@ export class FrontendService {
     return { message: "Signed out successfully." };
   }
 
-  async resendEmailVerification(actor: Actor) {
-    const result = await this.authService.requestEmailVerification(actor.userId);
+  async resendEmailVerification(actor: Actor, context?: { ipAddress?: string }) {
+    const result = await this.authService.requestEmailVerification(actor.userId, context);
     return {
       message: result.message,
       verification: "verification" in result ? result.verification : undefined
     };
   }
 
-  async verifyEmail(input: { email: string; code: string }) {
-    return this.authService.confirmEmailVerification(input);
+  async verifyEmail(input: { email: string; code: string }, context?: { ipAddress?: string }) {
+    return this.authService.confirmEmailVerification(input, context);
   }
 
-  async forgotPassword(email: string) {
-    return this.authService.requestPasswordReset(email);
+  async forgotPassword(email: string, context?: { ipAddress?: string }) {
+    return this.authService.requestPasswordReset(email, context);
   }
 
-  async resetPassword(input: { email: string; code: string; password: string }) {
-    return this.authService.confirmPasswordReset(input);
+  async resetPassword(input: { email: string; code: string; password: string }, context?: { ipAddress?: string }) {
+    return this.authService.confirmPasswordReset(input, context);
   }
 
   async completeProfile(actor: Actor, input: {
@@ -265,6 +281,152 @@ export class FrontendService {
 
   async linkPasswordAccount(actor: Actor, password: string) {
     return this.authService.linkPassword(actor.userId, password);
+  }
+
+  async getProfileSettings(actor: Actor) {
+    const user = await this.db.user.findUnique({
+      where: { id: actor.userId },
+      include: { creatorProfile: true }
+    });
+
+    if (!user) {
+      throw new AppError("Account is unavailable.", 403);
+    }
+
+    const allowedRoles = getAllowedSettingsRoles(user.role);
+    const settings = isRecord(user.settings) ? user.settings : {};
+    const appearance = isRecord(settings.appearancePreferences) ? settings.appearancePreferences : {};
+    const privacy = isRecord(settings.privacyPreferences) ? settings.privacyPreferences : {};
+    const payout = isRecord(settings.payoutPreferences) ? settings.payoutPreferences : {};
+    const notifications = isRecord(user.notificationPreferences) ? user.notificationPreferences : {};
+
+    return {
+      fullName: `${user.firstName} ${user.lastName}`.trim(),
+      email: user.email,
+      roles: allowedRoles,
+      defaultRole:
+        allowedRoles.includes(settings.defaultRole as UserRole)
+          ? settings.defaultRole as UserRole
+          : allowedRoles[0],
+      notificationPreferences: {
+        liveReminders: readBoolean(notifications.liveReminders, true),
+        purchaseUpdates: readBoolean(notifications.purchaseUpdates, true),
+        creatorAnnouncements: readBoolean(notifications.creatorAnnouncements, true),
+        systemAlerts: true
+      },
+      appearancePreferences: {
+        theme:
+          appearance.theme === "light" || appearance.theme === "dark" || appearance.theme === "system"
+            ? appearance.theme
+            : "system",
+        compactMode: readBoolean(appearance.compactMode, false)
+      },
+      privacyPreferences: {
+        publicCreatorProfile: readBoolean(privacy.publicCreatorProfile, Boolean(user.creatorProfile)),
+        communityVisibility: readBoolean(privacy.communityVisibility, true)
+      },
+      payoutPreferences:
+        user.role === "creator" || user.role === "admin"
+          ? {
+              method: readString(payout.method, "Bank transfer"),
+              note: readString(payout.note).trim() || undefined
+            }
+          : undefined
+    };
+  }
+
+  async saveProfileSettings(
+    actor: Actor,
+    input: {
+      fullName: string;
+      email: string;
+      roles: UserRole[];
+      defaultRole: UserRole;
+      notificationPreferences: {
+        liveReminders: boolean;
+        purchaseUpdates: boolean;
+        creatorAnnouncements: boolean;
+        systemAlerts: boolean;
+      };
+      appearancePreferences: {
+        theme: "system" | "light" | "dark";
+        compactMode: boolean;
+      };
+      privacyPreferences: {
+        publicCreatorProfile: boolean;
+        communityVisibility: boolean;
+      };
+      payoutPreferences?: {
+        method: string;
+        note?: string;
+      };
+    }
+  ) {
+    const user = await this.db.user.findUnique({
+      where: { id: actor.userId },
+      include: { creatorProfile: true }
+    });
+
+    if (!user) {
+      throw new AppError("Account is unavailable.", 403);
+    }
+
+    const normalizedEmail = input.email.trim().toLowerCase();
+    if (normalizedEmail !== user.email) {
+      throw new AppError("Email changes require a dedicated verification flow.", 400);
+    }
+
+    const allowedRoles = getAllowedSettingsRoles(user.role);
+    if (
+      input.roles.length !== allowedRoles.length ||
+      input.roles.some((role) => !allowedRoles.includes(role))
+    ) {
+      throw new AppError("Account roles cannot be changed from profile settings.", 403);
+    }
+
+    if (!allowedRoles.includes(input.defaultRole)) {
+      throw new AppError("Default role is invalid for this account.", 400);
+    }
+
+    const names = splitFullName(input.fullName);
+    const payoutPreferences =
+      user.role === "creator" || user.role === "admin"
+        ? {
+            method: input.payoutPreferences?.method?.trim() || "Bank transfer",
+            note: input.payoutPreferences?.note?.trim() || undefined
+          }
+        : undefined;
+
+    await this.db.user.update({
+      where: { id: user.id },
+      data: {
+        firstName: names.firstName,
+        lastName: names.lastName,
+        settings: {
+          defaultRole: input.defaultRole,
+          appearancePreferences: {
+            theme: input.appearancePreferences.theme,
+            compactMode: input.appearancePreferences.compactMode
+          },
+          privacyPreferences: {
+            publicCreatorProfile: input.privacyPreferences.publicCreatorProfile,
+            communityVisibility: input.privacyPreferences.communityVisibility
+          },
+          payoutPreferences
+        },
+        notificationPreferences: {
+          liveReminders: input.notificationPreferences.liveReminders,
+          purchaseUpdates: input.notificationPreferences.purchaseUpdates,
+          creatorAnnouncements: input.notificationPreferences.creatorAnnouncements,
+          systemAlerts: true
+        }
+      }
+    });
+
+    return {
+      message: "Profile settings saved successfully.",
+      settings: await this.getProfileSettings(actor)
+    };
   }
 
   async getHomeFeed() {
@@ -521,7 +683,7 @@ export class FrontendService {
     };
   }
 
-  async getLiveDetail(liveId: string) {
+  async getLiveDetail(liveId: string, actor?: Actor) {
     const live = await this.db.liveSession.findUnique({
       where: { id: liveId },
       include: {
@@ -556,13 +718,13 @@ export class FrontendService {
     });
 
     return {
-      live: (await this.toLiveSummaries([live]))[0],
-      relatedLives: listResponse(await this.toLiveSummaries(related))
+      live: (await this.toLiveSummaries([live], actor))[0],
+      relatedLives: listResponse(await this.toLiveSummaries(related, actor))
     };
   }
 
   async getLiveRoom(actor: Actor, liveId: string) {
-    await this.accessService.assertLiveJoinAccess(actor.userId, actor.role, liveId);
+    const joinAccess = await this.accessService.assertLiveJoinAccess(actor.userId, actor.role, liveId);
 
     const live = await this.db.liveSession.findUnique({
       where: { id: liveId },
@@ -578,7 +740,7 @@ export class FrontendService {
       throw new AppError("Live unavailable.", 404);
     }
 
-    const liveSummary = (await this.toLiveSummaries([live], actor.userId))[0];
+    const liveSummary = (await this.toLiveSummaries([live], actor))[0];
     const roomMetadata = live.roomMetadata as Record<string, unknown> | null;
 
     return {
@@ -586,6 +748,8 @@ export class FrontendService {
         ...liveSummary,
         accessGranted: true
       },
+      roomAccessToken: joinAccess.roomAccessToken,
+      roomId: live.roomId,
       hostNotes: Array.isArray(roomMetadata?.hostNotes)
         ? roomMetadata!.hostNotes.filter((item): item is string => typeof item === "string")
         : undefined,
@@ -738,7 +902,7 @@ export class FrontendService {
             .filter((item) => item.targetType === "live_session")
             .map((item) => liveById.get(item.targetId))
             .filter((item): item is NonNullable<typeof item> => Boolean(item)),
-          actor.userId
+          actor
         )
       ),
       purchasedContent: listResponse(
@@ -1092,6 +1256,21 @@ export class FrontendService {
   }
 
   async requestPayout(actor: Actor, input: { amount: number; method: string; note?: string }) {
+    if (actor.role !== "admin") {
+      const creatorProfile = await this.db.creatorProfile.findUnique({
+        where: { userId: actor.userId },
+        select: { verificationStatus: true, payoutEligible: true }
+      });
+
+      if (!creatorProfile) {
+        throw new AppError("Complete your creator profile before requesting payouts.", 403);
+      }
+
+      if (creatorProfile.verificationStatus !== "approved" || !creatorProfile.payoutEligible) {
+        throw new AppError("Creator verification must be approved before requesting payouts.", 403);
+      }
+    }
+
     await this.walletsService.requestPayout(
       { userId: actor.userId, role: actor.role as "creator" | "admin" },
       input.amount,
@@ -1099,7 +1278,7 @@ export class FrontendService {
     );
 
     return {
-      message: `Payout request submitted via ${input.method}.`
+      message: "Payout request submitted successfully."
     };
   }
 
@@ -1298,11 +1477,13 @@ export class FrontendService {
     return "Video live";
   }
 
-  private async toLiveSummaries(lives: LiveRecord[], actorUserId?: string) {
+  private async toLiveSummaries(lives: LiveRecord[], actor?: Pick<Actor, "userId" | "role">) {
     const liveIds = lives.map((item) => item.id);
     const creatorIds = Array.from(new Set(lives.map((item) => item.creator.id)));
+    const actorUserId = actor?.userId;
+    const actorRole = actor?.role;
 
-    const [viewerCounts, creatorStats, grants] = await Promise.all([
+    const [viewerCounts, creatorStats, grants, follows, privateInvites] = await Promise.all([
       liveIds.length
         ? this.db.liveParticipant.groupBy({
             by: ["liveSessionId"],
@@ -1325,25 +1506,62 @@ export class FrontendService {
               status: "active"
             }
           })
+        : Promise.resolve([]),
+      actorUserId && creatorIds.length
+        ? this.db.follow.findMany({
+            where: {
+              followerId: actorUserId,
+              creatorId: { in: creatorIds }
+            },
+            select: { creatorId: true }
+          })
+        : Promise.resolve([]),
+      actorUserId && liveIds.length
+        ? this.db.accessGrant.findMany({
+            where: {
+              userId: actorUserId,
+              targetId: { in: liveIds },
+              status: "active",
+              targetType: "private_live_invite"
+            },
+            select: { targetId: true }
+          })
         : Promise.resolve([])
     ]);
 
     const viewerCountById = new Map(viewerCounts.map((item) => [item.liveSessionId, item._count._all]));
     const grantedIds = new Set(grants.map((item) => item.targetId));
+    const followedCreatorIds = new Set(follows.map((item) => item.creatorId));
+    const privateInviteIds = new Set(privateInvites.map((item) => item.targetId));
 
-    return lives.map((item) => ({
-      id: item.id,
-      title: item.title,
-      description: item.description ?? "",
-      creator: this.toCreatorSummary(item.creator, creatorStats.get(item.creator.id)),
-      category: normalizeCategorySlug(item.category?.slug ?? item.category?.name),
-      price: toNumber(item.price),
-      startTime: (item.startedAt ?? item.scheduledFor ?? item.createdAt).toISOString(),
-      endTime: item.endedAt?.toISOString(),
-      isLive: item.status === "live",
-      viewerCount: viewerCountById.get(item.id) ?? 0,
-      accessGranted: item.creatorId === actorUserId || !item.isPaid || grantedIds.has(item.id)
-    }));
+    return lives.map((item) => {
+      const visibilityGranted =
+        item.visibility === "public"
+          ? true
+          : item.visibility === "followers_only"
+            ? followedCreatorIds.has(item.creatorId)
+            : privateInviteIds.has(item.id) || grantedIds.has(item.id);
+      const paymentGranted = !item.isPaid || grantedIds.has(item.id);
+
+      return {
+        id: item.id,
+        title: item.title,
+        description: item.description ?? "",
+        creator: this.toCreatorSummary(item.creator, creatorStats.get(item.creator.id)),
+        category: normalizeCategorySlug(item.category?.slug ?? item.category?.name),
+        price: toNumber(item.price),
+        startTime: (item.startedAt ?? item.scheduledFor ?? item.createdAt).toISOString(),
+        endTime: item.endedAt?.toISOString(),
+        isLive: item.status === "live",
+        visibility: item.visibility,
+        viewerCount: viewerCountById.get(item.id) ?? 0,
+        accessGranted:
+          actorRole === "admin" ||
+          actorRole === "moderator" ||
+          item.creatorId === actorUserId ||
+          (visibilityGranted && paymentGranted)
+      };
+    });
   }
 
   private async toPremiumContentSummary(content: ContentRecord, actorUserId?: string) {

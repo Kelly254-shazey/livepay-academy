@@ -37,7 +37,13 @@ class UsersService {
         return this.repository.listPurchaseHistory(userId);
     }
     async getRecommendations(userId) {
-        return this.pythonClient.getCreatorRecommendations(userId);
+        return this.pythonClient.getCreatorRecommendations(userId).catch(() => ({
+            user_id: userId,
+            generated_at: new Date().toISOString(),
+            results: {
+                creators: []
+            }
+        }));
     }
 }
 exports.UsersService = UsersService;

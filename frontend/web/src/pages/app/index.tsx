@@ -54,11 +54,13 @@ function SettingsToggle({
   body,
   checked,
   onChange,
+  disabled = false,
 }: {
   label: string;
   body: string;
   checked: boolean;
   onChange: (value: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="flex items-start justify-between gap-4 rounded-[24px] border border-white/35 bg-white/20 px-4 py-4 backdrop-blur-xl">
@@ -66,7 +68,7 @@ function SettingsToggle({
         <p className="text-sm font-medium">{label}</p>
         <p className="text-sm leading-6 text-muted">{body}</p>
       </div>
-      <input checked={checked} className="mt-1 h-4 w-4 accent-accent" onChange={(event) => onChange(event.target.checked)} type="checkbox" />
+      <input checked={checked} className="mt-1 h-4 w-4 accent-accent" disabled={disabled} onChange={(event) => onChange(event.target.checked)} type="checkbox" />
     </label>
   );
 }
@@ -197,7 +199,10 @@ function ProfileSettingsPanel({ mode }: { mode: 'viewer' | 'creator' }) {
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Email</label>
-            <Input {...settingsForm.register('email')} placeholder="you@livegate.com" />
+            <Input {...settingsForm.register('email')} placeholder="you@livegate.com" readOnly />
+            <p className="text-xs leading-5 text-muted">
+              Email changes are locked here and should go through a verified email-change flow.
+            </p>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Default role</label>
@@ -259,10 +264,11 @@ function ProfileSettingsPanel({ mode }: { mode: 'viewer' | 'creator' }) {
             onChange={(value) => settingsForm.setValue('creatorAnnouncements', value)}
           />
           <SettingsToggle
-            body="Keep account, moderation, and security notices enabled."
+            body="Critical security and system notices stay locked on."
             checked={settingsForm.watch('systemAlerts')}
             label="System alerts"
-            onChange={(value) => settingsForm.setValue('systemAlerts', value)}
+            onChange={() => undefined}
+            disabled
           />
           <SettingsToggle
             body="Use tighter spacing for denser dashboard views."

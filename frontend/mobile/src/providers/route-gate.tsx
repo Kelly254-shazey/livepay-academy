@@ -1,5 +1,6 @@
 import { useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { getRequiredAuthStep } from '@/shared';
 import { useSessionStore } from '@/store/session-store';
 
 export function RouteGate() {
@@ -26,7 +27,15 @@ export function RouteGate() {
       nextRoute = '/(public)/onboarding';
     } else if (!session) {
       if (root !== '(public)') {
-        nextRoute = '/(public)/sign-in';
+        nextRoute = '/(public)/role-selection';
+      }
+    } else if (getRequiredAuthStep(session) === 'verify-email') {
+      if (segments[1] !== 'email-verification') {
+        nextRoute = '/(public)/email-verification';
+      }
+    } else if (getRequiredAuthStep(session) === 'complete-profile') {
+      if (segments[1] !== 'profile-completion') {
+        nextRoute = '/(public)/profile-completion';
       }
     } else if (session.user.role === 'creator') {
       if (root !== '(creator)') {
