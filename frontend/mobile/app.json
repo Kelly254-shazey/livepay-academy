@@ -6,6 +6,9 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "updates": {
+      "url": "https://u.expo.dev/43aa178a-fad3-4afe-b95b-d228b043e4cd"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "livegate",
