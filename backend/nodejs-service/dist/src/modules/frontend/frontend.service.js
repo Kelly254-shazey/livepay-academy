@@ -17,6 +17,8 @@ const CANONICAL_CATEGORIES = [
 ];
 const CATEGORY_BY_SLUG = new Map(CANONICAL_CATEGORIES.map(([slug, title, shortDescription]) => [slug, { slug, title, shortDescription }]));
 const CATEGORY_TITLE_TO_SLUG = new Map(CANONICAL_CATEGORIES.map(([slug, title]) => [title.toLowerCase(), slug]));
+const SUPPORTED_PAYMENT_METHODS = ["Card", "Apple Pay", "Google Pay", "PayPal", "M-Pesa", "Bank transfer"];
+const SUPPORTED_PAYOUT_METHODS = ["Bank transfer", "Mobile money", "PayPal", "Wise"];
 function listResponse(items) {
     return {
         items,
@@ -746,7 +748,7 @@ class FrontendService {
             followedCreators: listResponse(follows
                 .filter((item) => Boolean(item.creator.creatorProfile))
                 .map((item) => this.toCreatorSummary(item.creator, creatorStats.get(item.creator.id)))),
-            transactions: await this.getViewerTransactions(actor.userId)
+            transactions: listResponse([])
         };
     }
     async getCreatorDashboard(actor) {
@@ -774,6 +776,7 @@ class FrontendService {
                 lifetimeEarnings: toNumber(wallet.lifetimeCreatorEarnings),
                 currency: wallet.currency ?? env_1.env.DEFAULT_CURRENCY
             },
+            supportedPayoutMethods: [...SUPPORTED_PAYOUT_METHODS],
             followers: user.creatorProfile.followersCount,
             verificationStatus: toVerificationStatus(user.creatorProfile.verificationStatus),
             recentTransactions: listResponse((Array.isArray(ledger) ? ledger : []).slice(0, 20).map((entry) => ({
@@ -844,8 +847,25 @@ class FrontendService {
             title: item.title,
             body: item.body,
             createdAt: item.createdAt.toISOString(),
-            read: Boolean(item.readAt)
+            read: Boolean(item.readAt),
+            actionTargetType: isRecord(item.data) ? readString(item.data.targetType) || undefined : undefined,
+            actionTargetId: isRecord(item.data) ? readString(item.data.targetId) || undefined : undefined
         })));
+    }
+    async markNotificationRead(actor, notificationId) {
+        const updated = await this.db.notification.updateMany({
+            where: {
+                id: notificationId,
+                userId: actor.userId
+            },
+            data: {
+                readAt: new Date()
+            }
+        });
+        if (!updated.count) {
+            throw new app_error_1.AppError("Notification not found.", 404);
+        }
+        return { updated: true };
     }
     async getTransactions(actor) {
         if (actor.role === "creator" || actor.role === "admin" || actor.role === "moderator") {
@@ -860,7 +880,7 @@ class FrontendService {
                 createdAt: String(entry.createdAt ?? new Date().toISOString())
             })));
         }
-        return this.getViewerTransactions(actor.userId);
+        return listResponse([]);
     }
     async search(input) {
         const categorySlug = input.category ? normalizeCategorySlug(input.category) : undefined;
@@ -980,6 +1000,14 @@ class FrontendService {
         };
     }
     async createCheckout(actor, input) {
+        const commissionBreakdown = async (amount) => {
+            const finance = await this.javaFinanceClient.calculateCommission({ amount: amount.toFixed(2) });
+            return {
+                totalAmount: toNumber(finance.grossAmount),
+                platformCommissionAmount: toNumber(finance.platformCommissionAmount),
+                creatorEarningsAmount: toNumber(finance.creatorShareAmount)
+            };
+        };
         switch (input.productType) {
             case "live": {
                 const live = await this.db.liveSession.findUnique({
@@ -994,13 +1022,20 @@ class FrontendService {
                 if (!live) {
                     throw new app_error_1.AppError("Live session unavailable.", 404);
                 }
+                const amount = toNumber(live.price);
+                const breakdown = await commissionBreakdown(amount);
                 return {
                     id: live.id,
                     title: live.title,
-                    amount: toNumber(live.price),
+                    amount,
                     currency: live.currency,
+                    productType: "live",
                     category: normalizeCategorySlug(live.category?.slug ?? live.category?.name),
-                    creatorName: live.creator.creatorProfile?.displayName ?? `${live.creator.firstName} ${live.creator.lastName}`.trim()
+                    creatorName: live.creator.creatorProfile?.displayName ?? `${live.creator.firstName} ${live.creator.lastName}`.trim(),
+                    sessionStatus: "ready",
+                    accessPolicy: "Payment is confirmed by the backend before live access is granted.",
+                    paymentMethods: [...SUPPORTED_PAYMENT_METHODS],
+                    ...breakdown
                 };
             }
             case "content": {
@@ -1016,13 +1051,20 @@ class FrontendService {
                 if (!content) {
                     throw new app_error_1.AppError("Premium content unavailable.", 404);
                 }
+                const amount = toNumber(content.price);
+                const breakdown = await commissionBreakdown(amount);
                 return {
                     id: content.id,
                     title: content.title,
-                    amount: toNumber(content.price),
+                    amount,
                     currency: content.currency,
+                    productType: "content",
                     category: normalizeCategorySlug(content.category?.slug ?? content.category?.name),
-                    creatorName: content.creator.creatorProfile?.displayName ?? content.creator.id
+                    creatorName: content.creator.creatorProfile?.displayName ?? content.creator.id,
+                    sessionStatus: "ready",
+                    accessPolicy: "Payment is confirmed by the backend before premium access is granted.",
+                    paymentMethods: [...SUPPORTED_PAYMENT_METHODS],
+                    ...breakdown
                 };
             }
             case "class": {
@@ -1038,13 +1080,20 @@ class FrontendService {
                 if (!learningClass) {
                     throw new app_error_1.AppError("Class unavailable.", 404);
                 }
+                const amount = toNumber(learningClass.price);
+                const breakdown = await commissionBreakdown(amount);
                 return {
                     id: learningClass.id,
                     title: learningClass.title,
-                    amount: toNumber(learningClass.price),
+                    amount,
                     currency: learningClass.currency,
+                    productType: "class",
                     category: normalizeCategorySlug(learningClass.category?.slug ?? learningClass.category?.name),
-                    creatorName: learningClass.creator.creatorProfile?.displayName ?? learningClass.creator.id
+                    creatorName: learningClass.creator.creatorProfile?.displayName ?? learningClass.creator.id,
+                    sessionStatus: "ready",
+                    accessPolicy: "Payment is confirmed by the backend before class enrollment is activated.",
+                    paymentMethods: [...SUPPORTED_PAYMENT_METHODS],
+                    ...breakdown
                 };
             }
         }
@@ -1064,6 +1113,14 @@ class FrontendService {
             }
         }
         await this.walletsService.requestPayout({ userId: actor.userId, role: actor.role }, input.amount, env_1.env.DEFAULT_CURRENCY);
+        await this.db.notification.create({
+            data: {
+                userId: actor.userId,
+                type: "system_alert",
+                title: "Payout request submitted",
+                body: `Your ${input.method} payout request for ${input.amount.toFixed(2)} ${env_1.env.DEFAULT_CURRENCY} is now under review.`
+            }
+        });
         return {
             message: "Payout request submitted successfully."
         };

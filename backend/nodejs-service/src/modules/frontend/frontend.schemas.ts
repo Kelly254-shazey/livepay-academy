@@ -132,6 +132,14 @@ export const liveIdParamsSchema = z.object({
   query: z.object({}).default({})
 });
 
+export const notificationIdParamsSchema = z.object({
+  body: z.object({}).default({}),
+  params: z.object({
+    notificationId: z.string().uuid()
+  }),
+  query: z.object({}).default({})
+});
+
 export const contentIdParamsSchema = z.object({
   body: z.object({}).default({}),
   params: z.object({

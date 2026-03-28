@@ -8,14 +8,15 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const socket_io_1 = require("socket.io");
 const env_1 = require("../../config/env");
 const logger_1 = require("../../config/logger");
+const cors_1 = require("../../config/cors");
 const jwt_1 = require("../../common/security/jwt");
 const redis_1 = require("../cache/redis");
 const prisma_1 = require("../db/prisma");
 function initializeSocket(httpServer) {
     const io = new socket_io_1.Server(httpServer, {
         cors: {
-            origin: env_1.env.CORS_ORIGIN === "*" ? "*" : env_1.env.CORS_ORIGIN,
-            credentials: env_1.env.CORS_ORIGIN !== "*"
+            origin: cors_1.socketCorsOrigin,
+            credentials: cors_1.corsCredentials
         }
     });
     io.use((socket, next) => {

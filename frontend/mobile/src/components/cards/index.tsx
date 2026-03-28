@@ -171,13 +171,28 @@ export function WalletCards({ wallet }: { wallet: WalletSummary }) {
   );
 }
 
-export function NotificationRow({ item }: { item: NotificationRecord }) {
+export function NotificationRow({
+  item,
+  onPress,
+}: {
+  item: NotificationRecord;
+  onPress?: () => void;
+}) {
   return (
-    <Surface>
-      <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>{item.title}</Text>
-      <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>{item.body}</Text>
-      <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>{item.read ? 'Read' : 'New update'}</Text>
-    </Surface>
+    <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => ({ opacity: pressed ? 0.97 : 1 })}>
+      <Surface style={{ borderColor: item.read ? undefined : theme.colors.accentMuted }}>
+        <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>{item.title}</Text>
+        <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>{item.body}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={{ fontSize: theme.typography.sizes.sm, color: item.read ? theme.colors.textMuted : theme.colors.accent }}>
+            {item.read ? 'Read' : 'New update'}
+          </Text>
+          <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>
+            {new Date(item.createdAt).toLocaleDateString()}
+          </Text>
+        </View>
+      </Surface>
+    </Pressable>
   );
 }
 

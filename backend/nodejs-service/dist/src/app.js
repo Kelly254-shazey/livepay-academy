@@ -12,6 +12,7 @@ const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
 const domain_1 = require("./common/constants/domain");
 const error_handler_1 = require("./common/errors/error-handler");
 const logger_1 = require("./config/logger");
+const cors_2 = require("./config/cors");
 const env_1 = require("./config/env");
 const swagger_1 = require("./config/swagger");
 const request_context_1 = require("./common/middleware/request-context");
@@ -87,15 +88,13 @@ function createApp() {
     const reportsService = new reports_service_1.ReportsService(new reports_repository_1.ReportsRepository(prisma_1.prisma), auditService, pythonClient);
     const adminService = new admin_service_1.AdminService(new admin_repository_1.AdminRepository(prisma_1.prisma), auditService, pythonClient, javaFinanceClient);
     const frontendService = new frontend_service_1.FrontendService(prisma_1.prisma, authService, accessService, javaFinanceClient, walletsService);
-    const corsOrigin = env_1.env.CORS_ORIGIN === "*" ? "*" : env_1.env.CORS_ORIGIN;
-    const corsCredentials = env_1.env.CORS_ORIGIN !== "*";
     // Railway/Vercel sit behind a reverse proxy, and auth throttling depends on the original client IP.
     app.set("trust proxy", 1);
     app.use(request_context_1.requestContext);
     app.use(logger_1.httpLogger);
     app.use((0, cors_1.default)({
-        origin: corsOrigin,
-        credentials: corsCredentials
+        origin: cors_2.corsOriginDelegate,
+        credentials: cors_2.corsCredentials
     }));
     app.use((0, helmet_1.default)());
     app.use((0, express_rate_limit_1.default)({

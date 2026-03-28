@@ -181,6 +181,7 @@ export interface CheckoutSummary {
   totalAmount?: number;
   sessionStatus?: 'draft' | 'ready';
   accessPolicy?: string;
+  paymentMethods?: string[];
 }
 
 export interface ProfileSettingsPayload {
@@ -215,6 +216,7 @@ export interface SaveProfileSettingsResponse {
 
 export interface ConfirmPurchaseResponse {
   idempotent?: boolean;
+  liveJoinCode?: string;
   grant?: {
     id: string;
     targetType: string;
@@ -275,6 +277,7 @@ export interface ViewerDashboardPayload {
 
 export interface CreatorDashboardPayload {
   wallet: WalletSummary;
+  supportedPayoutMethods?: string[];
   followers: number;
   verificationStatus: VerificationStatus;
   recentTransactions: ApiListResponse<TransactionRecord>;
@@ -301,6 +304,8 @@ export interface NotificationRecord {
   body: string;
   createdAt: string;
   read: boolean;
+  actionTargetType?: string;
+  actionTargetId?: string;
 }
 
 export interface SearchFilters {

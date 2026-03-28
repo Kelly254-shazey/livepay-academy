@@ -34,23 +34,15 @@ import type {
 import {
   apiRoutes,
   DEMO_PASSWORD,
-  createDemoCheckout,
   forgotPasswordDemo,
   getDemoAdminDashboard,
   getDemoCategoryDetail,
   getDemoClassDetail,
-  getDemoCreatorDashboard,
   getDemoCreatorProfile,
   getDemoHomeFeed,
   getDemoLiveDetail,
-  getDemoLiveRoom,
-  getDemoNotifications,
-  getDemoProfileSettings,
   getDemoPremiumContentDetail,
-  getDemoViewerDashboard,
-  requestDemoPayout,
   resetPasswordDemo,
-  saveDemoProfileSettings,
   searchDemo,
   signInWithDemo,
   signUpWithDemo,
@@ -732,16 +724,21 @@ export const mobileApi = {
         const validatedId = validateId(id, 'live session ID');
         return request<LiveSessionDetailPayload>(apiRoutes.liveDetail(validatedId));
       },
-      () => getDemoLiveDetail(id),
-    ),
-  getLiveRoom: (id: string) =>
-    withDemoFallback(
       () => {
-        const validatedId = validateId(id, 'live room ID');
-        return request<LiveRoomPayload>(apiRoutes.liveRoom(validatedId));
+        const demoDetail = getDemoLiveDetail(id);
+        return {
+          ...demoDetail,
+          live: {
+            ...demoDetail.live,
+            accessGranted: demoDetail.live.price <= 0 ? demoDetail.live.accessGranted : false,
+          },
+        };
       },
-      () => getDemoLiveRoom(id)
     ),
+  getLiveRoom: (id: string) => {
+    const validatedId = validateId(id, 'live room ID');
+    return request<LiveRoomPayload>(apiRoutes.liveRoom(validatedId));
+  },
   getPremiumContentDetail: (id: string) =>
     withDemoFallback(
       () => {
@@ -760,14 +757,16 @@ export const mobileApi = {
       },
       () => getDemoClassDetail(id),
     ),
-  getViewerDashboard: () =>
-    withDemoFallback(() => request<ViewerDashboardPayload>(apiRoutes.viewerDashboard), getDemoViewerDashboard),
-  getCreatorDashboard: () =>
-    withDemoFallback(() => request<CreatorDashboardPayload>(apiRoutes.creatorDashboard), getDemoCreatorDashboard),
+  getViewerDashboard: () => request<ViewerDashboardPayload>(apiRoutes.viewerDashboard),
+  getCreatorDashboard: () => request<CreatorDashboardPayload>(apiRoutes.creatorDashboard),
   getAdminDashboard: () =>
     withDemoFallback(() => request<AdminDashboardPayload>(apiRoutes.adminDashboard), getDemoAdminDashboard),
-  getNotifications: () =>
-    withDemoFallback(() => request<ApiListResponse<NotificationRecord>>(apiRoutes.notifications), getDemoNotifications),
+  getNotifications: () => request<ApiListResponse<NotificationRecord>>(apiRoutes.notifications),
+  markNotificationRead: (notificationId: string) =>
+    request<{ updated: boolean }>(apiRoutes.notificationRead(validateId(notificationId, 'notification ID')), {
+      method: 'POST',
+      body: {},
+    }),
   search: (filters: SearchFilters) => {
     const params = new URLSearchParams();
     // Security: Sanitize search parameters to prevent injection
@@ -795,67 +794,51 @@ export const mobileApi = {
       () => searchDemo(filters),
     );
   },
-  createCheckout: (body: { productId: string; productType: 'live' | 'content' | 'class' }) =>
-    withDemoFallback(
-      () => {
-        const validatedProductId = validateId(body.productId, 'product ID');
-        const allowedTypes = ['live', 'content', 'class'] as const;
-        if (!allowedTypes.includes(body.productType)) {
-          throw new MobileApiError('Invalid product type');
-        }
-        return request<CheckoutSummary>(apiRoutes.checkout, { 
-          method: 'POST', 
-          body: { ...body, productId: validatedProductId } 
-        });
+  createCheckout: (body: { productId: string; productType: 'live' | 'content' | 'class' }) => {
+    const validatedProductId = validateId(body.productId, 'product ID');
+    const allowedTypes = ['live', 'content', 'class'] as const;
+    if (!allowedTypes.includes(body.productType)) {
+      throw new MobileApiError('Invalid product type');
+    }
+    return request<CheckoutSummary>(apiRoutes.checkout, {
+      method: 'POST',
+      body: { ...body, productId: validatedProductId },
+    });
+  },
+  requestPayout: (body: { amount: number; method: string; note?: string }) => {
+    if (!body.amount || typeof body.amount !== 'number' || body.amount <= 0 || body.amount > 1000000) {
+      throw new MobileApiError('Invalid payout amount: must be a positive number under 1,000,000');
+    }
+    if (!body.method || typeof body.method !== 'string' || body.method.length > 100) {
+      throw new MobileApiError('Invalid payout method: must be a non-empty string under 100 characters');
+    }
+    const sanitizedMethod = body.method.replace(/[<>"'&]/g, '').trim();
+    const sanitizedNote = body.note ? body.note.replace(/[<>"'&]/g, '').trim().slice(0, 500) : undefined;
+
+    return request<{ message: string }>(apiRoutes.creatorPayouts, {
+      method: 'POST',
+      body: {
+        amount: body.amount,
+        method: sanitizedMethod,
+        note: sanitizedNote,
       },
-      () => createDemoCheckout(body),
-    ),
-  requestPayout: (body: { amount: number; method: string; note?: string }) =>
-    withDemoFallback(
-      () => {
-        // Validate payout request data
-        if (!body.amount || typeof body.amount !== 'number' || body.amount <= 0 || body.amount > 1000000) {
-          throw new MobileApiError('Invalid payout amount: must be a positive number under 1,000,000');
-        }
-        if (!body.method || typeof body.method !== 'string' || body.method.length > 100) {
-          throw new MobileApiError('Invalid payout method: must be a non-empty string under 100 characters');
-        }
-        const sanitizedMethod = body.method.replace(/[<>"'&]/g, '').trim();
-        const sanitizedNote = body.note ? body.note.replace(/[<>"'&]/g, '').trim().slice(0, 500) : undefined;
-        
-        return request<{ message: string }>(apiRoutes.creatorPayouts, { 
-          method: 'POST', 
-          body: {
-            amount: body.amount,
-            method: sanitizedMethod,
-            note: sanitizedNote
-          }
-        });
-      },
-      () => requestDemoPayout(body),
-    ),
+    });
+  },
   confirmPurchase: (body: {
     targetType: 'live_session' | 'premium_content' | 'class';
     targetId: string;
     providerReference: string;
     idempotencyKey: string;
   }) =>
-    withDemoFallback(
-      () =>
-        request<ConfirmPurchaseResponse>(apiRoutes.accessConfirmPurchase, {
-          method: 'POST',
-          body,
-        }),
-      async () => ({ idempotent: false }),
-    ),
+    request<ConfirmPurchaseResponse>(apiRoutes.accessConfirmPurchase, {
+      method: 'POST',
+      body,
+    }),
   getAccessGrantStatus: (
     targetType: 'live_session' | 'premium_content' | 'class' | 'lesson' | 'private_live_invite',
     targetId: string,
   ) =>
-    withDemoFallback(
-      () => request<{ allowed: boolean }>(apiRoutes.accessGrantStatus(targetType, targetId)),
-      async () => ({ allowed: true }),
-    ),
+    request<{ allowed: boolean }>(apiRoutes.accessGrantStatus(targetType, targetId)),
   getLiveChatMessages: (liveId: string, limit = 40) =>
     withDemoFallback(
       async () => {
@@ -899,28 +882,12 @@ export const mobileApi = {
         }),
       async () => ({ updated: true }),
     ),
-  getProfileSettings: () =>
-    withDemoFallback(
-      () => request<ProfileSettingsPayload>(apiRoutes.profileSettings),
-      () => {
-        const session = useSessionStore.getState().session;
-        return getDemoProfileSettings({
-          fullName: session?.user.fullName,
-          email: session?.user.email,
-          roles: session?.user.roles,
-          defaultRole: session?.user.role,
-        });
-      },
-    ),
+  getProfileSettings: () => request<ProfileSettingsPayload>(apiRoutes.profileSettings),
   saveProfileSettings: (body: ProfileSettingsPayload) =>
-    withDemoFallback(
-      () =>
-        request<SaveProfileSettingsResponse>(apiRoutes.profileSettings, {
-          method: 'PUT',
-          body,
-        }),
-      () => saveDemoProfileSettings(body),
-    ),
+    request<SaveProfileSettingsResponse>(apiRoutes.profileSettings, {
+      method: 'PUT',
+      body,
+    }),
 };
 
 export function getNodeApiBaseUrl() {

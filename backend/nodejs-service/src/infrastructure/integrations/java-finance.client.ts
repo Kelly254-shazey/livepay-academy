@@ -24,6 +24,10 @@ type RecordPaymentInput = {
   idempotencyKey: string;
 };
 
+type CommissionCalculationInput = {
+  amount: string;
+};
+
 export class JavaFinanceClient {
   private readonly client: AxiosInstance;
   private readonly breaker = new IntegrationCircuitBreaker("java-finance");
@@ -92,6 +96,16 @@ export class JavaFinanceClient {
           currency
         })
       ).data
+    });
+  }
+
+  async calculateCommission(input: CommissionCalculationInput) {
+    return executeInternalServiceRequest({
+      service: "java-finance",
+      operation: "calculate checkout commission",
+      breaker: this.breaker,
+      retryAttempts: 1,
+      run: async () => (await this.client.post("/internal/commissions/calculate", input)).data
     });
   }
 

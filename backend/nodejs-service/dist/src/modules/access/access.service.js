@@ -8,6 +8,11 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const env_1 = require("../../config/env");
 const app_error_1 = require("../../common/errors/app-error");
 const prisma_json_1 = require("../../common/db/prisma-json");
+function buildLiveJoinCode(source) {
+    const normalized = source.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    const body = normalized.slice(0, 10).padEnd(10, "X");
+    return `LIV-${body}`;
+}
 class AccessService {
     db;
     auditService;
@@ -40,7 +45,11 @@ class AccessService {
             where: { sourceReference: input.providerReference }
         });
         if (existing) {
-            return { grant: existing, idempotent: true };
+            return {
+                grant: existing,
+                idempotent: true,
+                liveJoinCode: input.targetType === "live_session" ? buildLiveJoinCode(existing.id) : undefined
+            };
         }
         const risk = await this.pythonClient
             .scoreTransaction({
@@ -128,11 +137,14 @@ class AccessService {
                     userId,
                     type: "purchase",
                     title: "Purchase confirmed",
-                    body: `Your access to ${target.title} is active.`,
+                    body: input.targetType === "live_session"
+                        ? `Your access to ${target.title} is active. Join code: ${buildLiveJoinCode(grant.id)}.`
+                        : `Your access to ${target.title} is active.`,
                     data: (0, prisma_json_1.toPrismaJson)({
                         targetType: input.targetType,
                         targetId: input.targetId,
-                        accessGrantId: grant.id
+                        accessGrantId: grant.id,
+                        joinCode: input.targetType === "live_session" ? buildLiveJoinCode(grant.id) : undefined
                     })
                 },
                 {
@@ -148,7 +160,12 @@ class AccessService {
                 }
             ]
         });
-        return { grant, finance, risk };
+        return {
+            grant,
+            finance,
+            risk,
+            liveJoinCode: input.targetType === "live_session" ? buildLiveJoinCode(grant.id) : undefined
+        };
     }
     async getGrantStatus(userId, targetType, targetId) {
         const grant = await this.findActiveGrant(userId, targetType, targetId);

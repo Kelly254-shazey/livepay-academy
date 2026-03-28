@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.profileSettingsSchema = exports.payoutRequestSchema = exports.checkoutSchema = exports.searchQuerySchema = exports.classIdParamsSchema = exports.contentIdParamsSchema = exports.liveIdParamsSchema = exports.creatorIdParamsSchema = exports.categorySlugParamsSchema = exports.emptyBodySchema = exports.frontendLinkPasswordSchema = exports.frontendCompleteProfileSchema = exports.frontendVerifyEmailSchema = exports.frontendResetPasswordSchema = exports.frontendForgotPasswordSchema = exports.frontendRefreshSchema = exports.frontendGoogleAuthSchema = exports.frontendSignUpSchema = exports.frontendSignInSchema = void 0;
+exports.profileSettingsSchema = exports.payoutRequestSchema = exports.checkoutSchema = exports.searchQuerySchema = exports.classIdParamsSchema = exports.contentIdParamsSchema = exports.notificationIdParamsSchema = exports.liveIdParamsSchema = exports.creatorIdParamsSchema = exports.categorySlugParamsSchema = exports.emptyBodySchema = exports.frontendLinkPasswordSchema = exports.frontendCompleteProfileSchema = exports.frontendVerifyEmailSchema = exports.frontendResetPasswordSchema = exports.frontendForgotPasswordSchema = exports.frontendRefreshSchema = exports.frontendGoogleAuthSchema = exports.frontendSignUpSchema = exports.frontendSignInSchema = void 0;
 const zod_1 = require("zod");
 const usernameSchema = zod_1.z.string().trim().min(3).max(32);
 const dateSchema = zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD format.");
@@ -117,6 +117,13 @@ exports.liveIdParamsSchema = zod_1.z.object({
     body: zod_1.z.object({}).default({}),
     params: zod_1.z.object({
         liveId: zod_1.z.string().uuid()
+    }),
+    query: zod_1.z.object({}).default({})
+});
+exports.notificationIdParamsSchema = zod_1.z.object({
+    body: zod_1.z.object({}).default({}),
+    params: zod_1.z.object({
+        notificationId: zod_1.z.string().uuid()
     }),
     query: zod_1.z.object({}).default({})
 });

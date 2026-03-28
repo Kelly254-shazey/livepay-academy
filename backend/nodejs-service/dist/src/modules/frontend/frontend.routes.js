@@ -147,6 +147,10 @@ function createFrontendRouter(service) {
         const result = await service.getNotifications(req.auth);
         res.json(result);
     }));
+    router.post("/notifications/:notificationId/read", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.notificationIdParamsSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.markNotificationRead(req.auth, (0, params_1.getStringParam)(req.params.notificationId));
+        res.json(result);
+    }));
     router.get("/transactions", authenticate_1.authenticate, (0, async_handler_1.asyncHandler)(async (req, res) => {
         const result = await service.getTransactions(req.auth);
         res.json(result);

@@ -1,12 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ProfileSettingsPayload } from '../shared';
-import { categories, DEMO_LIVE_ACCESS_CODE, formatCurrency, getSessionRoles } from '../shared';
+import { categories, formatCurrency, getSessionRoles } from '../shared';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { mobileApi } from '@/api/client';
+import { MobileAlert } from '@/components/MobileAlert';
 import {
   CategoryChip,
   ClassCard,
@@ -14,7 +15,6 @@ import {
   CreatorCard,
   LiveCard,
   NotificationRow,
-  TransactionRow,
 } from '@/components/cards';
 import { 
   Button, 
@@ -635,9 +635,9 @@ export function ViewerLibraryScreen() {
               value={String(query.data.followedCreators.items.length)}
             />
             <SummaryTile
-              body="Completed or ready purchase records tied to access."
-              label="Transactions"
-              value={String(query.data.transactions.items.length)}
+              body="Paid items currently unlocked on this account."
+              label="Access grants"
+              value={String(libraryItemCount)}
             />
           </View>
           <Surface>
@@ -713,7 +713,6 @@ export function ViewerProfileScreen() {
     (dashboardQuery.data?.purchasedContent.items.length ?? 0) +
     (dashboardQuery.data?.enrolledClasses.items.length ?? 0);
   const followingCount = dashboardQuery.data?.followedCreators.items.length ?? 0;
-  const transactionCount = dashboardQuery.data?.transactions.items.length ?? 0;
   const themeMode = settingsQuery.data?.appearancePreferences.theme ?? 'system';
   const communityVisibility = settingsQuery.data?.privacyPreferences.communityVisibility ?? true;
   const connectedProviders = session?.user.authProviders?.length
@@ -761,7 +760,7 @@ export function ViewerProfileScreen() {
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         <SummaryTile body="Lives, classes, and premium content already unlocked." label="Library" value={String(purchasedCount)} />
         <SummaryTile body="Creators you can revisit without searching again." label="Following" value={String(followingCount)} />
-        <SummaryTile body="Successful purchase records kept in your history." label="Transactions" value={String(transactionCount)} />
+        <SummaryTile body="Backend-confirmed access already active on this account." label="Access" value={String(purchasedCount)} />
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         <QuickActionTile
@@ -772,11 +771,11 @@ export function ViewerProfileScreen() {
           title="Notifications"
         />
         <QuickActionTile
-          actionTitle="Open transactions"
-          body="Checkout history and payment confidence in one place."
+          actionTitle="Open purchases"
+          body="Purchased access, enrollments, and unlocked lives in one place."
           icon="wallet-outline"
           onPress={() => router.push('/(viewer)/wallet')}
-          title="Wallet"
+          title="Purchases"
         />
         <QuickActionTile
           actionTitle="Open settings"
@@ -968,12 +967,6 @@ export function CreatorProfileScreen() {
 
 export function LiveDetailsScreen() {
   const { liveId } = useLocalSearchParams<{ liveId: string }>();
-  const session = useSessionStore((state) => state.session);
-  const unlockedDemoLiveIds = useSessionStore((state) => state.unlockedDemoLiveIds);
-  const unlockDemoLiveAccess = useSessionStore((state) => state.unlockDemoLiveAccess);
-  const [accessCode, setAccessCode] = useState('');
-  const [accessMessage, setAccessMessage] = useState<string | null>(null);
-  const isDemoSession = session?.isDemo === true;
   const query = useQuery({
     queryKey: queryKeys.viewer.live(liveId ?? 'unknown'),
     queryFn: () => mobileApi.getLiveDetail(liveId),
@@ -988,13 +981,13 @@ export function LiveDetailsScreen() {
       {query.data ? (
         <>
           {(() => {
-            const hasAccess =
-              query.data.live.accessGranted || (isDemoSession && liveId ? unlockedDemoLiveIds.includes(liveId) : false);
+            const hasAccess = query.data.live.accessGranted;
+            const requiresPayment = query.data.live.price > 0;
             const restrictionMessage = hasAccess
               ? 'Access confirmed. Enter the live room now.'
-              : isDemoSession
-                ? `Choose one option to continue: make payment, or enter your M-Pesa/payment code if you already paid. For testing, use ${DEMO_LIVE_ACCESS_CODE}.`
-                : 'Live access is enforced by payment and visibility rules. Complete any required payment, follow the creator if required, or wait for a private invite, then refresh access.';
+              : requiresPayment
+                ? 'Payment is required before you can join this live. Complete checkout, then refresh access after the backend confirms the purchase.'
+                : 'Live access is controlled by visibility rules. Follow the creator if required or wait for a private invite, then refresh access.';
 
             return (
               <>
@@ -1033,7 +1026,7 @@ export function LiveDetailsScreen() {
             ) : null}
             {!hasAccess ? (
               <>
-                {query.data.live.price > 0 ? (
+                {requiresPayment ? (
                   <Button
                     onPress={() =>
                       router.push({
@@ -1044,40 +1037,7 @@ export function LiveDetailsScreen() {
                     title="Make payment"
                   />
                 ) : null}
-                {isDemoSession ? (
-                  <>
-                    <TextField
-                      label="M-Pesa or payment code"
-                      onChangeText={(value) => {
-                        setAccessCode(value);
-                        if (accessMessage) setAccessMessage(null);
-                      }}
-                      placeholder="Enter payment code"
-                      value={accessCode}
-                    />
-                    {accessMessage ? (
-                      <Text style={{ color: accessMessage.includes('granted') ? theme.colors.success : theme.colors.danger }}>
-                        {accessMessage}
-                      </Text>
-                    ) : null}
-                    <Button
-                      onPress={() => {
-                        if (accessCode.trim() === DEMO_LIVE_ACCESS_CODE) {
-                          unlockDemoLiveAccess(liveId);
-                          setAccessMessage('Payment code accepted. Opening live now.');
-                          router.replace(`/(viewer)/live/${liveId}/room`);
-                          return;
-                        }
-
-                        setAccessMessage('Invalid payment code. Use 12345 for testing.');
-                      }}
-                      title="Enter with payment code"
-                      variant="secondary"
-                    />
-                  </>
-                ) : (
-                  <Button onPress={() => void query.refetch()} title="Refresh access" variant="secondary" />
-                )}
+                <Button onPress={() => void query.refetch()} title="Refresh access" variant="secondary" />
               </>
             ) : null}
           </Surface>
@@ -1092,7 +1052,6 @@ export function LiveDetailsScreen() {
 
 export function LiveRoomScreen() {
   const { liveId } = useLocalSearchParams<{ liveId: string }>();
-  const unlockedDemoLiveIds = useSessionStore((state) => state.unlockedDemoLiveIds);
   const session = useSessionStore((state) => state.session);
   const demoLiveChatMessages =
     useSessionStore((state) => (liveId ? state.demoLiveChats[liveId] : undefined)) ??
@@ -1135,17 +1094,14 @@ export function LiveRoomScreen() {
         <>
           {(() => {
             const isDemoSession = session?.isDemo === true;
-            const hasAccess =
-              query.data.live.accessGranted || (isDemoSession && liveId ? unlockedDemoLiveIds.includes(liveId) : false);
+            const hasAccess = query.data.live.accessGranted;
 
             if (!hasAccess) {
               return (
                 <Surface>
                   <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Live room is locked</Text>
                   <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
-                    {isDemoSession
-                      ? 'Return to the live details screen to complete payment or enter the demo access code.'
-                      : 'Return to the live details screen to complete any required payment or satisfy the live visibility rules.'}
+                    Return to the live details screen to complete payment or satisfy the live visibility rules.
                   </Text>
                   <Button onPress={() => router.replace(`/(viewer)/live/${liveId}`)} title="Back to live details" />
                 </Surface>
@@ -1517,9 +1473,16 @@ export function ClassDetailsScreen() {
 }
 
 export function NotificationsScreen() {
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: queryKeys.viewer.notifications,
     queryFn: mobileApi.getNotifications,
+  });
+  const markReadMutation = useMutation({
+    mutationFn: mobileApi.markNotificationRead,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.viewer.notifications });
+    },
   });
 
   return (
@@ -1530,7 +1493,17 @@ export function NotificationsScreen() {
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Notifications unavailable" /> : null}
       {query.data ? (
         query.data.items.length ? (
-          query.data.items.map((item) => <NotificationRow item={item} key={item.id} />)
+          query.data.items.map((item) => (
+            <NotificationRow
+              item={item}
+              key={item.id}
+              onPress={() => {
+                if (!item.read && !markReadMutation.isPending) {
+                  markReadMutation.mutate(item.id);
+                }
+              }}
+            />
+          ))
         ) : (
           <EmptyState body="Notification records will appear here from the backend." title="No notifications yet" />
         )
@@ -1544,54 +1517,64 @@ export function ViewerWalletScreen() {
     queryKey: queryKeys.viewer.dashboard,
     queryFn: mobileApi.getViewerDashboard,
   });
-
-  const totalSpend =
-    query.data?.transactions.items.reduce((sum, item) => sum + (item.status === 'paid' ? item.amount : 0), 0) ?? 0;
-  const latestPurchase = query.data?.transactions.items[0];
+  const totalUnlocked =
+    (query.data?.purchasedLives.items.length ?? 0) +
+    (query.data?.purchasedContent.items.length ?? 0) +
+    (query.data?.enrolledClasses.items.length ?? 0);
+  const latestUnlocked =
+    query.data?.purchasedLives.items[0]?.title ??
+    query.data?.purchasedContent.items[0]?.title ??
+    query.data?.enrolledClasses.items[0]?.title;
 
   return (
     <Screen>
       <ScreenBackLink fallback="/(viewer)/(tabs)/profile" label="Back to profile" />
-      <Heading title="Transactions" />
-      {query.isLoading ? <LoadingState label="Loading transactions..." /> : null}
-      {query.isError ? <EmptyState body={(query.error as Error).message} title="Wallet unavailable" /> : null}
+      <Heading title="Purchases & access" />
+      {query.isLoading ? <LoadingState label="Loading purchases..." /> : null}
+      {query.isError ? <EmptyState body={(query.error as Error).message} title="Purchases unavailable" /> : null}
       {query.data ? (
-        query.data.transactions.items.length ? (
+        totalUnlocked ? (
           <>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
               <SummaryTile
-                body="Total paid value connected to lives, content, and classes."
-                label="Total spend"
-                value={formatCurrency(totalSpend)}
+                body="Lives, content, and classes currently unlocked on your account."
+                label="Unlocked items"
+                value={String(totalUnlocked)}
               />
               <SummaryTile
-                body="Successful purchase records in your history."
-                label="Purchases"
-                value={String(query.data.transactions.items.length)}
+                body="Paid live sessions available to enter after backend confirmation."
+                label="Lives"
+                value={String(query.data.purchasedLives.items.length)}
               />
               <SummaryTile
-                body="Most recent item in your checkout history."
+                body="Most recent unlocked item visible on your account."
                 label="Latest"
-                value={latestPurchase ? latestPurchase.title : 'No purchases yet'}
+                value={latestUnlocked ?? 'No unlocked items yet'}
               />
             </View>
             <Surface>
-              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Checkout confidence</Text>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Access confidence</Text>
               <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
-                LiveGate keeps payment, unlocks, and access grants connected so your wallet history explains why an
-                item appears in the library.
+                Viewer accounts do not expose a wallet ledger here. Instead, you see the access that the backend has
+                already granted after payment or enrollment confirmation.
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                 <Button onPress={() => router.push('/(viewer)/(tabs)/library')} title="Open library" />
                 <Button onPress={() => router.push('/(viewer)/(tabs)/search')} title="Find more content" variant="secondary" />
               </View>
             </Surface>
-            {query.data.transactions.items.map((item) => (
-              <TransactionRow item={item} key={item.id} />
+            {query.data.purchasedLives.items.map((item) => (
+              <LiveCard key={item.id} live={item} onPress={() => router.push(`/(viewer)/live/${item.id}`)} />
+            ))}
+            {query.data.purchasedContent.items.map((item) => (
+              <ContentCard content={item} key={item.id} onPress={() => router.push(`/(viewer)/content/${item.id}`)} />
+            ))}
+            {query.data.enrolledClasses.items.map((item) => (
+              <ClassCard classItem={item} key={item.id} onPress={() => router.push(`/(viewer)/class/${item.id}`)} />
             ))}
           </>
         ) : (
-          <EmptyState body="Transactions appear here after purchases are completed." title="No transactions yet" />
+          <EmptyState body="Purchased lives, content, and classes appear here after access is granted." title="No purchases yet" />
         )
       ) : null}
     </Screen>
@@ -1711,6 +1694,15 @@ export function CheckoutScreen() {
             <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
               Payment confirmation and access grants are resolved by the Node backend before the unlocked state is trusted.
             </Text>
+            {checkoutQuery.data.paymentMethods?.length ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {checkoutQuery.data.paymentMethods.map((method) => (
+                  <Badge key={method} variant="primary">
+                    {method}
+                  </Badge>
+                ))}
+              </View>
+            ) : null}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
               <Button
                 onPress={() => confirmMutation.mutate()}
@@ -1723,20 +1715,27 @@ export function CheckoutScreen() {
             </View>
           </Surface>
           {confirmMutation.isError ? (
-            <Surface>
-              <Text style={{ fontSize: 14, color: theme.colors.danger }}>
-                {(confirmMutation.error as Error).message}
-              </Text>
-            </Surface>
+            <MobileAlert message={(confirmMutation.error as Error).message} type="error" title="Payment confirmation failed" />
           ) : null}
           {confirmed ? (
             <Surface>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.success }}>
-                {confirmMutation.data?.idempotent ? 'Existing access confirmed' : 'Payment confirmed'}
-              </Text>
-              <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
-                Access is active and the relevant viewer surfaces have been refreshed against backend truth.
-              </Text>
+              <MobileAlert
+                message="Access is active and the relevant viewer surfaces have been refreshed against backend truth."
+                type="success"
+                title={confirmMutation.data?.idempotent ? 'Existing access confirmed' : 'Payment confirmed'}
+              />
+              {productType === 'live' && confirmMutation.data?.liveJoinCode ? (
+                <Surface style={{ backgroundColor: theme.colors.surfaceMuted }}>
+                  <Text style={getMetaLabelStyle()}>Live join code</Text>
+                  <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text }}>
+                    {confirmMutation.data.liveJoinCode}
+                  </Text>
+                  <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
+                    This code is generated automatically after payment confirmation. Live room entry is still validated by
+                    the backend before you join.
+                  </Text>
+                </Surface>
+              ) : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                 <Button
                   onPress={() => router.replace(getUnlockedRoute(productType, productId))}
@@ -1873,9 +1872,13 @@ export function SettingsScreen() {
               value={String(dashboardQuery.data?.followedCreators.items.length ?? 0)}
             />
             <SummaryTile
-              body="Total checkout records connected to this account."
+              body="Total backend-confirmed access grants connected to this account."
               label="Purchases"
-              value={String(dashboardQuery.data?.transactions.items.length ?? 0)}
+              value={String(
+                (dashboardQuery.data?.purchasedLives.items.length ?? 0) +
+                  (dashboardQuery.data?.purchasedContent.items.length ?? 0) +
+                  (dashboardQuery.data?.enrolledClasses.items.length ?? 0),
+              )}
             />
             <SummaryTile
               body="How your account appears to the broader learning community."

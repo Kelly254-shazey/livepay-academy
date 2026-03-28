@@ -19,6 +19,12 @@ type ResolvedTarget = {
   isPaid: boolean;
 };
 
+function buildLiveJoinCode(source: string) {
+  const normalized = source.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const body = normalized.slice(0, 10).padEnd(10, "X");
+  return `LIV-${body}`;
+}
+
 export class AccessService {
   constructor(
     private readonly db: PrismaClient,
@@ -63,7 +69,11 @@ export class AccessService {
     });
 
     if (existing) {
-      return { grant: existing, idempotent: true };
+      return {
+        grant: existing,
+        idempotent: true,
+        liveJoinCode: input.targetType === "live_session" ? buildLiveJoinCode(existing.id) : undefined
+      };
     }
 
     const risk = await this.pythonClient
@@ -159,11 +169,15 @@ export class AccessService {
           userId,
           type: "purchase",
           title: "Purchase confirmed",
-          body: `Your access to ${target.title} is active.`,
+          body:
+            input.targetType === "live_session"
+              ? `Your access to ${target.title} is active. Join code: ${buildLiveJoinCode(grant.id)}.`
+              : `Your access to ${target.title} is active.`,
           data: toPrismaJson({
             targetType: input.targetType,
             targetId: input.targetId,
-            accessGrantId: grant.id
+            accessGrantId: grant.id,
+            joinCode: input.targetType === "live_session" ? buildLiveJoinCode(grant.id) : undefined
           })
         },
         {
@@ -180,7 +194,12 @@ export class AccessService {
       ]
     });
 
-    return { grant, finance, risk };
+    return {
+      grant,
+      finance,
+      risk,
+      liveJoinCode: input.targetType === "live_session" ? buildLiveJoinCode(grant.id) : undefined
+    };
   }
 
   async getGrantStatus(userId: string, targetType: AccessGrantTargetType, targetId: string) {

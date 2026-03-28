@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { z } from 'zod';
 import { mobileApi } from '@/api/client';
+import { MobileAlert } from '@/components/MobileAlert';
 import {
   CategoryChip,
   ClassCard,
@@ -539,10 +540,28 @@ export function CreatorProfileScreen() {
 
 export function PayoutsScreen() {
   const queryClient = useQueryClient();
+  const dashboardQuery = useQuery({
+    queryKey: queryKeys.creator.dashboard,
+    queryFn: mobileApi.getCreatorDashboard,
+  });
   const form = useForm<z.infer<typeof payoutSchema>>({
     resolver: zodResolver(payoutSchema),
     defaultValues: { amount: 0, method: '', note: '' },
   });
+  const supportedPayoutMethods = dashboardQuery.data?.supportedPayoutMethods ?? [];
+
+  useEffect(() => {
+    if (!supportedPayoutMethods.length) {
+      return;
+    }
+
+    if (!form.getValues('method')) {
+      form.setValue('method', supportedPayoutMethods[0], {
+        shouldDirty: false,
+        shouldValidate: true,
+      });
+    }
+  }, [form, supportedPayoutMethods]);
 
   const mutation = useMutation({
     mutationFn: mobileApi.requestPayout,
@@ -560,6 +579,35 @@ export function PayoutsScreen() {
       <ScreenBackLink fallback="/(creator)/(tabs)/profile" label="Back to profile" />
       <Heading title="Request payout" />
       <Surface>
+        {dashboardQuery.data ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <SummaryTile
+              body="Balance currently available to withdraw."
+              label="Available now"
+              value={formatCurrency(dashboardQuery.data.wallet.availableBalance, dashboardQuery.data.wallet.currency)}
+            />
+            <SummaryTile
+              body="Balance still settling before payout eligibility."
+              label="Pending"
+              value={formatCurrency(dashboardQuery.data.wallet.pendingBalance, dashboardQuery.data.wallet.currency)}
+            />
+          </View>
+        ) : null}
+        {supportedPayoutMethods.length ? (
+          <View style={{ gap: 8 }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary }}>Supported payout methods</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {supportedPayoutMethods.map((method) => (
+                <CategoryChip
+                  key={method}
+                  title={method}
+                  active={form.watch('method') === method}
+                  onPress={() => form.setValue('method', method, { shouldDirty: true, shouldValidate: true })}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
         <Controller
           control={form.control}
           name="amount"
@@ -581,8 +629,8 @@ export function PayoutsScreen() {
             <TextField label="Note" onChangeText={field.onChange} placeholder="Optional note" value={field.value ?? ''} />
           )}
         />
-        {mutation.isSuccess ? <Text style={{ color: theme.colors.success }}>{mutation.data?.message ?? ''}</Text> : null}
-        {mutation.isError ? <Text style={{ color: theme.colors.danger }}>{(mutation.error as Error).message}</Text> : null}
+        {mutation.isSuccess ? <MobileAlert message={mutation.data?.message ?? ''} type="success" title="Payout requested" /> : null}
+        {mutation.isError ? <MobileAlert message={(mutation.error as Error).message} type="error" title="Payout request failed" /> : null}
         <Button
           onPress={form.handleSubmit((values) => mutation.mutate(values))}
           title={mutation.isPending ? 'Submitting payout...' : 'Submit payout request'}
@@ -1351,9 +1399,16 @@ export function CreateLiveScreen() {
 }
 
 export function CreatorNotificationsScreen() {
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: queryKeys.creator.notifications,
     queryFn: mobileApi.getNotifications,
+  });
+  const markReadMutation = useMutation({
+    mutationFn: mobileApi.markNotificationRead,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.creator.notifications });
+    },
   });
 
   return (
@@ -1362,7 +1417,21 @@ export function CreatorNotificationsScreen() {
       <Heading title="Content creator updates" />
       {query.isLoading ? <LoadingState label="Loading notifications..." /> : null}
       {query.isError ? <EmptyState body={(query.error as Error).message} title="Notifications unavailable" /> : null}
-      {query.data ? query.data.items.map((item) => <NotificationRow item={item} key={item.id} />) : null}
+      {query.data
+        ? query.data.items.length
+          ? query.data.items.map((item) => (
+              <NotificationRow
+                item={item}
+                key={item.id}
+                onPress={() => {
+                  if (!item.read && !markReadMutation.isPending) {
+                    markReadMutation.mutate(item.id);
+                  }
+                }}
+              />
+            ))
+          : <EmptyState body="Creator alerts, sales, and payout updates will appear here." title="No notifications yet" />
+        : null}
     </Screen>
   );
 }

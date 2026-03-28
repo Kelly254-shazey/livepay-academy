@@ -28,6 +28,7 @@ export const apiRoutes = {
   classes: '/classes',
   classDetail: (id: string) => `/classes/${id}`,
   notifications: '/notifications',
+  notificationRead: (id: string) => `/notifications/${id}/read`,
   search: '/search',
   checkout: '/checkout',
   profileSettings: '/users/settings',

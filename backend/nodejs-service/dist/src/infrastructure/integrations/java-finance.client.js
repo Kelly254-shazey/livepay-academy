@@ -69,6 +69,15 @@ class JavaFinanceClient {
             })).data
         });
     }
+    async calculateCommission(input) {
+        return (0, internal_service_resilience_1.executeInternalServiceRequest)({
+            service: "java-finance",
+            operation: "calculate checkout commission",
+            breaker: this.breaker,
+            retryAttempts: 1,
+            run: async () => (await this.client.post("/internal/commissions/calculate", input)).data
+        });
+    }
     async getRevenueSummary(from, to) {
         return (0, internal_service_resilience_1.executeInternalServiceRequest)({
             service: "java-finance",

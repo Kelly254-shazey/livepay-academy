@@ -271,6 +271,7 @@ export function getDemoCategoryDetail(slug: string): CategoryDetailPayload {
 export const getDemoClassDetail = (id: string): ClassDetailPayload => ({ classItem: classItem({ id }) });
 export const getDemoCreatorDashboard = (): CreatorDashboardPayload => ({
   wallet: { availableBalance: 1820, pendingBalance: 245, lifetimeEarnings: 14890, currency: 'USD' },
+  supportedPayoutMethods: ['Bank transfer', 'Mobile money', 'PayPal', 'Wise'],
   followers: primaryCreator.followerCount,
   verificationStatus: primaryCreator.verificationStatus,
   recentTransactions: list([transaction({ id: 'txn-demo-creator-1', type: 'earning', title: 'Creator payout credit' })]),
@@ -318,7 +319,7 @@ export const getDemoViewerDashboard = (): ViewerDashboardPayload => ({
   purchasedContent: list([premium]),
   enrolledClasses: list([cohort]),
   followedCreators: list([primaryCreator, secondaryCreator]),
-  transactions: list([transaction(), transaction({ id: 'txn-demo-2', title: 'Premium content purchase', amount: premium.price })]),
+  transactions: list([]),
 });
 export const requestDemoPayout = (input: { amount: number; method: string; note?: string }): { message: string } => ({
   message: `Demo payout request received for ${input.amount} via ${input.method}.`,

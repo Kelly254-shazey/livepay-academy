@@ -23,6 +23,7 @@ import {
   frontendSignInSchema,
   frontendSignUpSchema,
   liveIdParamsSchema,
+  notificationIdParamsSchema,
   payoutRequestSchema,
   searchQuerySchema
 } from "./frontend.schemas";
@@ -306,6 +307,16 @@ export function createFrontendRouter(service: FrontendService) {
     authenticate,
     asyncHandler(async (req, res) => {
       const result = await service.getNotifications(req.auth!);
+      res.json(result);
+    })
+  );
+
+  router.post(
+    "/notifications/:notificationId/read",
+    authenticate,
+    validate(notificationIdParamsSchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.markNotificationRead(req.auth!, getStringParam(req.params.notificationId));
       res.json(result);
     })
   );
