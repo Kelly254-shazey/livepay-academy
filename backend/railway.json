@@ -10,7 +10,7 @@
     "restartPolicyType": "on_failure",
     "restartPolicyMaxRetries": 5,
     "healthcheck": {
-      "test": ["CMD", "curl", "-f", "http://localhost:$PORT/health"],
+      "test": ["CMD-SHELL", "curl -f http://localhost:${PORT}/health || exit 1"],
       "interval": 30,
       "timeout": 10,
       "retries": 3,

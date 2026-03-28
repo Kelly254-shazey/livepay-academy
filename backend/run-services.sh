@@ -18,6 +18,107 @@ export PYTHON_INTELLIGENCE_URL=${PYTHON_INTELLIGENCE_URL:-http://127.0.0.1:${PYT
 export PYTHON_DATABASE_URL=${PYTHON_DATABASE_URL:-}
 export PYTHON_SOURCE_DATABASE_URL=${PYTHON_SOURCE_DATABASE_URL:-}
 
+generate_secret() {
+  tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48
+}
+
+derive_database_name() {
+  local base_name="${1:-}"
+  local target_suffix="$2"
+
+  if [ -z "${base_name}" ]; then
+    echo "livegate_${target_suffix}"
+    return 0
+  fi
+
+  case "${base_name}" in
+    *_nodejs|*_java|*_python)
+      echo "${base_name%_*}_${target_suffix}"
+      ;;
+    *)
+      echo "${base_name}_${target_suffix}"
+      ;;
+  esac
+}
+
+normalize_runtime_env() {
+  local mysql_host="${MYSQLHOST:-${MYSQL_HOST:-}}"
+  local mysql_port="${MYSQLPORT:-${MYSQL_PORT:-3306}}"
+  local mysql_user="${MYSQLUSER:-${MYSQL_USER:-}}"
+  local mysql_password="${MYSQLPASSWORD:-${MYSQL_PASSWORD:-}}"
+  local mysql_database="${MYSQLDATABASE:-${MYSQL_DATABASE:-}}"
+  local node_database_name="${NODE_DATABASE_NAME:-${mysql_database:-}}"
+  local java_database_name=""
+  local python_database_name=""
+
+  if [ -z "${DATABASE_URL:-}" ] && [ -n "${MYSQL_URL:-}" ]; then
+    export DATABASE_URL="${MYSQL_URL}"
+  fi
+
+  if [ -z "${DATABASE_URL:-}" ] && [ -n "${mysql_host}" ] && [ -n "${mysql_user}" ] && [ -n "${mysql_password}" ] && [ -n "${node_database_name}" ]; then
+    export DATABASE_URL="mysql://${mysql_user}:${mysql_password}@${mysql_host}:${mysql_port}/${node_database_name}"
+    echo "Derived DATABASE_URL from Railway MySQL variables"
+  fi
+
+  java_database_name="$(derive_database_name "${node_database_name}" "java")"
+  python_database_name="$(derive_database_name "${node_database_name}" "python")"
+
+  if [ -z "${SPRING_DATASOURCE_URL:-}" ] && [ -n "${mysql_host}" ] && [ -n "${java_database_name}" ]; then
+    export SPRING_DATASOURCE_URL="jdbc:mysql://${mysql_host}:${mysql_port}/${JAVA_DATABASE_NAME:-${java_database_name}}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+  fi
+
+  if [ -z "${SPRING_DATASOURCE_USERNAME:-}" ] && [ -n "${mysql_user}" ]; then
+    export SPRING_DATASOURCE_USERNAME="${mysql_user}"
+  fi
+
+  if [ -z "${SPRING_DATASOURCE_PASSWORD:-}" ] && [ -n "${mysql_password}" ]; then
+    export SPRING_DATASOURCE_PASSWORD="${mysql_password}"
+  fi
+
+  if [ -z "${PYTHON_DATABASE_URL:-}" ] && [ -n "${mysql_host}" ] && [ -n "${mysql_user}" ] && [ -n "${mysql_password}" ] && [ -n "${python_database_name}" ]; then
+    export PYTHON_DATABASE_URL="mysql+aiomysql://${mysql_user}:${mysql_password}@${mysql_host}:${mysql_port}/${PYTHON_DATABASE_NAME:-${python_database_name}}"
+  fi
+
+  if [ -z "${PYTHON_SOURCE_DATABASE_URL:-}" ] && [ -n "${DATABASE_URL:-}" ]; then
+    export PYTHON_SOURCE_DATABASE_URL="$(printf '%s' "${DATABASE_URL}" | sed 's#^mysql://#mysql+aiomysql://#')"
+  fi
+
+  if [ -z "${JWT_ACCESS_SECRET:-}" ] && [ -n "${JWT_SECRET:-}" ]; then
+    export JWT_ACCESS_SECRET="${JWT_SECRET}"
+  fi
+
+  if [ -z "${JWT_REFRESH_SECRET:-}" ] && [ -n "${JWT_SECRET:-}" ]; then
+    export JWT_REFRESH_SECRET="${JWT_SECRET}-refresh"
+  fi
+
+  if [ -z "${INTERNAL_API_KEY:-}" ]; then
+    export INTERNAL_API_KEY="$(generate_secret)"
+    echo "Generated INTERNAL_API_KEY for this deployment"
+  fi
+}
+
+validate_node_runtime_env() {
+  local missing=()
+
+  [ -n "${DATABASE_URL:-}" ] || missing+=("DATABASE_URL")
+  [ -n "${JWT_ACCESS_SECRET:-}" ] || missing+=("JWT_ACCESS_SECRET")
+  [ -n "${JWT_REFRESH_SECRET:-}" ] || missing+=("JWT_REFRESH_SECRET")
+  [ -n "${INTERNAL_API_KEY:-}" ] || missing+=("INTERNAL_API_KEY")
+
+  if [ "${#missing[@]}" -gt 0 ]; then
+    echo "Node.js service configuration is incomplete."
+    echo "Missing required environment variables:"
+    for var_name in "${missing[@]}"; do
+      echo "  - ${var_name}"
+    done
+    return 1
+  fi
+
+  return 0
+}
+
+normalize_runtime_env
+
 PIDS=()
 LAST_STARTED_PID=""
 PRIMARY_PID=""
@@ -58,6 +159,12 @@ wait_for_port() {
 }
 
 start_java() {
+  if [ -z "${SPRING_DATASOURCE_URL:-}" ] || [ -z "${SPRING_DATASOURCE_USERNAME:-}" ] || [ -z "${SPRING_DATASOURCE_PASSWORD:-}" ]; then
+    echo "Skipping Java service because datasource configuration is incomplete"
+    LAST_STARTED_PID=""
+    return 0
+  fi
+
   echo "Starting Java service on port ${SERVER_PORT}..."
   (
     cd /app/java-service
@@ -70,6 +177,7 @@ start_java() {
 start_python() {
   if [ -z "${PYTHON_DATABASE_URL}" ]; then
     echo "Skipping Python service because PYTHON_DATABASE_URL is not set"
+    LAST_STARTED_PID=""
     return 0
   fi
 
@@ -79,6 +187,7 @@ start_python() {
 
   if [ -z "${PYTHON_SOURCE_DATABASE_URL}" ]; then
     echo "Skipping Python service because PYTHON_SOURCE_DATABASE_URL is not set"
+    LAST_STARTED_PID=""
     return 0
   fi
 
@@ -96,6 +205,7 @@ start_python() {
 }
 
 start_node() {
+  validate_node_runtime_env
   echo "Starting Node.js service on port ${PORT}..."
   (
     cd /app/nodejs-service
@@ -133,6 +243,11 @@ case "$SERVICE_TYPE" in
     exit 1
     ;;
 esac
+
+if [ -z "${PRIMARY_PID}" ] && [ "${#PIDS[@]}" -eq 0 ]; then
+  echo "No backend services were started. Check Railway environment configuration."
+  exit 1
+fi
 
 if [ -n "${PRIMARY_PID}" ]; then
   wait "${PRIMARY_PID}"
