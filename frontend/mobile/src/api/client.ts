@@ -214,16 +214,33 @@ const inferredApiBaseUrl = (() => {
 const isDevelopmentRuntime = __DEV__ || process.env.NODE_ENV === 'development';
 const explicitApiHostname = getHostnameFromUrl(explicitApiBaseUrl);
 
+const isExpoWebDev =
+  Platform.OS === 'web' &&
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1') &&
+  (window.location.port === '8081' || window.location.port === '19006');
+const expoWebDevFallbackApiBaseUrl = isExpoWebDev
+  ? 'http://localhost:3000/api'
+  : '';
+const expoWebDevFallbackSocketOrigin = isExpoWebDev
+  ? 'http://localhost:3000'
+  : '';
+
 const apiBaseUrl =
-  (!isDevelopmentRuntime && (!explicitApiBaseUrl || isLocalHostname(explicitApiHostname))
-    ? DEFAULT_PRODUCTION_API_BASE_URL
-    : explicitApiBaseUrl) ||
-  (Platform.OS === 'web' ? '' : inferredApiBaseUrl);
+  ((!isDevelopmentRuntime && (!explicitApiBaseUrl || isLocalHostname(explicitApiHostname))
+      ? DEFAULT_PRODUCTION_API_BASE_URL
+      : explicitApiBaseUrl) ||
+    expoWebDevFallbackApiBaseUrl ||
+    (Platform.OS === 'web' ? '' : inferredApiBaseUrl));
 const socketOrigin =
-  (!isDevelopmentRuntime && (!explicitSocketOrigin || isLocalHostname(getHostnameFromUrl(explicitSocketOrigin)))
-    ? DEFAULT_PRODUCTION_SOCKET_ORIGIN
-    : explicitSocketOrigin) ||
-  (apiBaseUrl ? new URL(apiBaseUrl).origin : '');
+  ((!isDevelopmentRuntime &&
+    (!explicitSocketOrigin ||
+      isLocalHostname(getHostnameFromUrl(explicitSocketOrigin)))
+      ? DEFAULT_PRODUCTION_SOCKET_ORIGIN
+      : explicitSocketOrigin) ||
+    expoWebDevFallbackSocketOrigin ||
+    (apiBaseUrl ? new URL(apiBaseUrl).origin : ''));
 
 export class MobileApiError extends Error {
   constructor(message: string, public readonly statusCode?: number) {
