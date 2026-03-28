@@ -19,7 +19,17 @@ export PYTHON_DATABASE_URL=${PYTHON_DATABASE_URL:-}
 export PYTHON_SOURCE_DATABASE_URL=${PYTHON_SOURCE_DATABASE_URL:-}
 
 generate_secret() {
-  tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48
+  python3 -c 'import secrets; print(secrets.token_urlsafe(36)[:48])'
+}
+
+parse_database_url() {
+  local raw_url="${1:-}"
+
+  if [ -z "${raw_url}" ]; then
+    return 1
+  fi
+
+  python3 -c 'from urllib.parse import urlparse; import sys; u = urlparse(sys.argv[1]); print(u.hostname or ""); print(u.port or 3306); print(u.username or ""); print(u.password or ""); print((u.path or "").lstrip("/").split("?", 1)[0]);' "${raw_url}"
 }
 
 derive_database_name() {
@@ -47,12 +57,28 @@ normalize_runtime_env() {
   local mysql_user="${MYSQLUSER:-${MYSQL_USER:-}}"
   local mysql_password="${MYSQLPASSWORD:-${MYSQL_PASSWORD:-}}"
   local mysql_database="${MYSQLDATABASE:-${MYSQL_DATABASE:-}}"
+  local database_url_source="${DATABASE_URL:-${DATABASE_PUBLIC_URL:-${MYSQL_URL:-}}}"
   local node_database_name="${NODE_DATABASE_NAME:-${mysql_database:-}}"
   local java_database_name=""
   local python_database_name=""
+  local parsed_parts=()
 
-  if [ -z "${DATABASE_URL:-}" ] && [ -n "${MYSQL_URL:-}" ]; then
-    export DATABASE_URL="${MYSQL_URL}"
+  if [ -z "${DATABASE_URL:-}" ] && [ -n "${database_url_source}" ]; then
+    export DATABASE_URL="${database_url_source}"
+  fi
+
+  if [ -z "${mysql_host}" ] && [ -n "${DATABASE_URL:-}" ]; then
+    mapfile -t parsed_parts < <(parse_database_url "${DATABASE_URL}") || true
+    if [ "${#parsed_parts[@]}" -ge 5 ]; then
+      mysql_host="${parsed_parts[0]}"
+      mysql_port="${parsed_parts[1]}"
+      mysql_user="${parsed_parts[2]}"
+      mysql_password="${parsed_parts[3]}"
+      mysql_database="${parsed_parts[4]}"
+      if [ -z "${node_database_name}" ] && [ -n "${mysql_database}" ]; then
+        node_database_name="${mysql_database}"
+      fi
+    fi
   fi
 
   if [ -z "${DATABASE_URL:-}" ] && [ -n "${mysql_host}" ] && [ -n "${mysql_user}" ] && [ -n "${mysql_password}" ] && [ -n "${node_database_name}" ]; then
@@ -89,6 +115,14 @@ normalize_runtime_env() {
 
   if [ -z "${JWT_REFRESH_SECRET:-}" ] && [ -n "${JWT_SECRET:-}" ]; then
     export JWT_REFRESH_SECRET="${JWT_SECRET}-refresh"
+  fi
+
+  if [ -z "${JWT_ACCESS_SECRET:-}" ] && [ -n "${JWT_REFRESH_SECRET:-}" ]; then
+    export JWT_ACCESS_SECRET="${JWT_REFRESH_SECRET}-access"
+  fi
+
+  if [ -z "${JWT_REFRESH_SECRET:-}" ] && [ -n "${JWT_ACCESS_SECRET:-}" ]; then
+    export JWT_REFRESH_SECRET="${JWT_ACCESS_SECRET}-refresh"
   fi
 
   if [ -z "${INTERNAL_API_KEY:-}" ]; then

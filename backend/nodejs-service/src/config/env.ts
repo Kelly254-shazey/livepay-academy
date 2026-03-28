@@ -2,6 +2,42 @@ import "dotenv/config";
 
 import { z } from "zod";
 
+function deriveMysqlUrl(source: NodeJS.ProcessEnv) {
+  const host = source.MYSQLHOST ?? source.MYSQL_HOST;
+  const port = source.MYSQLPORT ?? source.MYSQL_PORT ?? "3306";
+  const user = source.MYSQLUSER ?? source.MYSQL_USER;
+  const password = source.MYSQLPASSWORD ?? source.MYSQL_PASSWORD;
+  const database = source.NODE_DATABASE_NAME ?? source.MYSQLDATABASE ?? source.MYSQL_DATABASE;
+
+  if (!host || !user || !password || !database) {
+    return undefined;
+  }
+
+  return `mysql://${user}:${password}@${host}:${port}/${database}`;
+}
+
+const runtimeEnv: Record<string, string | undefined> = { ...process.env };
+
+if (!runtimeEnv.DATABASE_URL) {
+  runtimeEnv.DATABASE_URL = runtimeEnv.DATABASE_PUBLIC_URL ?? runtimeEnv.MYSQL_URL ?? deriveMysqlUrl(process.env);
+}
+
+if (!runtimeEnv.JWT_ACCESS_SECRET && runtimeEnv.JWT_SECRET) {
+  runtimeEnv.JWT_ACCESS_SECRET = runtimeEnv.JWT_SECRET;
+}
+
+if (!runtimeEnv.JWT_REFRESH_SECRET && runtimeEnv.JWT_SECRET) {
+  runtimeEnv.JWT_REFRESH_SECRET = `${runtimeEnv.JWT_SECRET}-refresh`;
+}
+
+if (!runtimeEnv.JWT_ACCESS_SECRET && runtimeEnv.JWT_REFRESH_SECRET) {
+  runtimeEnv.JWT_ACCESS_SECRET = `${runtimeEnv.JWT_REFRESH_SECRET}-access`;
+}
+
+if (!runtimeEnv.JWT_REFRESH_SECRET && runtimeEnv.JWT_ACCESS_SECRET) {
+  runtimeEnv.JWT_REFRESH_SECRET = `${runtimeEnv.JWT_ACCESS_SECRET}-refresh`;
+}
+
 const booleanString = z
   .string()
   .trim()
@@ -66,4 +102,4 @@ const envSchema = z.object({
   SWAGGER_ENABLED: booleanEnv.default(true)
 });
 
-export const env = envSchema.parse(process.env);
+export const env = envSchema.parse(runtimeEnv);

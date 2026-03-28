@@ -3,6 +3,33 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.env = void 0;
 require("dotenv/config");
 const zod_1 = require("zod");
+function deriveMysqlUrl(source) {
+    const host = source.MYSQLHOST ?? source.MYSQL_HOST;
+    const port = source.MYSQLPORT ?? source.MYSQL_PORT ?? "3306";
+    const user = source.MYSQLUSER ?? source.MYSQL_USER;
+    const password = source.MYSQLPASSWORD ?? source.MYSQL_PASSWORD;
+    const database = source.NODE_DATABASE_NAME ?? source.MYSQLDATABASE ?? source.MYSQL_DATABASE;
+    if (!host || !user || !password || !database) {
+        return undefined;
+    }
+    return `mysql://${user}:${password}@${host}:${port}/${database}`;
+}
+const runtimeEnv = { ...process.env };
+if (!runtimeEnv.DATABASE_URL) {
+    runtimeEnv.DATABASE_URL = runtimeEnv.DATABASE_PUBLIC_URL ?? runtimeEnv.MYSQL_URL ?? deriveMysqlUrl(process.env);
+}
+if (!runtimeEnv.JWT_ACCESS_SECRET && runtimeEnv.JWT_SECRET) {
+    runtimeEnv.JWT_ACCESS_SECRET = runtimeEnv.JWT_SECRET;
+}
+if (!runtimeEnv.JWT_REFRESH_SECRET && runtimeEnv.JWT_SECRET) {
+    runtimeEnv.JWT_REFRESH_SECRET = `${runtimeEnv.JWT_SECRET}-refresh`;
+}
+if (!runtimeEnv.JWT_ACCESS_SECRET && runtimeEnv.JWT_REFRESH_SECRET) {
+    runtimeEnv.JWT_ACCESS_SECRET = `${runtimeEnv.JWT_REFRESH_SECRET}-access`;
+}
+if (!runtimeEnv.JWT_REFRESH_SECRET && runtimeEnv.JWT_ACCESS_SECRET) {
+    runtimeEnv.JWT_REFRESH_SECRET = `${runtimeEnv.JWT_ACCESS_SECRET}-refresh`;
+}
 const booleanString = zod_1.z
     .string()
     .trim()
@@ -60,4 +87,4 @@ const envSchema = zod_1.z.object({
     DEFAULT_CURRENCY: zod_1.z.string().default("USD"),
     SWAGGER_ENABLED: booleanEnv.default(true)
 });
-exports.env = envSchema.parse(process.env);
+exports.env = envSchema.parse(runtimeEnv);
