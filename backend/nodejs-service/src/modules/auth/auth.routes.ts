@@ -21,7 +21,7 @@ export function createAuthRouter(service: AuthService) {
   const router = Router();
 
   router.post(
-    "/register",
+    "/sign-up",
     validate(registerSchema),
     asyncHandler(async (req, res) => {
       const result = await service.register({
@@ -34,7 +34,7 @@ export function createAuthRouter(service: AuthService) {
   );
 
   router.post(
-    "/login",
+    "/sign-in",
     validate(loginSchema),
     asyncHandler(async (req, res) => {
       const result = await service.login({
