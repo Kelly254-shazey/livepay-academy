@@ -226,21 +226,26 @@ const expoWebDevFallbackApiBaseUrl = isExpoWebDev
 const expoWebDevFallbackSocketOrigin = isExpoWebDev
   ? 'http://localhost:3000'
   : '';
+const resolvedApiBaseUrl =
+  !isDevelopmentRuntime &&
+  (!explicitApiBaseUrl || isLocalHostname(explicitApiHostname))
+    ? DEFAULT_PRODUCTION_API_BASE_URL
+    : explicitApiBaseUrl;
+const resolvedSocketOrigin =
+  !isDevelopmentRuntime &&
+  (!explicitSocketOrigin ||
+    isLocalHostname(getHostnameFromUrl(explicitSocketOrigin)))
+    ? DEFAULT_PRODUCTION_SOCKET_ORIGIN
+    : explicitSocketOrigin;
 
 const apiBaseUrl =
-  ((!isDevelopmentRuntime && (!explicitApiBaseUrl || isLocalHostname(explicitApiHostname))
-      ? DEFAULT_PRODUCTION_API_BASE_URL
-      : explicitApiBaseUrl) ||
-    expoWebDevFallbackApiBaseUrl ||
-    (Platform.OS === 'web' ? '' : inferredApiBaseUrl));
+  resolvedApiBaseUrl ||
+  expoWebDevFallbackApiBaseUrl ||
+  (Platform.OS === 'web' ? '' : inferredApiBaseUrl);
 const socketOrigin =
-  ((!isDevelopmentRuntime &&
-    (!explicitSocketOrigin ||
-      isLocalHostname(getHostnameFromUrl(explicitSocketOrigin)))
-      ? DEFAULT_PRODUCTION_SOCKET_ORIGIN
-      : explicitSocketOrigin) ||
-    expoWebDevFallbackSocketOrigin ||
-    (apiBaseUrl ? new URL(apiBaseUrl).origin : ''));
+  resolvedSocketOrigin ||
+  expoWebDevFallbackSocketOrigin ||
+  (apiBaseUrl ? new URL(apiBaseUrl).origin : '');
 
 export class MobileApiError extends Error {
   constructor(message: string, public readonly statusCode?: number) {
@@ -435,14 +440,22 @@ async function safeFetch(url: string, options: RequestInit): Promise<Response> {
   }
   
   // Additional security headers and options
+  const finalHeaders = new Headers(options.headers);
+  
+  // Security: Only add these headers on native platforms. 
+  // X-Requested-With triggers preflight rejections in many CORS configs on Web.
+  // User-Agent is a forbidden header name in browser fetch calls.
+  if (Platform.OS !== 'web') {
+    finalHeaders.set('X-Requested-With', 'XMLHttpRequest');
+    finalHeaders.set('User-Agent', 'LiveGate-Mobile/1.0');
+  }
+
   const secureOptions: RequestInit = {
     ...options,
-    headers: {
-      ...options.headers,
-      'X-Requested-With': 'XMLHttpRequest',
-      'User-Agent': 'LiveGate-Mobile/1.0',
-    },
-    redirect: 'error', // Prevent redirect-based SSRF
+    headers: finalHeaders,
+    // Allow manual or follow redirects. 'error' can break requests if the API
+    // performs canonical redirects (e.g., adding a trailing slash).
+    redirect: Platform.OS === 'web' ? 'follow' : 'error',
     signal: options.signal ?? AbortSignal.timeout(30000), // 30 second timeout
   };
   
