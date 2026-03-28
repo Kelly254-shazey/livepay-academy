@@ -208,7 +208,7 @@ function getHostnameFromUrl(value: string): string {
   }
 }
 
-const DEFAULT_PRODUCTION_API_BASE_URL = 'https://livepay-academy.vercel.app/api';
+const DEFAULT_PRODUCTION_API_BASE_URL = 'https://livepay-academy-production.up.railway.app/api';
 const DEFAULT_PRODUCTION_SOCKET_ORIGIN = 'https://livepay-academy-production.up.railway.app';
 const demoPreviewEnabled = process.env.EXPO_PUBLIC_ENABLE_DEMO_MODE === 'true';
 const explicitApiBaseUrl = normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL ?? '');

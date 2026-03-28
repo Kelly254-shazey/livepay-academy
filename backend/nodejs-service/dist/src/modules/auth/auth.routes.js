@@ -8,7 +8,7 @@ const authenticate_1 = require("../../common/middleware/authenticate");
 const auth_schemas_1 = require("./auth.schemas");
 function createAuthRouter(service) {
     const router = (0, express_1.Router)();
-    router.post("/register", (0, validate_1.validate)(auth_schemas_1.registerSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+    router.post("/sign-up", (0, validate_1.validate)(auth_schemas_1.registerSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
         const result = await service.register({
             ...req.body,
             ipAddress: req.ip,
@@ -16,7 +16,7 @@ function createAuthRouter(service) {
         });
         res.status(201).json(result);
     }));
-    router.post("/login", (0, validate_1.validate)(auth_schemas_1.loginSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+    router.post("/sign-in", (0, validate_1.validate)(auth_schemas_1.loginSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
         const result = await service.login({
             ...req.body,
             ipAddress: req.ip,
