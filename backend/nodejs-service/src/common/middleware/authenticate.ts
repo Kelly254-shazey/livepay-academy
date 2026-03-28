@@ -32,7 +32,11 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
   try {
     req.auth = await resolveAuthContext(authorization);
     return next();
-  } catch {
+  } catch (error) {
+    if (error instanceof AppError) {
+      return next(error);
+    }
+
     return next(new AppError("Invalid or expired token.", 401));
   }
 }
@@ -51,7 +55,11 @@ export async function optionalAuthenticate(req: Request, _res: Response, next: N
   try {
     req.auth = await resolveAuthContext(authorization);
     return next();
-  } catch {
+  } catch (error) {
+    if (error instanceof AppError) {
+      return next(error);
+    }
+
     return next(new AppError("Invalid or expired token.", 401));
   }
 }

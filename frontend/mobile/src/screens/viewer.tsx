@@ -696,7 +696,6 @@ export function ViewerLibraryScreen() {
 export function ViewerProfileScreen() {
   const session = useSessionStore((state) => state.session);
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
-  const signOut = useSessionStore((state) => state.signOut);
   const roles = getSessionRoles(session);
   const dashboardQuery = useQuery({
     queryKey: queryKeys.viewer.dashboard,
@@ -824,8 +823,8 @@ export function ViewerProfileScreen() {
         </View>
       </Surface>
       <Button
-        onPress={() => {
-          signOut();
+        onPress={async () => {
+          await mobileApi.signOutCurrentSession();
           router.replace('/(public)/sign-in');
         }}
         title="Sign out"

@@ -30,7 +30,10 @@ async function authenticate(req, _res, next) {
         req.auth = await resolveAuthContext(authorization);
         return next();
     }
-    catch {
+    catch (error) {
+        if (error instanceof app_error_1.AppError) {
+            return next(error);
+        }
         return next(new app_error_1.AppError("Invalid or expired token.", 401));
     }
 }
@@ -46,7 +49,10 @@ async function optionalAuthenticate(req, _res, next) {
         req.auth = await resolveAuthContext(authorization);
         return next();
     }
-    catch {
+    catch (error) {
+        if (error instanceof app_error_1.AppError) {
+            return next(error);
+        }
         return next(new app_error_1.AppError("Invalid or expired token.", 401));
     }
 }

@@ -387,7 +387,6 @@ export function CreatorWalletScreen() {
 export function CreatorProfileScreen() {
   const session = useSessionStore((state) => state.session);
   const setActiveRole = useSessionStore((state) => state.setActiveRole);
-  const signOut = useSessionStore((state) => state.signOut);
   const roles = getSessionRoles(session);
   const dashboardQuery = useQuery({
     queryKey: queryKeys.creator.dashboard,
@@ -527,8 +526,8 @@ export function CreatorProfileScreen() {
         </View>
       </Surface>
       <Button
-        onPress={() => {
-          signOut();
+        onPress={async () => {
+          await mobileApi.signOutCurrentSession();
           router.replace('/(public)/sign-in');
         }}
         title="Sign out"

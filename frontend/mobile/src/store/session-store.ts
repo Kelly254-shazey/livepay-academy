@@ -225,18 +225,40 @@ const createStore = () => {
             };
           }),
         setActiveRole: (role: UserRole) =>
-          set((state) => ({
-            preferredRole: normalizeUserRole(role, state.preferredRole),
-            session: switchSessionRole(
-              state.session,
-              normalizeUserRole(role, state.preferredRole),
-            ),
-          })),
+          set((state) => {
+            const requestedRole = normalizeUserRole(role, state.preferredRole);
+            const nextSession = switchSessionRole(state.session, requestedRole);
+            const nextRole =
+              nextSession?.activeRole ?? nextSession?.user.role ?? state.preferredRole;
+
+            return {
+              preferredRole: nextRole,
+              session: nextSession,
+            };
+          }),
         setSession: (session: AuthSession | null) =>
-          set((state) => ({
-            authBootstrapError: null,
-            session: sanitizeSession(session, state.preferredRoles, state.preferredRole),
-          })),
+          set((state) => {
+            const normalizedSession = sanitizeSession(
+              session,
+              state.preferredRoles,
+              state.preferredRole,
+            );
+
+            return {
+              authBootstrapError: null,
+              session: normalizedSession,
+              preferredRoles:
+                normalizedSession?.user.roles?.length
+                  ? normalizedSession.user.roles
+                  : state.preferredRoles,
+              preferredRole: normalizedSession
+                ? normalizeUserRole(
+                    normalizedSession.activeRole ?? normalizedSession.user.role,
+                    normalizedSession.user.roles?.[0] ?? state.preferredRole,
+                  )
+                : state.preferredRole,
+            };
+          }),
         unlockDemoLiveAccess: (liveId: string) =>
           set((state) => ({
             unlockedDemoLiveIds: state.unlockedDemoLiveIds.includes(liveId)
@@ -363,17 +385,39 @@ const createStore = () => {
             }),
           setActiveRole: (role: UserRole) =>
             set((state: SessionState) => {
-              const normalizedPreferredRole = normalizeUserRole(role, state.preferredRole);
+              const requestedRole = normalizeUserRole(role, state.preferredRole);
+              const nextSession = switchSessionRole(state.session, requestedRole);
+              const nextRole =
+                nextSession?.activeRole ?? nextSession?.user.role ?? state.preferredRole;
+
               return {
-                preferredRole: normalizedPreferredRole,
-                session: switchSessionRole(state.session, normalizedPreferredRole),
+                preferredRole: nextRole,
+                session: nextSession,
               };
             }),
           setSession: (session: AuthSession | null) =>
-            set((state: SessionState) => ({
-              authBootstrapError: null,
-              session: sanitizeSession(session, state.preferredRoles, state.preferredRole),
-            })),
+            set((state: SessionState) => {
+              const normalizedSession = sanitizeSession(
+                session,
+                state.preferredRoles,
+                state.preferredRole,
+              );
+
+              return {
+                authBootstrapError: null,
+                session: normalizedSession,
+                preferredRoles:
+                  normalizedSession?.user.roles?.length
+                    ? normalizedSession.user.roles
+                    : state.preferredRoles,
+                preferredRole: normalizedSession
+                  ? normalizeUserRole(
+                      normalizedSession.activeRole ?? normalizedSession.user.role,
+                      normalizedSession.user.roles?.[0] ?? state.preferredRole,
+                    )
+                  : state.preferredRole,
+              };
+            }),
           unlockDemoLiveAccess: (liveId: string) =>
             set((state: SessionState) => ({
               unlockedDemoLiveIds: state.unlockedDemoLiveIds.includes(liveId)

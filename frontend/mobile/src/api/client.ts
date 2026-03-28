@@ -33,8 +33,6 @@ import type {
 } from '../shared';
 import {
   apiRoutes,
-  DEMO_PASSWORD,
-  forgotPasswordDemo,
   getDemoAdminDashboard,
   getDemoCategoryDetail,
   getDemoClassDetail,
@@ -42,10 +40,7 @@ import {
   getDemoHomeFeed,
   getDemoLiveDetail,
   getDemoPremiumContentDetail,
-  resetPasswordDemo,
   searchDemo,
-  signInWithDemo,
-  signUpWithDemo,
   normalizeAuthSession,
   type UserRole,
 } from '../shared';
@@ -209,6 +204,7 @@ function getHostnameFromUrl(value: string): string {
 
 const DEFAULT_PRODUCTION_API_BASE_URL = 'https://livepay-academy.vercel.app/api';
 const DEFAULT_PRODUCTION_SOCKET_ORIGIN = 'https://livepay-academy-production.up.railway.app';
+const demoPreviewEnabled = process.env.EXPO_PUBLIC_ENABLE_DEMO_MODE === 'true';
 const explicitApiBaseUrl = normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL ?? '');
 const explicitSocketOrigin = normalizeOriginUrl(process.env.EXPO_PUBLIC_SOCKET_URL ?? '');
 const inferredApiBaseUrl = (() => {
@@ -235,6 +231,13 @@ export class MobileApiError extends Error {
     this.name = 'MobileApiError';
   }
 }
+
+type AuthStateUpdateResponse = {
+  accepted: boolean;
+  message: string;
+  user: AuthSession['user'];
+  nextStep?: AuthSession['nextStep'];
+};
 
 let inFlightRefresh: Promise<string | null> | null = null;
 const localApiProbeCache = new Map<string, Promise<boolean>>();
@@ -328,6 +331,10 @@ async function isLiveGateLocalApiAvailable() {
 }
 
 function shouldUseDemoFallback() {
+  if (!demoPreviewEnabled) {
+    return false;
+  }
+
   if (!isDevelopmentRuntime) {
     return false;
   }
@@ -568,15 +575,11 @@ async function refreshStoredSession() {
 
 export const mobileApi = {
   signIn: (body: { identifier: string; password: string; role: string; roles?: UserRole[] }) =>
-    withDemoFallback(
-      () => request<AuthSession>(apiRoutes.auth.signIn, { method: 'POST', body, authenticated: false }),
-      () =>
-        signInWithDemo({
-          email: body.identifier.includes('@') ? body.identifier : `${body.identifier}@demo.local`,
-          activeRole: body.role as UserRole,
-          roles: body.roles,
-        }),
-    ),
+    request<AuthSession>(apiRoutes.auth.signIn, {
+      method: 'POST',
+      body,
+      authenticated: false,
+    }),
   signUp: (body: {
     fullName: string;
     email: string;
@@ -588,78 +591,64 @@ export const mobileApi = {
     role: string;
     roles?: UserRole[];
   }) =>
-    withDemoFallback(
-      () => request<AuthSession>(apiRoutes.auth.signUp, { method: 'POST', body, authenticated: false }),
-      () => signUpWithDemo({ ...body, activeRole: body.role as UserRole }),
-    ),
+    request<AuthSession>(apiRoutes.auth.signUp, {
+      method: 'POST',
+      body,
+      authenticated: false,
+    }),
   signInWithGoogle: (body: { idToken: string; role?: string; roles?: UserRole[] }) =>
-    withDemoFallback(
-      () => request<AuthSession>(apiRoutes.auth.signInWithGoogle, { method: 'POST', body, authenticated: false }),
-      () => signInWithDemo({ email: 'google@demo.local', activeRole: (body.role || 'viewer') as UserRole, roles: body.roles }),
-    ),
+    request<AuthSession>(apiRoutes.auth.signInWithGoogle, {
+      method: 'POST',
+      body,
+      authenticated: false,
+    }),
   refresh: (body: { refreshToken: string }) =>
-    withDemoFallback(
-      () => request<AuthSession>(apiRoutes.auth.refresh, { method: 'POST', body, authenticated: false }),
-      () => ({ tokens: { accessToken: 'demo', refreshToken: 'demo' }, user: { id: 'demo', email: 'demo@demo.local', fullName: 'Demo', role: 'viewer' as UserRole, roles: ['viewer'] as UserRole[] } } as never),
-    ),
+    request<AuthSession>(apiRoutes.auth.refresh, {
+      method: 'POST',
+      body,
+      authenticated: false,
+    }),
   getCurrentSession: () =>
-    withDemoFallback(
-      async () => {
-        const currentTokens = useSessionStore.getState().session?.tokens;
-        const currentSession = await request<AuthSession>(apiRoutes.auth.session);
+    (async () => {
+      const currentTokens = useSessionStore.getState().session?.tokens;
+      const currentSession = await request<AuthSession>(apiRoutes.auth.session);
 
-        return {
-          ...currentSession,
-          tokens:
-            currentSession.tokens?.accessToken || currentSession.tokens?.refreshToken
-              ? currentSession.tokens
-              : currentTokens ?? currentSession.tokens,
-        };
-      },
-      async () => {
-        const session = useSessionStore.getState().session;
-        if (!session) {
-          throw new MobileApiError('No active session.');
-        }
-
-        return session;
-      },
-    ),
+      return {
+        ...currentSession,
+        tokens:
+          currentSession.tokens?.accessToken || currentSession.tokens?.refreshToken
+            ? currentSession.tokens
+            : currentTokens ?? currentSession.tokens,
+      };
+    })(),
   logout: (body: { refreshToken: string }) =>
-    withDemoFallback(
-      () => request<{ message: string }>(apiRoutes.auth.logout, { method: 'POST', body }),
-      async () => ({ message: 'Logged out' }),
-    ),
+    request<{ message: string }>(apiRoutes.auth.logout, { method: 'POST', body }),
   requestEmailVerification: () =>
-    withDemoFallback(
-      () => request<{ message: string; maskedEmail: string }>(apiRoutes.auth.emailVerificationRequest, { method: 'POST', body: {} }),
-      async () => ({ message: 'Code sent', maskedEmail: 'd***@demo.local' }),
+    request<{ message: string; verification?: { email: string; previewCode?: string } }>(
+      apiRoutes.auth.emailVerificationRequest,
+      { method: 'POST', body: {} },
     ),
   confirmEmailVerification: (body: { email: string; code: string }) =>
-    withDemoFallback(
-      () => request<AuthSession>(apiRoutes.auth.emailVerificationConfirm, { method: 'POST', body, authenticated: false }),
-      () => signInWithDemo({ email: body.email, activeRole: 'viewer' as UserRole }) as never,
-    ),
+    request<AuthStateUpdateResponse>(apiRoutes.auth.emailVerificationConfirm, {
+      method: 'POST',
+      body,
+      authenticated: false,
+    }),
   forgotPassword: (body: { email: string }) =>
-    withDemoFallback(
-      () =>
-        request<{ message: string; maskedEmail: string }>(apiRoutes.auth.forgotPassword, {
-          method: 'POST',
-          body,
-          authenticated: false,
-        }),
-      () => forgotPasswordDemo(body),
+    request<{ message: string; reset?: { email: string; previewCode?: string } }>(
+      apiRoutes.auth.forgotPassword,
+      {
+        method: 'POST',
+        body,
+        authenticated: false,
+      },
     ),
   resetPassword: (body: { email: string; code: string; password: string }) =>
-    withDemoFallback(
-      () =>
-        request<{ message: string }>(apiRoutes.auth.resetPassword, {
-          method: 'POST',
-          body,
-          authenticated: false,
-        }),
-      () => resetPasswordDemo(body),
-    ),
+    request<{ message: string }>(apiRoutes.auth.resetPassword, {
+      method: 'POST',
+      body,
+      authenticated: false,
+    }),
   completeProfile: (body: { 
     fullName: string; 
     username: string; 
@@ -667,38 +656,19 @@ export const mobileApi = {
     gender: string; 
     customGender?: string;
   }) =>
-    withDemoFallback(
-      () => request<AuthSession>(apiRoutes.auth.completeProfile, { method: 'POST', body }),
-      async () => {
-        const session = useSessionStore.getState().session;
-        return { 
-          tokens: session?.tokens || { accessToken: 'demo', refreshToken: 'demo' }, 
-          user: { 
-            ...session?.user, 
-            ...body, 
-            id: session?.user.id || 'demo',
-            email: session?.user.email || 'demo@demo.local',
-            role: session?.user.role || 'viewer',
-            roles: session?.user.roles || ['viewer']
-          } 
-        } as never;
-      },
-    ),
+    request<AuthStateUpdateResponse>(apiRoutes.auth.completeProfile, {
+      method: 'POST',
+      body,
+    }),
   linkGoogleAccount: (body: { idToken: string }) =>
-    withDemoFallback(
-      () => request<AuthSession>(apiRoutes.auth.linkGoogleAccount, { method: 'POST', body }),
-      async () => {
-        const session = useSessionStore.getState().session;
-        return session as never;
-      },
+    request<{ accepted: boolean; message: string; user: AuthSession['user'] }>(
+      apiRoutes.auth.linkGoogleAccount,
+      { method: 'POST', body },
     ),
   linkPassword: (body: { password: string }) =>
-    withDemoFallback(
-      () => request<AuthSession>(apiRoutes.auth.linkPassword, { method: 'POST', body }),
-      async () => {
-        const session = useSessionStore.getState().session;
-        return session as never;
-      },
+    request<{ accepted: boolean; message: string; user: AuthSession['user'] }>(
+      apiRoutes.auth.linkPassword,
+      { method: 'POST', body },
     ),
   getHomeFeed: () =>
     withDemoFallback(() => request<HomeFeedPayload>(apiRoutes.home, { authenticated: false }), getDemoHomeFeed),
@@ -888,6 +858,38 @@ export const mobileApi = {
       method: 'PUT',
       body,
     }),
+  signOutCurrentSession: async () => {
+    const store = useSessionStore.getState();
+    const initialRefreshToken = store.session?.tokens.refreshToken;
+
+    try {
+      if (initialRefreshToken) {
+        try {
+          await request<{ message: string }>(apiRoutes.auth.logout, {
+            method: 'POST',
+            body: { refreshToken: initialRefreshToken },
+            retryOnAuthFailure: false,
+          });
+        } catch (error) {
+          if (error instanceof MobileApiError && error.statusCode === 401) {
+            const refreshedAccessToken = await refreshStoredSession();
+            const rotatedRefreshToken =
+              useSessionStore.getState().session?.tokens.refreshToken;
+
+            if (refreshedAccessToken && rotatedRefreshToken) {
+              await request<{ message: string }>(apiRoutes.auth.logout, {
+                method: 'POST',
+                body: { refreshToken: rotatedRefreshToken },
+                retryOnAuthFailure: false,
+              });
+            }
+          }
+        }
+      }
+    } finally {
+      store.signOut();
+    }
+  },
 };
 
 export function getNodeApiBaseUrl() {
@@ -908,4 +910,8 @@ export function getNodeApiOrigin() {
 
 export function getNodeSocketOrigin() {
   return socketOrigin;
+}
+
+export function isDemoModeEnabled() {
+  return demoPreviewEnabled;
 }

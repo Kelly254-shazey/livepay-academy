@@ -44,7 +44,7 @@ const publicModes = [
   {
     id: 'hybrid',
     title: 'Viewer + Content Creator',
-    body: 'Use one account for both audience and content creator workflows, then switch role context later.',
+    body: 'Choose a blended onboarding intent. LiveGate still enforces whichever roles are actually enabled on your account.',
     roles: ['viewer', 'creator'] as UserRole[],
     activeRole: 'viewer' as UserRole,
   },
@@ -1232,6 +1232,7 @@ export function ResetPasswordScreen() {
 
 export function EmailVerificationScreen() {
   const session = useSessionStore((state) => state.session);
+  const setSession = useSessionStore((state) => state.setSession);
   const form = useForm<z.infer<typeof emailVerificationSchema>>({
     resolver: zodResolver(emailVerificationSchema),
     defaultValues: { email: session?.user.email || '', code: '' },
@@ -1239,8 +1240,35 @@ export function EmailVerificationScreen() {
 
   const mutation = useMutation({
     mutationFn: mobileApi.confirmEmailVerification,
-    onSuccess: () => {
-      router.replace('/(viewer)/(tabs)/home');
+    onSuccess: (result) => {
+      if (!session) {
+        router.replace('/(public)/sign-in');
+        return;
+      }
+
+      const updatedSession = normalizeAuthSession(
+        {
+          ...session,
+          user: {
+            ...session.user,
+            ...result.user,
+          },
+          nextStep: result.nextStep ?? null,
+        },
+        session.user.roles ?? [session.user.role],
+        session.user.role,
+      );
+
+      setSession(updatedSession);
+
+      if (updatedSession.nextStep === 'complete-profile') {
+        router.replace('/(public)/profile-completion');
+        return;
+      }
+
+      router.replace(
+        nextPathForRole(updatedSession.user.role, updatedSession.user.roles),
+      );
     },
   });
 
@@ -1290,10 +1318,26 @@ export function ProfileCompletionScreen() {
 
   const mutation = useMutation({
     mutationFn: mobileApi.completeProfile,
-    onSuccess: (updatedSession) => {
-      const normalized = normalizeAuthSession(updatedSession, session?.user.roles || [], session?.user.role);
+    onSuccess: (result) => {
+      if (!session) {
+        router.replace('/(public)/sign-in');
+        return;
+      }
+
+      const normalized = normalizeAuthSession(
+        {
+          ...session,
+          user: {
+            ...session.user,
+            ...result.user,
+          },
+          nextStep: result.nextStep ?? null,
+        },
+        session.user.roles || [session.user.role],
+        session.user.role,
+      );
       setSession(normalized);
-      if (session?.user.role === 'creator') {
+      if (normalized.user.role === 'creator') {
         router.replace('/(creator)/(tabs)/dashboard');
       } else {
         router.replace('/(viewer)/(tabs)/home');

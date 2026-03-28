@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Text, View } from 'react-native';
 import { mobileApi } from '@/api/client';
 import { Button, EmptyState, Heading, LoadingState, Screen, Surface } from '@/components/ui';
-import { useSessionStore } from '@/store/session-store';
 import { theme } from '@/theme';
 
 const statLabel = {
@@ -23,7 +22,6 @@ export function StaffDashboardScreen() {
     queryKey: ['mobile-staff-dashboard'],
     queryFn: mobileApi.getAdminDashboard,
   });
-  const signOut = useSessionStore((state) => state.signOut);
 
   return (
     <Screen>
@@ -62,8 +60,8 @@ export function StaffDashboardScreen() {
             </Text>
           </Surface>
           <Button
-            onPress={() => {
-              signOut();
+            onPress={async () => {
+              await mobileApi.signOutCurrentSession();
             }}
             title="Sign out"
             variant="secondary"

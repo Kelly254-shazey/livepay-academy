@@ -3,18 +3,18 @@ import { useEffect, useRef } from 'react';
 import { mobileApi } from '@/api/client';
 import { queryClient } from '@/services/query-client';
 import { disconnectLiveRoomSocket } from '@/services/realtime/live-room-socket';
-import { normalizeAuthSession } from '@/shared';
 import { useSessionStore } from '@/store/session-store';
 
 export function SessionBootstrap() {
   const hydrated = useSessionStore((state) => state.hydrated);
   const session = useSessionStore((state) => state.session);
-  const preferredRole = useSessionStore((state) => state.preferredRole);
-  const preferredRoles = useSessionStore((state) => state.preferredRoles);
   const setSession = useSessionStore((state) => state.setSession);
   const signOut = useSessionStore((state) => state.signOut);
   const setAuthBootstrapState = useSessionStore((state) => state.setAuthBootstrapState);
   const lastTokenRef = useRef<string | null>(null);
+  const lastBootstrapKeyRef = useRef<string | null>(null);
+  const bootstrapKey =
+    session?.tokens.refreshToken ?? session?.tokens.accessToken ?? null;
 
   useEffect(() => {
     const currentToken = session?.tokens.accessToken ?? null;
@@ -36,11 +36,18 @@ export function SessionBootstrap() {
     let active = true;
 
     const bootstrap = async () => {
-      if (!session?.tokens.accessToken && !session?.tokens.refreshToken) {
+      if (!bootstrapKey) {
+        lastBootstrapKeyRef.current = null;
         setAuthBootstrapState('ready');
         return;
       }
 
+      if (lastBootstrapKeyRef.current === bootstrapKey) {
+        setAuthBootstrapState('ready');
+        return;
+      }
+
+      lastBootstrapKeyRef.current = bootstrapKey;
       setAuthBootstrapState('restoring');
 
       try {
@@ -50,13 +57,7 @@ export function SessionBootstrap() {
           return;
         }
 
-        const normalizedSession = normalizeAuthSession(
-          restoredSession,
-          preferredRoles,
-          preferredRole,
-        );
-
-        setSession(normalizedSession);
+        setSession(restoredSession);
         setAuthBootstrapState('ready');
       } catch (error) {
         if (!active) {
@@ -77,11 +78,8 @@ export function SessionBootstrap() {
       active = false;
     };
   }, [
+    bootstrapKey,
     hydrated,
-    preferredRole,
-    preferredRoles,
-    session?.tokens.accessToken,
-    session?.tokens.refreshToken,
     setAuthBootstrapState,
     setSession,
     signOut,

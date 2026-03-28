@@ -21,11 +21,24 @@ export function normalizeAuthSession(
   roles?: UserRole[],
   activeRole?: UserRole,
 ): AuthSession {
+  const serverRoles = session.user.roles?.length
+    ? session.user.roles
+    : session.user.role
+      ? [session.user.role]
+      : [];
+  const fallbackRoles = roles?.length
+    ? roles
+    : [activeRole ?? session.activeRole ?? session.user.role].filter(
+        (role): role is UserRole => Boolean(role),
+      );
   const normalizedRoles = Array.from(
-    new Set(roles?.length ? roles : session.user.roles?.length ? session.user.roles : [activeRole ?? session.activeRole ?? session.user.role]),
+    new Set(serverRoles.length ? serverRoles : fallbackRoles),
   );
-  const normalizedActiveRole =
+  const requestedActiveRole =
     activeRole ?? session.activeRole ?? session.user.role ?? normalizedRoles[0];
+  const normalizedActiveRole = normalizedRoles.includes(requestedActiveRole)
+    ? requestedActiveRole
+    : normalizedRoles[0];
   const nextStep =
     session.nextStep ??
     (session.user.emailVerified === false
