@@ -581,7 +581,7 @@ async function request<T>(
     throw new MobileApiError(getResponseErrorMessage(response.status, json?.message), response.status);
   }
 
-  return (json?.data ?? json) as T;
+  return json as T;
 }
 
 async function refreshStoredSession() {
