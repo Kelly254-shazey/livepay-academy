@@ -626,10 +626,13 @@ async function refreshStoredSession() {
 }
 
 export const mobileApi = {
-  signIn: (body: { identifier: string; password: string; role: string; roles?: UserRole[] }) =>
+  signIn: (body: { identifier: string; password: string; role?: string; roles?: UserRole[] }) =>
     request<AuthSession>(apiRoutes.auth.signIn, {
       method: 'POST',
-      body,
+      body: {
+        identifier: body.identifier,
+        password: body.password,
+      },
       authenticated: false,
     }),
   signUp: (body: {
@@ -640,18 +643,30 @@ export const mobileApi = {
     dateOfBirth: string;
     gender: string;
     customGender?: string;
-    role: string;
+    role?: string;
     roles?: UserRole[];
   }) =>
     request<AuthSession>(apiRoutes.auth.signUp, {
       method: 'POST',
-      body,
+      body: {
+        fullName: body.fullName,
+        email: body.email,
+        password: body.password,
+        username: body.username,
+        dateOfBirth: body.dateOfBirth,
+        gender: body.gender,
+        customGender: body.customGender,
+        role: body.role ?? 'viewer',
+      },
       authenticated: false,
     }),
   signInWithGoogle: (body: { idToken: string; role?: string; roles?: UserRole[] }) =>
     request<AuthSession>(apiRoutes.auth.signInWithGoogle, {
       method: 'POST',
-      body,
+      body: {
+        idToken: body.idToken,
+        role: body.role ?? 'viewer',
+      },
       authenticated: false,
     }),
   refresh: (body: { refreshToken: string }) =>
