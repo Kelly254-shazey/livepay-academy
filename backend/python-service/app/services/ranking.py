@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import hashlib
 from datetime import datetime, timezone
 
@@ -6,6 +8,9 @@ from app.clients.database import DatabaseClient
 from app.clients.service_database import ServiceDatabaseClient
 from app.core.config import get_settings
 from app.schemas.common import RankedMetric
+
+
+logger = logging.getLogger(__name__)
 
 
 class RankingService:
@@ -39,8 +44,7 @@ class RankingService:
             )
             for row in rows
         ]
-        await self._store_snapshot("creators", limit, items)
-        await self._cache.set_json(cache_key, [item.model_dump() for item in items], self._ttl)
+        await self._persist_rankings("creators", cache_key, limit, items)
         return items
 
     async def trending_categories(self, limit: int = 10) -> list[RankedMetric]:
@@ -65,8 +69,7 @@ class RankingService:
             )
             for row in rows
         ]
-        await self._store_snapshot("categories", limit, items)
-        await self._cache.set_json(cache_key, [item.model_dump() for item in items], self._ttl)
+        await self._persist_rankings("categories", cache_key, limit, items)
         return items
 
     async def trending_lives(self, limit: int = 10) -> list[RankedMetric]:
@@ -100,8 +103,7 @@ class RankingService:
                 )
             )
 
-        await self._store_snapshot("lives", limit, items)
-        await self._cache.set_json(cache_key, [item.model_dump() for item in items], self._ttl)
+        await self._persist_rankings("lives", cache_key, limit, items)
         return items
 
     def personalize(self, user_id: str, items: list[RankedMetric]) -> list[RankedMetric]:
@@ -127,3 +129,42 @@ class RankingService:
                 "items": [item.model_dump(mode="json") for item in items],
             },
         )
+
+    async def warm_rankings(self, limit: int = 10) -> dict[str, int]:
+        creators, categories, lives = await asyncio.gather(
+            self.trending_creators(limit),
+            self.trending_categories(limit),
+            self.trending_lives(limit),
+        )
+        return {
+            "limit": limit,
+            "creators": len(creators),
+            "categories": len(categories),
+            "lives": len(lives),
+        }
+
+    async def _persist_rankings(
+        self,
+        ranking_scope: str,
+        cache_key: str,
+        limit: int,
+        items: list[RankedMetric],
+    ) -> None:
+        serialized = [item.model_dump() for item in items]
+        try:
+            await self._store_snapshot(ranking_scope, limit, items)
+        except Exception as error:
+            logger.warning(
+                "Failed to persist %s ranking snapshot. %s",
+                ranking_scope,
+                error,
+            )
+
+        try:
+            await self._cache.set_json(cache_key, serialized, self._ttl)
+        except Exception as error:
+            logger.warning(
+                "Failed to cache %s rankings. %s",
+                ranking_scope,
+                error,
+            )

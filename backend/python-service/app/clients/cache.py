@@ -14,7 +14,7 @@ class MemoryCacheBackend:
         self._store: dict[str, tuple[str, float | None]] = {}
 
     async def ping(self) -> bool:
-        return False
+        return True
 
     async def get_json(self, key: str) -> Any | None:
         entry = self._store.get(key)
@@ -85,6 +85,10 @@ class CacheClient:
                 await self._client.close()
 
         await self._memory.close()
+
+    @property
+    def mode(self) -> str:
+        return "memory" if self._using_memory or self._client is None else "redis"
 
     def _activate_memory_fallback(self, message: str, error: Exception) -> None:
         if self._using_memory:

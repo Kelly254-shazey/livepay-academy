@@ -19,6 +19,7 @@ const request_context_1 = require("./common/middleware/request-context");
 const prisma_1 = require("./infrastructure/db/prisma");
 const redis_1 = require("./infrastructure/cache/redis");
 const email_service_1 = require("./infrastructure/communications/email.service");
+const clerk_service_1 = require("./infrastructure/auth/clerk.service");
 const google_auth_service_1 = require("./infrastructure/auth/google-auth.service");
 const audit_service_1 = require("./common/audit/audit.service");
 const java_finance_client_1 = require("./infrastructure/integrations/java-finance.client");
@@ -69,12 +70,13 @@ function createApp() {
     const app = (0, express_1.default)();
     const auditService = new audit_service_1.AuditService(prisma_1.prisma);
     const emailService = new email_service_1.EmailService();
+    const clerkService = new clerk_service_1.ClerkService();
     const googleAuthService = new google_auth_service_1.GoogleAuthService();
     const authSecurityService = new auth_security_service_1.AuthSecurityService(redis_1.redis);
     const javaFinanceClient = new java_finance_client_1.JavaFinanceClient();
     const pythonClient = new python_intelligence_client_1.PythonIntelligenceClient();
     const streamingProviderClient = new streaming_provider_client_1.StreamingProviderClient();
-    const authService = new auth_service_1.AuthService(new auth_repository_1.AuthRepository(prisma_1.prisma), auditService, emailService, googleAuthService, authSecurityService);
+    const authService = new auth_service_1.AuthService(prisma_1.prisma, new auth_repository_1.AuthRepository(prisma_1.prisma), auditService, emailService, clerkService, googleAuthService, authSecurityService);
     const accessService = new access_service_1.AccessService(prisma_1.prisma, auditService, javaFinanceClient, pythonClient);
     const usersService = new users_service_1.UsersService(new users_repository_1.UsersRepository(prisma_1.prisma), auditService, pythonClient);
     const creatorsService = new creators_service_1.CreatorsService(new creators_repository_1.CreatorsRepository(prisma_1.prisma), auditService, pythonClient);
@@ -87,7 +89,7 @@ function createApp() {
     const reviewsService = new reviews_service_1.ReviewsService(new reviews_repository_1.ReviewsRepository(prisma_1.prisma), auditService);
     const reportsService = new reports_service_1.ReportsService(new reports_repository_1.ReportsRepository(prisma_1.prisma), auditService, pythonClient);
     const adminService = new admin_service_1.AdminService(new admin_repository_1.AdminRepository(prisma_1.prisma), auditService, pythonClient, javaFinanceClient);
-    const frontendService = new frontend_service_1.FrontendService(prisma_1.prisma, authService, accessService, javaFinanceClient, walletsService);
+    const frontendService = new frontend_service_1.FrontendService(prisma_1.prisma, authService, accessService, javaFinanceClient, walletsService, liveSessionsService);
     // Railway/Vercel sit behind a reverse proxy, and auth throttling depends on the original client IP.
     app.set("trust proxy", 1);
     app.use(request_context_1.requestContext);

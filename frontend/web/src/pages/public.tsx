@@ -1,9 +1,6 @@
 import {
   brand,
-  categories,
-  demoParticipants,
   productRules,
-  type DemoParticipant,
 } from '../lib/shared';
 import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
@@ -36,12 +33,12 @@ const publicModes = [
     badge: 'Monetization',
   },
   {
-    id: 'hybrid',
-    title: 'Hybrid mode',
-    body: 'Operate as both viewer and creator from one account, then switch context without signing out.',
-    href: '/auth/role-selection',
-    cta: 'Use both roles',
-    badge: 'Flexible identity',
+    id: 'staff',
+    title: 'Staff portal',
+    body: 'Moderators and admins authenticate through a separate restricted access surface.',
+    href: '/staff/portal',
+    cta: 'Open staff portal',
+    badge: 'Restricted',
   },
 ] as const;
 
@@ -56,7 +53,7 @@ const launchFlow = [
   },
   {
     title: 'Switch roles cleanly',
-    body: 'One account can act as viewer and creator, while staff access stays off the public path.',
+    body: 'Public roles stay cleanly separated, while staff access remains off the public path.',
   },
 ] as const;
 
@@ -98,36 +95,11 @@ function QuerySection<T>({
   );
 }
 
-function DemoAccountCard({ participant }: { participant: DemoParticipant }) {
-  return (
-    <Card className="space-y-4 transition duration-200 hover:-translate-y-1 hover:shadow-panel">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <p className="text-lg font-semibold tracking-[-0.03em]">{participant.fullName}</p>
-          <p className="text-xs uppercase tracking-[0.18em] text-muted">{participant.roleLabel}</p>
-        </div>
-        <Badge tone="accent">Demo</Badge>
-      </div>
-      <p className="text-sm leading-6 text-muted">{participant.summary}</p>
-      <div className="flex flex-wrap gap-2">
-        {participant.roles.map((role) => (
-          <Badge key={role}>{role}</Badge>
-        ))}
-      </div>
-      <p className="text-sm text-muted">{participant.email}</p>
-      <Link to={`/auth/sign-in?demo=${participant.id}`}>
-        <Button className="w-full">Open this demo account</Button>
-      </Link>
-    </Card>
-  );
-}
-
 export function LandingPage() {
   const homeQuery = useQuery({
     queryKey: ['home-feed'],
     queryFn: webApi.getHomeFeed,
   });
-  const publicDemoAccounts = demoParticipants.filter((participant) => participant.audience === 'public');
 
   return (
     <PageFrame>
@@ -140,9 +112,9 @@ export function LandingPage() {
                   <Link to="/auth/role-selection">
                     <Button size="lg">Choose your role</Button>
                   </Link>
-                  <Link to="/auth/sign-in?demo=demo-hybrid">
+                  <Link to="/auth/sign-in">
                     <Button size="lg" variant="secondary">
-                      Open demo workspace
+                      Sign in
                     </Button>
                   </Link>
                 </div>
@@ -179,14 +151,14 @@ export function LandingPage() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
               <div className="rounded-[24px] border border-white/35 bg-white/22 p-4 backdrop-blur-xl">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted">Commission split</p>
-                <p className="mt-2 text-3xl font-semibold tracking-[-0.04em]">80 / 20</p>
-                <p className="mt-1 text-sm text-muted">Creators keep 80%, platform retains 20%.</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted">Commerce controls</p>
+                <p className="mt-2 text-3xl font-semibold tracking-[-0.04em]">Backend-owned</p>
+                <p className="mt-1 text-sm text-muted">Access checks, payouts, and commission rules are enforced server-side.</p>
               </div>
               <div className="rounded-[24px] border border-white/35 bg-white/22 p-4 backdrop-blur-xl">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Role model</p>
-                <p className="mt-2 text-3xl font-semibold tracking-[-0.04em]">Hybrid</p>
-                <p className="mt-1 text-sm text-muted">One account can switch between viewer and creator context.</p>
+                <p className="mt-2 text-3xl font-semibold tracking-[-0.04em]">Role-based</p>
+                <p className="mt-1 text-sm text-muted">Viewer, creator, and staff flows stay intentionally separated.</p>
               </div>
               <div className="rounded-[24px] border border-white/35 bg-white/22 p-4 backdrop-blur-xl sm:col-span-2 xl:col-span-1">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Staff access</p>
@@ -248,31 +220,18 @@ export function LandingPage() {
             <StatCard
               detail="Supported categories with distinct discovery surfaces."
               label="Categories"
-              value={String(categories.length)}
+              value={String(homeQuery.data?.categories.length ?? 0)}
             />
             <StatCard
-              detail="Preview accounts for audience, creator, and hybrid workflows."
-              label="Demo participants"
-              value={String(publicDemoAccounts.length)}
+              detail="Creators surfaced directly from the backend home feed."
+              label="Featured creators"
+              value={String(homeQuery.data?.featuredCreators.length ?? 0)}
             />
             <StatCard
               detail="Access remains verified server-side before paid joins and unlocks."
               label="Trust model"
               value="Strict"
             />
-          </div>
-        </section>
-
-        <section className="space-y-6">
-          <SectionTitle
-            eyebrow="Demo access"
-            body="Use these public demo participants to inspect the dashboards, navigation paths, and AI-assisted flows without waiting for live backend data."
-            title="Preview the product with real role-based demo identities"
-          />
-          <div className="grid gap-4 lg:grid-cols-3">
-            {publicDemoAccounts.map((participant) => (
-              <DemoAccountCard key={participant.id} participant={participant} />
-            ))}
           </div>
         </section>
 
@@ -343,8 +302,8 @@ export function LandingPage() {
               <Link to="/auth/sign-up">
                 <Button>Open an account</Button>
               </Link>
-              <Link to="/auth/sign-in?demo=demo-viewer">
-                <Button variant="secondary">Preview viewer flow</Button>
+              <Link to="/auth/sign-in">
+                <Button variant="secondary">Open sign in</Button>
               </Link>
             </div>
           </Card>

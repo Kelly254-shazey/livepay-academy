@@ -1,4 +1,6 @@
+import ssl
 from collections.abc import Mapping
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import text
@@ -6,11 +8,28 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 
 class ServiceDatabaseClient:
-    def __init__(self, database_url: str) -> None:
+    def __init__(
+        self,
+        database_url: str,
+        *,
+        ssl_enabled: bool = False,
+        ssl_verify: bool = True,
+        ssl_ca_path: str | None = None,
+    ) -> None:
+        connect_args: dict[str, Any] = {}
+        ssl_context = self._build_ssl_context(
+            ssl_enabled=ssl_enabled,
+            ssl_verify=ssl_verify,
+            ssl_ca_path=ssl_ca_path,
+        )
+        if ssl_context is not None:
+            connect_args["ssl"] = ssl_context
+
         self._engine: AsyncEngine = create_async_engine(
             database_url,
             pool_pre_ping=True,
             future=True,
+            connect_args=connect_args,
         )
 
     async def init_schema(self) -> None:
@@ -245,12 +264,83 @@ class ServiceDatabaseClient:
             ).mappings().all()
         return [dict(row) for row in rows]
 
+    async def recent_fraud_event_summary(self, hours: int = 24) -> dict[str, Any]:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        row = await self._fetch_one_dict(
+            """
+            SELECT
+                COUNT(*) AS total_events,
+                AVG(risk_score) AS average_risk_score,
+                MAX(risk_score) AS max_risk_score,
+                SUM(CASE WHEN decision = 'review' THEN 1 ELSE 0 END) AS review_count,
+                SUM(CASE WHEN decision = 'deny' THEN 1 ELSE 0 END) AS deny_count
+            FROM fraud_events
+            WHERE created_at >= :cutoff
+            """,
+            {"cutoff": cutoff},
+        )
+        return {
+            "window_hours": hours,
+            "total_events": int(row.get("total_events") or 0),
+            "average_risk_score": float(row.get("average_risk_score") or 0.0),
+            "max_risk_score": float(row.get("max_risk_score") or 0.0),
+            "review_count": int(row.get("review_count") or 0),
+            "deny_count": int(row.get("deny_count") or 0),
+        }
+
+    async def recent_moderation_event_summary(self, hours: int = 24) -> dict[str, Any]:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        row = await self._fetch_one_dict(
+            """
+            SELECT
+                COUNT(*) AS total_events,
+                AVG(risk_score) AS average_risk_score,
+                MAX(risk_score) AS max_risk_score,
+                SUM(CASE WHEN severity = 'high' THEN 1 ELSE 0 END) AS high_severity_count,
+                SUM(CASE WHEN severity = 'medium' THEN 1 ELSE 0 END) AS medium_severity_count
+            FROM moderation_events
+            WHERE created_at >= :cutoff
+            """,
+            {"cutoff": cutoff},
+        )
+        return {
+            "window_hours": hours,
+            "total_events": int(row.get("total_events") or 0),
+            "average_risk_score": float(row.get("average_risk_score") or 0.0),
+            "max_risk_score": float(row.get("max_risk_score") or 0.0),
+            "high_severity_count": int(row.get("high_severity_count") or 0),
+            "medium_severity_count": int(row.get("medium_severity_count") or 0),
+        }
+
     async def close(self) -> None:
         await self._engine.dispose()
+
+    @staticmethod
+    def _build_ssl_context(
+        *,
+        ssl_enabled: bool,
+        ssl_verify: bool,
+        ssl_ca_path: str | None,
+    ) -> ssl.SSLContext | None:
+        if not ssl_enabled:
+            return None
+
+        if ssl_verify:
+            return ssl.create_default_context(cafile=ssl_ca_path)
+
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        return context
 
     async def _execute(self, sql: str, params: Mapping[str, Any]) -> None:
         async with self._engine.begin() as connection:
             await connection.execute(text(sql), params)
+
+    async def _fetch_one_dict(self, sql: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        async with self._engine.connect() as connection:
+            row = (await connection.execute(text(sql), params)).mappings().one()
+        return dict(row)
 
     @staticmethod
     def _as_json(payload: Mapping[str, Any]) -> str:

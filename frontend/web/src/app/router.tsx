@@ -1,9 +1,9 @@
-import type { UserRole } from '../lib/shared';
+import { getRequiredAuthStep, type UserRole } from '../lib/shared';
 import type { ReactNode } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { useSessionStore } from '@/store/session-store';
 import { AdminDashboardPage, CheckoutPage, CreatorDashboardPage, NotificationsCenterPage, PaymentFailedPage, PaymentSuccessPage, UserDashboardPage } from '@/pages/app';
-import { ForgotPasswordPage, ResetPasswordPage, RoleSelectionPage, SignInPage, SignUpPage, StaffAccessPage } from '@/pages/auth';
+import { ClerkGoogleCallbackPage, ClerkGoogleExchangePage, CompleteProfilePage, ForgotPasswordPage, ResetPasswordPage, RoleSelectionPage, SignInPage, SignUpPage, StaffAccessPage, VerifyEmailPage } from '@/pages/auth';
 import { CategoryPage, ClassDetailsPage, CreatorProfilePage, LiveDetailsPage, LiveRoomPage, PremiumContentPage } from '@/pages/discovery';
 import { LandingPage } from '@/pages/public';
 
@@ -18,6 +18,15 @@ function ProtectedRoute({
 
   if (!session) {
     return <Navigate replace to="/auth/sign-in" />;
+  }
+
+  const requiredStep = getRequiredAuthStep(session);
+  if (requiredStep === 'verify-email') {
+    return <Navigate replace to="/auth/verify-email" />;
+  }
+
+  if (requiredStep === 'complete-profile') {
+    return <Navigate replace to="/auth/complete-profile" />;
   }
 
   if (roles && !roles.includes(session.user.role)) {
@@ -38,9 +47,13 @@ export const router = createBrowserRouter([
   { path: '/auth/role-selection', element: <RoleSelectionPage /> },
   { path: '/auth/sign-in', element: <SignInPage /> },
   { path: '/auth/sign-up', element: <SignUpPage /> },
+  { path: '/auth/clerk/callback', element: <ClerkGoogleCallbackPage /> },
+  { path: '/auth/clerk/exchange', element: <ClerkGoogleExchangePage /> },
   { path: '/staff/portal', element: <StaffAccessPage /> },
   { path: '/auth/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/auth/reset-password', element: <ResetPasswordPage /> },
+  { path: '/auth/verify-email', element: <VerifyEmailPage /> },
+  { path: '/auth/complete-profile', element: <CompleteProfilePage /> },
   { path: '/categories/:slug', element: <CategoryPage /> },
   { path: '/creators/:creatorId', element: <CreatorProfilePage /> },
   { path: '/lives/:liveId', element: <LiveDetailsPage /> },

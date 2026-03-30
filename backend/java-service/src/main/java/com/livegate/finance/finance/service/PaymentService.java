@@ -12,13 +12,11 @@ import com.livegate.finance.finance.repository.CommissionRecordRepository;
 import com.livegate.finance.finance.repository.PaymentTransactionRepository;
 import java.time.Instant;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 public class PaymentService {
 
     private final PaymentTransactionRepository paymentTransactionRepository;
@@ -26,6 +24,20 @@ public class PaymentService {
     private final CommissionService commissionService;
     private final WalletService walletService;
     private final AuditLogService auditLogService;
+
+    public PaymentService(
+            PaymentTransactionRepository paymentTransactionRepository,
+            CommissionRecordRepository commissionRecordRepository,
+            CommissionService commissionService,
+            WalletService walletService,
+            AuditLogService auditLogService
+    ) {
+        this.paymentTransactionRepository = paymentTransactionRepository;
+        this.commissionRecordRepository = commissionRecordRepository;
+        this.commissionService = commissionService;
+        this.walletService = walletService;
+        this.auditLogService = auditLogService;
+    }
 
     @Transactional
     public RecordPaymentResponse recordPayment(RecordPaymentRequest request) {
@@ -97,4 +109,3 @@ public class PaymentService {
         );
     }
 }
-

@@ -27,6 +27,7 @@ import {
   payoutRequestSchema,
   searchQuerySchema
 } from "./frontend.schemas";
+import { createLiveSchema } from "../live-sessions/live-sessions.schemas";
 import { FrontendService } from "./frontend.service";
 
 export function createFrontendRouter(service: FrontendService) {
@@ -165,7 +166,10 @@ export function createFrontendRouter(service: FrontendService) {
     authenticate,
     validate(frontendGoogleAuthSchema),
     asyncHandler(async (req, res) => {
-      const result = await service.linkGoogleAccount(req.auth!, req.body.idToken);
+      const result = await service.linkGoogleAccount(req.auth!, {
+        idToken: req.body.idToken,
+        clerkToken: req.body.clerkToken
+      });
       res.json(result);
     })
   );
@@ -202,6 +206,14 @@ export function createFrontendRouter(service: FrontendService) {
   router.get("/home", asyncHandler(async (_req, res) => res.json(await service.getHomeFeed())));
 
   router.get(
+    "/categories",
+    asyncHandler(async (_req, res) => {
+      const result = await service.getCategoryCatalog();
+      res.json(result);
+    })
+  );
+
+  router.get(
     "/categories/:slug",
     validate(categorySlugParamsSchema),
     asyncHandler(async (req, res) => {
@@ -225,6 +237,28 @@ export function createFrontendRouter(service: FrontendService) {
     validate(liveIdParamsSchema),
     asyncHandler(async (req, res) => {
       const result = await service.getLiveDetail(getStringParam(req.params.liveId), req.auth);
+      res.json(result);
+    })
+  );
+
+  router.post(
+    "/lives",
+    authenticate,
+    authorize("creator", "admin"),
+    validate(createLiveSchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.createLiveSession(req.auth!, req.body);
+      res.status(201).json(result);
+    })
+  );
+
+  router.post(
+    "/lives/:liveId/publish",
+    authenticate,
+    authorize("creator", "admin"),
+    validate(liveIdParamsSchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.publishLiveSession(req.auth!, getStringParam(req.params.liveId));
       res.json(result);
     })
   );

@@ -1,7 +1,11 @@
 import asyncio
+import logging
 
 from app.clients.service_database import ServiceDatabaseClient
 from app.schemas.fraud import RiskScoreRequest, RiskScoreResponse
+
+
+logger = logging.getLogger(__name__)
 
 
 class FraudService:
@@ -87,7 +91,17 @@ class FraudService:
 
     def _record(self, event_type: str, request: RiskScoreRequest, response: RiskScoreResponse) -> None:
         asyncio.create_task(
-            self._service_database.record_fraud_event(
+            self._record_event(event_type, request, response)
+        )
+
+    async def _record_event(
+        self,
+        event_type: str,
+        request: RiskScoreRequest,
+        response: RiskScoreResponse,
+    ) -> None:
+        try:
+            await self._service_database.record_fraud_event(
                 event_type,
                 response.risk_score,
                 response.decision,
@@ -96,4 +110,9 @@ class FraudService:
                     "response": response.model_dump(mode="json"),
                 },
             )
-        )
+        except Exception as error:
+            logger.warning(
+                "Failed to persist fraud event for %s. %s",
+                event_type,
+                error,
+            )

@@ -27,7 +27,7 @@ export class AdminRepository {
     return this.db.auditLog.findMany({
       skip,
       take,
-      orderBy: { createdAt: "desc" }
+      orderBy: { timestamp: "desc" }
     });
   }
 

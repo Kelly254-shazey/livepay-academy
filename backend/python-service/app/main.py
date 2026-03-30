@@ -31,8 +31,18 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    source_database = DatabaseClient(settings.source_database_url)
-    service_database = ServiceDatabaseClient(settings.database_url)
+    source_database = DatabaseClient(
+        settings.source_database_url,
+        ssl_enabled=settings.source_database_ssl_enabled,
+        ssl_verify=settings.source_database_ssl_verify,
+        ssl_ca_path=settings.source_database_ssl_ca_path,
+    )
+    service_database = ServiceDatabaseClient(
+        settings.database_url,
+        ssl_enabled=settings.database_ssl_enabled,
+        ssl_verify=settings.database_ssl_verify,
+        ssl_ca_path=settings.database_ssl_ca_path,
+    )
     cache = CacheClient(settings.redis_url)
     await service_database.init_schema()
     ranking_service = RankingService(source_database, cache, service_database)
@@ -42,7 +52,12 @@ async def lifespan(app: FastAPI):
     analytics_service = AnalyticsService(source_database, service_database, ranking_service)
     fraud_service = FraudService(service_database)
     moderation_service = ModerationService(service_database)
-    scheduler = build_scheduler(service_database)
+    scheduler = build_scheduler(
+        service_database,
+        analytics_service,
+        recommendation_service,
+        ranking_service,
+    )
 
     app.state.source_database = source_database
     app.state.service_database = service_database

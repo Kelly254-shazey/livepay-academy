@@ -1,2 +1,16 @@
 frontend/web/web-dev.log
 frontend/web/web-dev.err.log
+.vscode/
+
+# Local build, audit, and deployment artifacts
+.dist/
+backend/nodejs-service/.tmp/
+backend/nodejs-service/*.log
+backend/java-service/*.log
+backend/java-service/.m2/
+backend/java-service/.m2repo/
+backend/java-service/target/
+frontend/web/dist/
+frontend/web/*.log
+frontend/mobile/.expo/
+frontend/mobile/dist*/

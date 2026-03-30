@@ -1,7 +1,11 @@
 import asyncio
+import logging
 
 from app.clients.service_database import ServiceDatabaseClient
 from app.schemas.moderation import ContentAnalysisRequest, ContentAnalysisResponse
+
+
+logger = logging.getLogger(__name__)
 
 
 class ModerationService:
@@ -42,8 +46,16 @@ class ModerationService:
             review_required=risk_score >= 25,
             sanitized_excerpt=excerpt,
         )
-        asyncio.create_task(
-            self._service_database.record_moderation_event(
+        asyncio.create_task(self._record_event(request, response))
+        return response
+
+    async def _record_event(
+        self,
+        request: ContentAnalysisRequest,
+        response: ContentAnalysisResponse,
+    ) -> None:
+        try:
+            await self._service_database.record_moderation_event(
                 request.content_type,
                 response.risk_score,
                 response.severity,
@@ -52,5 +64,9 @@ class ModerationService:
                     "response": response.model_dump(mode="json"),
                 },
             )
-        )
-        return response
+        except Exception as error:
+            logger.warning(
+                "Failed to persist moderation event for %s. %s",
+                request.content_type,
+                error,
+            )

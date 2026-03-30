@@ -93,6 +93,7 @@ const envSchema = z.object({
   EMAIL_CODE_TTL_MINUTES: z.coerce.number().positive().default(15),
   PASSWORD_RESET_CODE_TTL_MINUTES: z.coerce.number().positive().default(30),
   GOOGLE_CLIENT_ID: z.string().optional(),
+  CLERK_SECRET_KEY: z.string().optional(),
   INTERNAL_API_KEY: z.string().min(8),
   JAVA_FINANCE_URL: z.string().url().default("http://127.0.0.1:8080"),
   PYTHON_INTELLIGENCE_URL: z.string().url().default("http://127.0.0.1:8000"),

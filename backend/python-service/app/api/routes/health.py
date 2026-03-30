@@ -28,4 +28,5 @@ async def health_check(request: Request) -> dict[str, object]:
             "service_database": "up" if service_database else "down",
             "cache": "up" if cache else "down",
         },
+        "cache_mode": getattr(request.app.state.cache, "mode", "unknown"),
     }

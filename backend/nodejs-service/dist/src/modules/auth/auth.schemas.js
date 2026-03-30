@@ -36,11 +36,21 @@ exports.loginSchema = zod_1.z.object({
     params: zod_1.z.object({}).default({}),
     query: zod_1.z.object({}).default({})
 });
+const googleAuthBodySchema = zod_1.z.object({
+    idToken: zod_1.z.string().min(20).optional(),
+    clerkToken: zod_1.z.string().min(20).optional(),
+    role: zod_1.z.enum(["viewer", "creator"]).default("viewer")
+}).superRefine((value, ctx) => {
+    if (!value.idToken && !value.clerkToken) {
+        ctx.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: ["idToken"],
+            message: "A Google token or Clerk token is required."
+        });
+    }
+});
 exports.googleSignInSchema = zod_1.z.object({
-    body: zod_1.z.object({
-        idToken: zod_1.z.string().min(20),
-        role: zod_1.z.enum(["viewer", "creator"]).default("viewer")
-    }),
+    body: googleAuthBodySchema,
     params: zod_1.z.object({}).default({}),
     query: zod_1.z.object({}).default({})
 });

@@ -14,6 +14,7 @@ import { requestContext } from "./common/middleware/request-context";
 import { prisma } from "./infrastructure/db/prisma";
 import { redis } from "./infrastructure/cache/redis";
 import { EmailService } from "./infrastructure/communications/email.service";
+import { ClerkService } from "./infrastructure/auth/clerk.service";
 import { GoogleAuthService } from "./infrastructure/auth/google-auth.service";
 import { AuditService } from "./common/audit/audit.service";
 import { JavaFinanceClient } from "./infrastructure/integrations/java-finance.client";
@@ -66,15 +67,18 @@ export function createApp() {
 
   const auditService = new AuditService(prisma);
   const emailService = new EmailService();
+  const clerkService = new ClerkService();
   const googleAuthService = new GoogleAuthService();
   const authSecurityService = new AuthSecurityService(redis);
   const javaFinanceClient = new JavaFinanceClient();
   const pythonClient = new PythonIntelligenceClient();
   const streamingProviderClient = new StreamingProviderClient();
   const authService = new AuthService(
+    prisma,
     new AuthRepository(prisma),
     auditService,
     emailService,
+    clerkService,
     googleAuthService,
     authSecurityService
   );
@@ -106,7 +110,8 @@ export function createApp() {
     authService,
     accessService,
     javaFinanceClient,
-    walletsService
+    walletsService,
+    liveSessionsService
   );
   // Railway/Vercel sit behind a reverse proxy, and auth throttling depends on the original client IP.
   app.set("trust proxy", 1);

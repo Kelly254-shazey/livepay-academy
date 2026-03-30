@@ -3,9 +3,9 @@ server:
 
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/livegate_java?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
-    username: ${SPRING_DATASOURCE_USERNAME:livegate}
-    password: ${SPRING_DATASOURCE_PASSWORD:livegate}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql-354d45d7-kelly123simiyu-a329.e.aivencloud.com:24928/livegate_java?sslMode=REQUIRED&enabledTLSProtocols=TLSv1.2,TLSv1.3&serverTimezone=UTC}
+    username: ${SPRING_DATASOURCE_USERNAME:avnadmin}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
   jpa:
     hibernate:
       ddl-auto: validate

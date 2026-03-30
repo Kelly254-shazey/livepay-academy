@@ -8,6 +8,7 @@ const validate_1 = require("../../common/http/validate");
 const authenticate_1 = require("../../common/middleware/authenticate");
 const authorize_1 = require("../../common/middleware/authorize");
 const frontend_schemas_1 = require("./frontend.schemas");
+const live_sessions_schemas_1 = require("../live-sessions/live-sessions.schemas");
 function createFrontendRouter(service) {
     const router = (0, express_1.Router)();
     router.post("/auth/sign-in", (0, validate_1.validate)(frontend_schemas_1.frontendSignInSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
@@ -81,7 +82,10 @@ function createFrontendRouter(service) {
         res.json(result);
     }));
     router.post("/auth/link/google", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.frontendGoogleAuthSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
-        const result = await service.linkGoogleAccount(req.auth, req.body.idToken);
+        const result = await service.linkGoogleAccount(req.auth, {
+            idToken: req.body.idToken,
+            clerkToken: req.body.clerkToken
+        });
         res.json(result);
     }));
     router.post("/auth/link/password", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.frontendLinkPasswordSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
@@ -97,6 +101,10 @@ function createFrontendRouter(service) {
         res.json(result);
     }));
     router.get("/home", (0, async_handler_1.asyncHandler)(async (_req, res) => res.json(await service.getHomeFeed())));
+    router.get("/categories", (0, async_handler_1.asyncHandler)(async (_req, res) => {
+        const result = await service.getCategoryCatalog();
+        res.json(result);
+    }));
     router.get("/categories/:slug", (0, validate_1.validate)(frontend_schemas_1.categorySlugParamsSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
         const result = await service.getCategoryDetail((0, params_1.getStringParam)(req.params.slug));
         res.json(result);
@@ -107,6 +115,14 @@ function createFrontendRouter(service) {
     }));
     router.get("/lives/:liveId", authenticate_1.optionalAuthenticate, (0, validate_1.validate)(frontend_schemas_1.liveIdParamsSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
         const result = await service.getLiveDetail((0, params_1.getStringParam)(req.params.liveId), req.auth);
+        res.json(result);
+    }));
+    router.post("/lives", authenticate_1.authenticate, (0, authorize_1.authorize)("creator", "admin"), (0, validate_1.validate)(live_sessions_schemas_1.createLiveSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.createLiveSession(req.auth, req.body);
+        res.status(201).json(result);
+    }));
+    router.post("/lives/:liveId/publish", authenticate_1.authenticate, (0, authorize_1.authorize)("creator", "admin"), (0, validate_1.validate)(frontend_schemas_1.liveIdParamsSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.publishLiveSession(req.auth, (0, params_1.getStringParam)(req.params.liveId));
         res.json(result);
     }));
     router.get("/lives/:liveId/room", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.liveIdParamsSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {

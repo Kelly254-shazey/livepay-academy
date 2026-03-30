@@ -76,7 +76,10 @@ function createAuthRouter(service) {
         res.json(result);
     }));
     router.post("/link/google", authenticate_1.authenticate, (0, validate_1.validate)(auth_schemas_1.googleSignInSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
-        const result = await service.linkGoogleAccount(req.auth.userId, req.body.idToken);
+        const result = await service.linkGoogleAccount(req.auth.userId, {
+            idToken: req.body.idToken,
+            clerkToken: req.body.clerkToken
+        });
         res.json(result);
     }));
     router.post("/link/password", authenticate_1.authenticate, (0, validate_1.validate)(auth_schemas_1.linkPasswordSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {

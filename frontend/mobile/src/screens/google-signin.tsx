@@ -1,4 +1,3 @@
-import { brand } from '../shared';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import React from 'react';
@@ -7,42 +6,70 @@ import { mobileApi } from '@/api/client';
 import { Badge, Button, Heading, Screen, Surface } from '@/components/ui';
 import { useSessionStore } from '@/store/session-store';
 import { theme } from '@/theme';
+import {
+  getGoogleSignInHelpText,
+  initializeGoogleSignIn,
+  isGoogleSignInConfigured,
+  signInWithGoogle,
+} from '@/utils/google-signin';
 
-// This is a placeholder for Google sign-in integration
-// In production, use @react-native-google-signin/google-signin or expo-auth-session
 export function GoogleSignInScreen() {
   const setSession = useSessionStore((state) => state.setSession);
   const preferredRole = useSessionStore((state) => state.preferredRole);
-  const [loading, setLoading] = React.useState(false);
+  const preferredRoles = useSessionStore((state) => state.preferredRoles);
+  const googleConfigured = isGoogleSignInConfigured();
+  const googleHelpText = getGoogleSignInHelpText();
 
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    try {
-      // TODO: Integrate with actual Google Sign-In provider
-      // const idToken = await getGoogleIdToken();
-      // const session = await mobileApi.signInWithGoogle({ idToken, role: preferredRole });
-      // setSession(session);
-      alert('Google sign-in integration needed - install @react-native-google-signin/google-signin');
-    } catch (error) {
-      alert((error as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  React.useEffect(() => {
+    initializeGoogleSignIn();
+  }, []);
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const result = await signInWithGoogle();
+      return mobileApi.signInWithGoogle({
+        idToken: result.idToken,
+        role: preferredRole,
+        roles: preferredRoles,
+      });
+    },
+    onSuccess: (session) => {
+      setSession(session);
+      if (session.nextStep === 'verify-email') {
+        router.replace('/(public)/email-verification');
+        return;
+      }
+
+      if (session.nextStep === 'complete-profile') {
+        router.replace('/(public)/profile-completion');
+        return;
+      }
+
+      if (session.user.role === 'creator') {
+        router.replace('/(creator)/(tabs)/dashboard');
+        return;
+      }
+
+      router.replace('/(viewer)/(tabs)/home');
+    },
+  });
 
   return (
     <Screen>
       <Heading title="Sign in with Google" />
       <Surface>
         <Text style={styles.infoText}>
-          To enable Google Sign-In, install the Google Sign-In library and configure your credentials.
+          {googleHelpText}
         </Text>
-        <Button 
-          disabled={loading}
-          onPress={handleGoogleSignIn} 
-          title={loading ? 'Signing in...' : 'Continue with Google'}
+        {mutation.isError ? (
+          <Text style={styles.errorText}>{(mutation.error as Error).message}</Text>
+        ) : null}
+        <Button
+          disabled={!googleConfigured || mutation.isPending}
+          onPress={() => mutation.mutate()}
+          title={mutation.isPending ? 'Signing in...' : 'Continue with Google'}
         />
-        <Button 
+        <Button
           onPress={() => router.back()}
           title="Back"
           variant="ghost"
@@ -58,6 +85,11 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     lineHeight: 22,
     marginBottom: theme.spacing.lg,
+  },
+  errorText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.danger,
+    fontWeight: theme.typography.weights.medium,
   },
 });
 

@@ -41,15 +41,19 @@ function toIsoDate(value) {
     return value ? value.toISOString().slice(0, 10) : undefined;
 }
 class AuthService {
+    db;
     repository;
     auditService;
     emailService;
+    clerkService;
     googleAuthService;
     authSecurityService;
-    constructor(repository, auditService, emailService, googleAuthService, authSecurityService) {
+    constructor(db, repository, auditService, emailService, clerkService, googleAuthService, authSecurityService) {
+        this.db = db;
         this.repository = repository;
         this.auditService = auditService;
         this.emailService = emailService;
+        this.clerkService = clerkService;
         this.googleAuthService = googleAuthService;
         this.authSecurityService = authSecurityService;
     }
@@ -89,21 +93,22 @@ class AuthService {
                 email
             }
         });
-        const verification = await this.sendEmailVerificationCode(user);
-        const tokens = await this.issueTokens(user.id, user.email, user.role, input.ipAddress, input.userAgent);
+        const sessionUser = await this.ensureCreatorProfileIfNeeded(user);
+        const verification = await this.sendEmailVerificationCode(sessionUser);
+        const tokens = await this.issueTokens(sessionUser.id, sessionUser.email, sessionUser.role, input.ipAddress, input.userAgent);
         await this.auditService.record({
-            actorId: user.id,
-            actorRole: user.role,
+            actorId: sessionUser.id,
+            actorRole: sessionUser.role,
             action: "auth.register",
             resource: "user",
-            resourceId: user.id,
+            resourceId: sessionUser.id,
             ipAddress: input.ipAddress,
             metadata: {
                 authProvider: "local",
-                username: user.username
+                username: sessionUser.username
             }
         });
-        return this.buildSessionResponse(user, tokens, verification);
+        return this.buildSessionResponse(sessionUser, tokens, verification);
     }
     async login(input) {
         const normalizedIdentifier = input.identifier.trim().toLowerCase();
@@ -118,21 +123,73 @@ class AuthService {
         }
         await this.authSecurityService.clearLoginFailures(normalizedIdentifier, input.ipAddress);
         await this.repository.updateLastLogin(user.id);
-        const tokens = await this.issueTokens(user.id, user.email, user.role, input.ipAddress, input.userAgent);
+        const sessionUser = await this.ensureCreatorProfileIfNeeded(user);
+        const tokens = await this.issueTokens(sessionUser.id, sessionUser.email, sessionUser.role, input.ipAddress, input.userAgent);
         await this.auditService.record({
-            actorId: user.id,
-            actorRole: user.role,
+            actorId: sessionUser.id,
+            actorRole: sessionUser.role,
             action: "auth.login",
             resource: "user",
-            resourceId: user.id,
+            resourceId: sessionUser.id,
             ipAddress: input.ipAddress,
             metadata: {
                 authProvider: "local"
             }
         });
-        return this.buildSessionResponse(user, tokens);
+        return this.buildSessionResponse(sessionUser, tokens);
     }
     async signInWithGoogle(input) {
+        if (input.clerkToken) {
+            const clerkSession = await this.clerkService.verifyGoogleSession(input.clerkToken);
+            const existingIdentity = await this.repository.findIdentity("google", clerkSession.user.googleProviderUserId);
+            const user = await this.clerkService.syncToDatabase({
+                id: clerkSession.user.id,
+                primaryEmailAddressId: null,
+                emailAddresses: [
+                    {
+                        emailAddress: clerkSession.user.email,
+                        verification: {
+                            status: clerkSession.user.emailVerified ? "verified" : "unverified"
+                        }
+                    }
+                ],
+                firstName: clerkSession.user.firstName,
+                lastName: clerkSession.user.lastName,
+                imageUrl: clerkSession.user.imageUrl,
+                publicMetadata: clerkSession.user.publicMetadata,
+                externalAccounts: [
+                    {
+                        provider: "google",
+                        providerUserId: clerkSession.user.googleProviderUserId
+                    }
+                ]
+            }, this.db, (input.role ?? "viewer"));
+            if (user.isSuspended) {
+                throw new app_error_1.AppError("Account is suspended.", 403);
+            }
+            await this.repository.updateLastLogin(user.id);
+            const sessionUser = await this.ensureCreatorProfileIfNeeded(user);
+            const tokens = await this.issueTokens(sessionUser.id, sessionUser.email, sessionUser.role, input.ipAddress, input.userAgent);
+            await this.auditService.record({
+                actorId: sessionUser.id,
+                actorRole: sessionUser.role,
+                action: "auth.google.login",
+                resource: "user",
+                resourceId: sessionUser.id,
+                ipAddress: input.ipAddress,
+                metadata: {
+                    authProvider: "google",
+                    broker: "clerk",
+                    clerkUserId: clerkSession.user.id,
+                    clerkSessionId: clerkSession.sessionId,
+                    linkedByEmail: !existingIdentity
+                }
+            });
+            return this.buildSessionResponse(sessionUser, tokens);
+        }
+        if (!input.idToken) {
+            throw new app_error_1.AppError("Google token is required.", 400);
+        }
         const googleProfile = await this.googleAuthService.verifyIdToken(input.idToken);
         const existingIdentity = await this.repository.findIdentity("google", googleProfile.providerUserId);
         let user = existingIdentity?.user ?? null;
@@ -181,20 +238,21 @@ class AuthService {
             throw new app_error_1.AppError("Account is suspended.", 403);
         }
         await this.repository.updateLastLogin(user.id);
-        const tokens = await this.issueTokens(user.id, user.email, user.role, input.ipAddress, input.userAgent);
+        const sessionUser = await this.ensureCreatorProfileIfNeeded(user);
+        const tokens = await this.issueTokens(sessionUser.id, sessionUser.email, sessionUser.role, input.ipAddress, input.userAgent);
         await this.auditService.record({
-            actorId: user.id,
-            actorRole: user.role,
+            actorId: sessionUser.id,
+            actorRole: sessionUser.role,
             action: "auth.google.login",
             resource: "user",
-            resourceId: user.id,
+            resourceId: sessionUser.id,
             ipAddress: input.ipAddress,
             metadata: {
                 authProvider: "google",
                 linkedByEmail: !existingIdentity
             }
         });
-        return this.buildSessionResponse(user, tokens);
+        return this.buildSessionResponse(sessionUser, tokens);
     }
     async refresh(refreshToken, context) {
         let payload;
@@ -228,8 +286,9 @@ class AuthService {
         if (!user || user.isSuspended) {
             throw new app_error_1.AppError("Account is unavailable.", 403);
         }
-        const tokens = await this.issueTokens(user.id, user.email, user.role, context?.ipAddress, context?.userAgent);
-        return this.buildSessionResponse(user, tokens);
+        const sessionUser = await this.ensureCreatorProfileIfNeeded(user);
+        const tokens = await this.issueTokens(sessionUser.id, sessionUser.email, sessionUser.role, context?.ipAddress, context?.userAgent);
+        return this.buildSessionResponse(sessionUser, tokens);
     }
     async logout(refreshToken, actor) {
         let payload;
@@ -412,28 +471,42 @@ class AuthService {
             nextStep: this.getNextStep(updatedUser)
         };
     }
-    async linkGoogleAccount(userId, idToken) {
+    async linkGoogleAccount(userId, input) {
         const user = await this.repository.findUserById(userId);
         if (!user) {
             throw new app_error_1.AppError("User not found.", 404);
         }
-        const googleProfile = await this.googleAuthService.verifyIdToken(idToken);
-        const existingIdentity = await this.repository.findIdentity("google", googleProfile.providerUserId);
+        const googleProfile = input.idToken
+            ? await this.googleAuthService.verifyIdToken(input.idToken)
+            : null;
+        const clerkProfile = input.clerkToken
+            ? await this.clerkService.verifyGoogleSession(input.clerkToken)
+            : null;
+        if (!googleProfile && !clerkProfile) {
+            throw new app_error_1.AppError("Google token is required.", 400);
+        }
+        const providerUserId = googleProfile?.providerUserId ?? clerkProfile?.user.googleProviderUserId;
+        const email = googleProfile?.email ?? clerkProfile?.user.email;
+        const emailVerified = googleProfile?.emailVerified ?? clerkProfile?.user.emailVerified ?? false;
+        if (!providerUserId || !email) {
+            throw new app_error_1.AppError("Google account could not be verified.", 400);
+        }
+        const existingIdentity = await this.repository.findIdentity("google", providerUserId);
         if (existingIdentity && existingIdentity.userId !== user.id) {
             throw new app_error_1.AppError("This Google account is already linked to another user.", 409);
         }
-        if (googleProfile.email !== user.email) {
+        if (email !== user.email) {
             throw new app_error_1.AppError("The Google account email must match your LiveGate account email.", 400);
         }
         const linked = await this.repository.findIdentityForUser(user.id, "google");
         if (!linked) {
             await this.repository.linkIdentity(user.id, {
                 provider: "google",
-                providerUserId: googleProfile.providerUserId,
-                email: googleProfile.email
+                providerUserId,
+                email
             });
         }
-        const updatedUser = googleProfile.emailVerified && !user.emailVerifiedAt
+        const updatedUser = emailVerified && !user.emailVerifiedAt
             ? await this.repository.updateEmailVerification(user.id, new Date())
             : await this.repository.findUserById(user.id);
         if (!updatedUser) {
@@ -689,6 +762,16 @@ class AuthService {
             provider: "local",
             providerUserId: user.email,
             email: user.email
+        });
+    }
+    async ensureCreatorProfileIfNeeded(user) {
+        if (user.role !== "creator" || user.creatorProfile) {
+            return user;
+        }
+        return this.repository.ensureCreatorProfile(user.id, {
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName
         });
     }
     escapeHtml(value) {

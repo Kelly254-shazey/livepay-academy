@@ -155,6 +155,34 @@ enum ModerationActionType {
   report_dismissed
 }
 
+enum PaymentMethodType {
+  credit_card
+  debit_card
+  paypal
+  bank_transfer
+  mobile_money
+  digital_wallet
+}
+
+enum PaymentProvider {
+  stripe
+  paypal
+  wise
+  mpesa
+  flutterwave
+  razorpay
+}
+
+enum AuditActionCategory {
+  auth
+  payment
+  content_access
+  session
+  security
+  moderation
+  admin
+}
+
 model User {
   id                      String              @id @default(uuid())
   email                   String              @unique
@@ -170,6 +198,12 @@ model User {
   profileCompletedAt      DateTime?
   lastLoginAt             DateTime?
   role                    UserRole            @default(viewer)
+  country                 String?             @db.Char(2) // ISO 3166-1 alpha-2 country code
+  countryDetectedAt       DateTime?
+  ipAddress               String?
+  preferredCurrency       String?             @db.Char(3) // ISO 4217 currency code
+  clerkId                 String?             @unique
+  clerkMetadata           Json?
   settings                Json?
   notificationPreferences Json?
   isSuspended             Boolean             @default(false)
@@ -177,6 +211,7 @@ model User {
   updatedAt               DateTime            @updatedAt
   creatorProfile          CreatorProfile?
   identities              AuthIdentity[]
+  paymentMethods          PaymentMethod[]
   oneTimeCodes            OneTimeCode[]
   refreshTokens           RefreshToken[]
   passwordResetTokens     PasswordResetToken[]
@@ -192,11 +227,16 @@ model User {
   participantRecords      LiveParticipant[]
   enrollments             Enrollment[]
   auditActorLogs          AuditLog[]          @relation("AuditActor")
+  sessionAuditLogs        SessionAuditLog[]
+  paymentAuditLogs        PaymentAuditLog[]
+  contentAccessAuditLogs  ContentAccessAuditLog[]
   creatorVerificationReviews CreatorVerificationReview[] @relation("CreatorVerificationReviewer")
   liveChatMessages        LiveChatMessage[]
   moderationActions       ModerationAction[]  @relation("ModerationActor")
   reviews                 Review[]
   reports                 Report[]
+
+  @@map("user")
 }
 
 model AuthIdentity {
@@ -213,6 +253,8 @@ model AuthIdentity {
   @@unique([userId, provider])
   @@index([userId])
   @@index([email])
+
+  @@map("authidentity")
 }
 
 model RefreshToken {
@@ -229,6 +271,8 @@ model RefreshToken {
 
   @@index([userId])
   @@index([expiresAt])
+
+  @@map("refreshtoken")
 }
 
 model OneTimeCode {
@@ -243,6 +287,8 @@ model OneTimeCode {
 
   @@index([userId, purpose, expiresAt])
   @@index([purpose, codeHash])
+
+  @@map("onetimecode")
 }
 
 model PasswordResetToken {
@@ -256,6 +302,8 @@ model PasswordResetToken {
 
   @@index([userId])
   @@index([expiresAt])
+
+  @@map("passwordresettoken")
 }
 
 model CreatorProfile {
@@ -276,6 +324,8 @@ model CreatorProfile {
   verificationReviews CreatorVerificationReview[]
 
   @@index([verificationStatus, payoutEligible])
+
+  @@map("creatorprofile")
 }
 
 model Category {
@@ -294,6 +344,8 @@ model Category {
   classes         LearningClass[]
 
   @@index([createdById])
+
+  @@map("category")
 }
 
 model LiveSession {
@@ -323,6 +375,8 @@ model LiveSession {
   @@index([creatorId, status])
   @@index([categoryId, scheduledFor])
   @@index([status, visibility, scheduledFor])
+
+  @@map("livesession")
 }
 
 model LiveParticipant {
@@ -337,6 +391,8 @@ model LiveParticipant {
 
   @@index([liveSessionId, userId])
   @@index([userId, joinedAt])
+
+  @@map("liveparticipant")
 }
 
 model PremiumContent {
@@ -361,6 +417,8 @@ model PremiumContent {
   @@index([creatorId, status])
   @@index([categoryId, publishedAt])
   @@index([status, publishedAt])
+
+  @@map("premiumcontent")
 }
 
 model LearningClass {
@@ -401,6 +459,8 @@ model ClassLesson {
   learningClass LearningClass  @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   @@unique([classId, orderIndex])
+
+  @@map("classlesson")
 }
 
 model Enrollment {
@@ -418,6 +478,8 @@ model Enrollment {
   @@unique([classId, userId])
   @@index([userId, status])
   @@index([accessGrantId])
+
+  @@map("enrollment")
 }
 
 model Follow {
@@ -429,6 +491,8 @@ model Follow {
   creator     User     @relation("CreatorFollower", fields: [creatorId], references: [id], onDelete: Cascade)
 
   @@unique([followerId, creatorId])
+
+  @@map("follow")
 }
 
 model Notification {
@@ -445,6 +509,8 @@ model Notification {
 
   @@index([userId, createdAt])
   @@index([scheduledFor, readAt])
+
+  @@map("notification")
 }
 
 model AccessGrant {
@@ -467,6 +533,8 @@ model AccessGrant {
 
   @@index([userId, targetType, targetId, status])
   @@index([targetType, targetId, status])
+
+  @@map("accessgrant")
 }
 
 model Review {
@@ -482,6 +550,8 @@ model Review {
 
   @@unique([authorId, targetType, targetId])
   @@index([targetType, targetId, createdAt])
+
+  @@map("review")
 }
 
 model Report {
@@ -499,23 +569,10 @@ model Report {
 
   @@index([targetType, targetId, status])
   @@index([status, createdAt])
+
+  @@map("report")
 }
 
-model AuditLog {
-  id          String    @id @default(uuid())
-  actorId     String?
-  actorRole   UserRole?
-  action      String
-  resource    String
-  resourceId  String?
-  ipAddress   String?
-  metadata    Json?
-  createdAt   DateTime  @default(now())
-  actor       User?     @relation("AuditActor", fields: [actorId], references: [id])
-
-  @@index([resource, resourceId])
-  @@index([action, createdAt])
-}
 
 model LiveChatMessage {
   id            String                @id @default(uuid())
@@ -531,6 +588,8 @@ model LiveChatMessage {
 
   @@index([liveSessionId, createdAt])
   @@index([senderId, createdAt])
+
+  @@map("livechatmessage")
 }
 
 model CreatorVerificationReview {
@@ -545,6 +604,8 @@ model CreatorVerificationReview {
 
   @@index([creatorProfileId, createdAt])
   @@index([reviewerId, createdAt])
+
+  @@map("creatorverificationreview")
 }
 
 model ModerationAction {
@@ -563,4 +624,172 @@ model ModerationAction {
   @@index([targetType, targetId, createdAt])
   @@index([moderatorId, createdAt])
   @@index([reportId])
+
+  @@map("moderationaction")
+}
+
+// ============ Global Platform Models ============
+
+model PaymentMethod {
+  id            String           @id @default(uuid())
+  userId        String
+  type          PaymentMethodType
+  provider      PaymentProvider
+  country       String?          @db.Char(2)
+  lastFour      String?          @db.Char(4)
+  brand         String?
+  isDefault     Boolean          @default(false)
+  isActive      Boolean          @default(true)
+  expiresAt     DateTime?
+  metadata      Json?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([type, country])
+  @@unique([userId, provider, type, lastFour])
+
+  @@map("paymentmethod")
+}
+
+model PaymentProviderConfig {
+  id                String   @id @default(uuid())
+  provider          PaymentProvider @unique
+  countries         Json     // ["US", "GB", "NG", ...]
+  paymentTypes      Json     // ["credit_card", "paypal", ...]
+  fees              Json     // {"fixed": 0.30, "percentage": 2.9}
+  settingsOverride  Json?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([isActive])
+
+  @@map("paymentproviderconfig")
+}
+
+model AuditLog {
+  id               String                  @id @default(uuid())
+  actorId          String?
+  actorRole        UserRole?
+  action           String
+  actionCategory   AuditActionCategory
+  resource         String
+  resourceType     String?
+  resourceId       String?
+  status           String                  @default("success") // success, failure, pending
+  statusCode       Int?
+  description      String?
+  ipAddress        String?
+  userAgent        String?
+  metadata         Json?
+  changes          Json?                   // {before: {...}, after: {...}}
+  errorMessage     String?
+  duration         Int?                    // milliseconds
+  createdAt        DateTime                @default(now())
+  timestamp        DateTime                @default(now())
+  actor            User?                   @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, timestamp])
+  @@index([action, timestamp])
+  @@index([actionCategory, status])
+  @@index([resourceType, resourceId])
+  @@index([status])
+  @@index([timestamp])
+
+  @@map("auditlog")
+}
+
+model SessionAuditLog {
+  id              String   @id @default(uuid())
+  userId          String
+  sessionId       String?  // JWT jti claim
+  eventType       String   // login_success, login_failure, logout, token_refresh, etc
+  ipAddress       String
+  userAgent       String
+  country         String?  @db.Char(2)
+  city            String?
+  isSuspicious    Boolean  @default(false)
+  metadata        Json?
+  timestamp       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, eventType])
+  @@index([eventType, timestamp])
+  @@index([isSuspicious])
+  @@index([userId, timestamp])
+
+  @@map("sessionauditlog")
+}
+
+model PaymentAuditLog {
+  id              String   @id @default(uuid())
+  paymentId       String
+  userId          String
+  paymentType     String   // purchase, refund, payout, adjustment
+  action          String   // initiated, processing, completed, failed, refunded
+  previousStatus  String?
+  newStatus       String?
+  amount          Decimal? @db.Decimal(19, 2)
+  currency        String?  @db.Char(3)
+  paymentMethod   String?
+  paymentProvider String?
+  failureReason   String?
+  ipAddress       String?
+  metadata        Json?
+  timestamp       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId, timestamp])
+  @@index([userId, action])
+  @@index([action, timestamp])
+  @@index([userId, timestamp])
+
+  @@map("paymentauditlog")
+}
+
+model ContentAccessAuditLog {
+  id              String   @id @default(uuid())
+  userId          String
+  contentType     String   // live_session, premium_content, class, lesson
+  contentId       String
+  creatorId       String?
+  accessType      String   // view, stream, download, share
+  accessDuration  Int?     // seconds
+  bytesTransferred Int?
+  ipAddress       String?
+  userAgent       String?
+  metadata        Json?
+  timestamp       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, contentType])
+  @@index([contentType, contentId])
+  @@index([creatorId, timestamp])
+  @@index([userId, timestamp])
+
+  @@map("contentaccessauditlog")
+}
+
+model CountryPaymentReconciliation {
+  id                   String   @id @default(uuid())
+  country              String   @db.Char(2)
+  month                Int      // 1-12
+  year                 Int
+  grossRevenue         Decimal  @default(0) @db.Decimal(19, 2)
+  platformCommission   Decimal  @default(0) @db.Decimal(19, 2)
+  creatorEarnings      Decimal  @default(0) @db.Decimal(19, 2)
+  totalTransactions    BigInt   @default(0)
+  failedTransactions   BigInt   @default(0)
+  refundedAmount       Decimal  @default(0) @db.Decimal(19, 2)
+  averageTransactionValue Decimal? @db.Decimal(19, 2)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([country, month, year])
+  @@index([country])
+  @@index([year, month])
+
+  @@map("countrypaymentreconciliation")
 }

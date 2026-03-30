@@ -133,7 +133,15 @@ export class PythonIntelligenceClient {
       service: "python-intelligence",
       operation: "check the intelligence service health",
       breaker: this.breaker,
-      run: async () => (await this.client.get("/health")).data
+      run: async () => {
+        const payload = (await this.client.get("/health")).data;
+        if (!payload || payload.status !== "ok") {
+          throw new Error(
+            `Python intelligence service is ${payload?.status ?? "unavailable"}.`
+          );
+        }
+        return payload;
+      }
     });
   }
 

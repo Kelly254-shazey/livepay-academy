@@ -23,6 +23,8 @@ export const apiRoutes = {
   liveDetail: (id: string) => `/lives/${id}`,
   livePublish: (id: string) => `/lives/${id}/publish`,
   liveRoom: (id: string) => `/lives/${id}/room`,
+  liveChatHistory: (id: string, limit = 40) => `/v1/lives/${id}/chat?limit=${limit}`,
+  liveAttendance: (id: string) => `/v1/lives/${id}/attendance`,
   premiumContent: '/premium-content',
   premiumContentDetail: (id: string) => `/premium-content/${id}`,
   classes: '/classes',

@@ -37,11 +37,22 @@ export const loginSchema = z.object({
   query: z.object({}).default({})
 });
 
+const googleAuthBodySchema = z.object({
+  idToken: z.string().min(20).optional(),
+  clerkToken: z.string().min(20).optional(),
+  role: z.enum(["viewer", "creator"]).default("viewer")
+}).superRefine((value, ctx) => {
+  if (!value.idToken && !value.clerkToken) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["idToken"],
+      message: "A Google token or Clerk token is required."
+    });
+  }
+});
+
 export const googleSignInSchema = z.object({
-  body: z.object({
-    idToken: z.string().min(20),
-    role: z.enum(["viewer", "creator"]).default("viewer")
-  }),
+  body: googleAuthBodySchema,
   params: z.object({}).default({}),
   query: z.object({}).default({})
 });

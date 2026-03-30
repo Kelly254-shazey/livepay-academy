@@ -9,6 +9,7 @@ import type {
   CreatorDashboardPayload,
   CreatorProfilePayload,
   HomeFeedPayload,
+  LiveChatMessageRecord,
   LiveRoomPayload,
   LiveSessionDetailPayload,
   NotificationRecord,
@@ -18,36 +19,36 @@ import type {
   SearchFilters,
   SearchResultsPayload,
   TransactionRecord,
+  UserRole,
   ViewerDashboardPayload,
 } from './shared';
-import {
-  apiRoutes,
-  DEMO_PASSWORD,
-  categories,
-  createDemoCheckout,
-  forgotPasswordDemo,
-  getDemoAdminDashboard,
-  getDemoCategoryDetail,
-  getDemoClassDetail,
-  getDemoCreatorDashboard,
-  getDemoCreatorProfile,
-  getDemoHomeFeed,
-  getDemoLiveDetail,
-  getDemoLiveRoom,
-  getDemoNotifications,
-  getDemoProfileSettings,
-  getDemoPremiumContentDetail,
-  getDemoViewerDashboard,
-  requestDemoPayout,
-  resetPasswordDemo,
-  saveDemoProfileSettings,
-  searchDemo,
-  signInWithDemo,
-  signUpWithDemo,
-  type UserRole,
-} from './shared';
+import { apiRoutes } from './shared';
 import { http } from './http';
-import { useSessionStore } from '@/store/session-store';
+
+type AuthStateUpdateResponse = {
+  accepted: boolean;
+  message: string;
+  user: AuthSession['user'];
+  nextStep?: AuthSession['nextStep'];
+};
+
+type EmailVerificationDeliveryResponse = {
+  accepted: boolean;
+  message: string;
+  verification?: {
+    email: string;
+    previewCode?: string;
+  };
+};
+
+type PasswordResetDeliveryResponse = {
+  accepted: boolean;
+  message: string;
+  reset?: {
+    email: string;
+    previewCode?: string;
+  };
+};
 
 type CreateLiveSessionInput = {
   categorySlug: string;
@@ -74,68 +75,61 @@ async function resolveCategoryId(categorySlug: string) {
   return category.id;
 }
 
-async function withDemoFallback<T>(run: () => Promise<T>, fallback: () => T | Promise<T>) {
-  try {
-    return await run();
-  } catch {
-    return fallback();
-  }
-}
-
 export const webApi = {
-  signIn: (body: { email: string; password: string; role: string; roles?: UserRole[] }) =>
-    withDemoFallback(
-      () => http<AuthSession>(apiRoutes.auth.signIn, { method: 'POST', body, authenticated: false }),
-      () => signInWithDemo({ ...body, activeRole: body.role as UserRole }),
-    ),
+  signIn: (body: { identifier: string; password: string; role?: string; roles?: UserRole[] }) =>
+    http<AuthSession>(apiRoutes.auth.signIn, {
+      method: 'POST',
+      body: {
+        identifier: body.identifier,
+        password: body.password,
+      },
+      authenticated: false,
+    }),
   signUp: (body: {
     fullName: string;
+    username: string;
     email: string;
     password: string;
     role: string;
-    roles?: UserRole[];
+    dateOfBirth: string;
+    gender: 'male' | 'female' | 'prefer_not_to_say' | 'custom';
+    customGender?: string;
   }) =>
-    withDemoFallback(
-      () => http<AuthSession>(apiRoutes.auth.signUp, { method: 'POST', body, authenticated: false }),
-      () => signUpWithDemo({ ...body, activeRole: body.role as UserRole }),
-    ),
-  signInWithGoogle: (body: { idToken: string; role?: string; roles?: UserRole[] }) =>
-    withDemoFallback(
-      () => http<AuthSession>(apiRoutes.auth.signInWithGoogle, { method: 'POST', body, authenticated: false }),
-      () => signInWithDemo({ email: 'google@demo.local', activeRole: (body.role || 'viewer') as UserRole, roles: body.roles }),
-    ),
+    http<AuthSession>(apiRoutes.auth.signUp, {
+      method: 'POST',
+      body,
+      authenticated: false,
+    }),
+  signInWithGoogle: (body: { idToken?: string; clerkToken?: string; role?: string; roles?: UserRole[] }) =>
+    http<AuthSession>(apiRoutes.auth.signInWithGoogle, {
+      method: 'POST',
+      body: {
+        idToken: body.idToken,
+        clerkToken: body.clerkToken,
+        role: body.role,
+      },
+      authenticated: false,
+    }),
   refresh: (body: { refreshToken: string }) =>
-    withDemoFallback(
-      () => http<AuthSession>(apiRoutes.auth.refresh, { method: 'POST', body, authenticated: false }),
-      () => ({ tokens: { accessToken: 'demo', refreshToken: 'demo' }, user: { id: 'demo', email: 'demo@demo.local', fullName: 'Demo', role: 'viewer' as UserRole, roles: ['viewer'] as UserRole[] } } as never),
-    ),
+    http<AuthSession>(apiRoutes.auth.refresh, { method: 'POST', body, authenticated: false }),
   logout: (body: { refreshToken: string }) =>
-    withDemoFallback(
-      () => http<{ message: string }>(apiRoutes.auth.logout, { method: 'POST', body }),
-      async () => ({ message: 'Logged out' }),
-    ),
+    http<{ message: string }>(apiRoutes.auth.logout, { method: 'POST', body }),
   requestEmailVerification: () =>
-    withDemoFallback(
-      () => http<{ message: string; maskedEmail: string }>(apiRoutes.auth.emailVerificationRequest, { method: 'POST', body: {} }),
-      async () => ({ message: 'Code sent', maskedEmail: 'd***@demo.local' }),
-    ),
+    http<EmailVerificationDeliveryResponse>(apiRoutes.auth.emailVerificationRequest, { method: 'POST', body: {} }),
   confirmEmailVerification: (body: { email: string; code: string }) =>
-    withDemoFallback(
-      () => http<AuthSession>(apiRoutes.auth.emailVerificationConfirm, { method: 'POST', body, authenticated: false }),
-      () => signInWithDemo({ email: body.email, activeRole: 'viewer' as UserRole }) as never,
-    ),
+    http<AuthStateUpdateResponse>(apiRoutes.auth.emailVerificationConfirm, { method: 'POST', body, authenticated: false }),
   forgotPassword: (body: { email: string }) =>
-    withDemoFallback(() => http<{ message: string; maskedEmail: string }>(apiRoutes.auth.forgotPassword, {
+    http<PasswordResetDeliveryResponse>(apiRoutes.auth.forgotPassword, {
       method: 'POST',
       body,
       authenticated: false,
-    }), () => forgotPasswordDemo(body)),
+    }),
   resetPassword: (body: { email: string; code: string; password: string }) =>
-    withDemoFallback(() => http<{ message: string }>(apiRoutes.auth.resetPassword, {
+    http<{ message: string }>(apiRoutes.auth.resetPassword, {
       method: 'POST',
       body,
       authenticated: false,
-    }), () => resetPasswordDemo(body)),
+    }),
   completeProfile: (body: { 
     fullName: string; 
     username: string; 
@@ -143,99 +137,69 @@ export const webApi = {
     gender: string; 
     customGender?: string;
   }) =>
-    withDemoFallback(
-      () => http<AuthSession>(apiRoutes.auth.completeProfile, { method: 'POST', body }),
-      async () => {
-        const session = useSessionStore.getState().session;
-        return { 
-          tokens: session?.tokens || { accessToken: 'demo', refreshToken: 'demo', expiresAt: new Date().toISOString(), refreshExpiresAt: new Date().toISOString() }, 
-          user: { 
-            ...session?.user, 
-            ...body, 
-            id: session?.user.id || 'demo',
-            email: session?.user.email || 'demo@demo.local',
-            role: session?.user.role || 'viewer',
-            roles: session?.user.roles || ['viewer']
-          } 
-        } as never;
-      },
-    ),
-  linkGoogleAccount: (body: { idToken: string }) =>
-    withDemoFallback(
-      () => http<AuthSession>(apiRoutes.auth.linkGoogleAccount, { method: 'POST', body }),
-      async () => {
-        const session = useSessionStore.getState().session;
-        return session as never;
-      },
-    ),
+    http<AuthStateUpdateResponse>(apiRoutes.auth.completeProfile, { method: 'POST', body }),
+  linkGoogleAccount: (body: { idToken?: string; clerkToken?: string }) =>
+    http<AuthStateUpdateResponse>(apiRoutes.auth.linkGoogleAccount, { method: 'POST', body }),
   linkPassword: (body: { password: string }) =>
-    withDemoFallback(
-      () => http<AuthSession>(apiRoutes.auth.linkPassword, { method: 'POST', body }),
-      async () => {
-        const session = useSessionStore.getState().session;
-        return session as never;
-      },
-    ),
-  getHomeFeed: () =>
-    withDemoFallback(() => http<HomeFeedPayload>(apiRoutes.home, { authenticated: false }), getDemoHomeFeed),
+    http<AuthStateUpdateResponse>(apiRoutes.auth.linkPassword, { method: 'POST', body }),
+  getHomeFeed: () => http<HomeFeedPayload>(apiRoutes.home, { authenticated: false }),
   getCategoryCatalog: () =>
-    withDemoFallback(
-      () => http<CategoryRecord[]>(apiRoutes.categories, { authenticated: false }),
-      () =>
-        categories.map((item) => ({
-          id: item.slug,
-          slug: item.slug,
-          name: item.title,
-          description: item.shortDescription,
-          status: 'active' as const,
-        })),
-    ),
+    http<CategoryRecord[]>(apiRoutes.categories, { authenticated: false }),
   getCategoryDetail: (slug: string) =>
-    withDemoFallback(
-      () => http<CategoryDetailPayload>(apiRoutes.categoryDetail(slug), { authenticated: false }),
-      () => getDemoCategoryDetail(slug as never),
-    ),
+    http<CategoryDetailPayload>(apiRoutes.categoryDetail(slug), { authenticated: false }),
   getCreatorProfile: (id: string) =>
-    withDemoFallback(
-      () => http<CreatorProfilePayload>(apiRoutes.creatorDetail(id), { authenticated: false }),
-      () => getDemoCreatorProfile(id),
-    ),
+    http<CreatorProfilePayload>(apiRoutes.creatorDetail(id), { authenticated: false }),
   getLiveDetail: (id: string) =>
-    withDemoFallback(
-      () => http<LiveSessionDetailPayload>(apiRoutes.liveDetail(id), { authenticated: false }),
-      () => getDemoLiveDetail(id),
-    ),
-  getLiveRoom: (id: string) =>
-    withDemoFallback(() => http<LiveRoomPayload>(apiRoutes.liveRoom(id)), () => getDemoLiveRoom(id)),
+    http<LiveSessionDetailPayload>(apiRoutes.liveDetail(id), { authenticated: false }),
+  getLiveRoom: (id: string) => http<LiveRoomPayload>(apiRoutes.liveRoom(id)),
+  getLiveChatMessages: async (id: string, limit = 40) => {
+    const messages = await http<
+      Array<{
+        id: string;
+        body: string;
+        status?: string;
+        createdAt: string;
+        senderId: string;
+        sender?: {
+          firstName?: string;
+          lastName?: string;
+          creatorProfile?: {
+            displayName?: string | null;
+          } | null;
+        } | null;
+      }>
+    >(apiRoutes.liveChatHistory(id, limit));
+
+    return messages.map<LiveChatMessageRecord>((message) => ({
+      id: message.id,
+      body: message.body,
+      senderId: message.senderId,
+      authorName:
+        message.sender?.creatorProfile?.displayName?.trim() ||
+        `${message.sender?.firstName ?? ''} ${message.sender?.lastName ?? ''}`.trim() ||
+        'Viewer',
+      sentAt: message.createdAt,
+      status: message.status,
+    }));
+  },
+  recordLiveAttendance: (id: string, attendanceSeconds: number) =>
+    http<{ updated: boolean }>(apiRoutes.liveAttendance(id), {
+      method: 'POST',
+      body: { attendanceSeconds },
+    }),
   getPremiumContentDetail: (id: string) =>
-    withDemoFallback(
-      () =>
-        http<PremiumContentDetailPayload>(apiRoutes.premiumContentDetail(id), {
-          authenticated: false,
-        }),
-      () => getDemoPremiumContentDetail(id),
-    ),
+    http<PremiumContentDetailPayload>(apiRoutes.premiumContentDetail(id), {
+      authenticated: false,
+    }),
   getClassDetail: (id: string) =>
-    withDemoFallback(
-      () => http<ClassDetailPayload>(apiRoutes.classDetail(id), { authenticated: false }),
-      () => getDemoClassDetail(id),
-    ),
-  getViewerDashboard: () =>
-    withDemoFallback(() => http<ViewerDashboardPayload>(apiRoutes.viewerDashboard), getDemoViewerDashboard),
-  getCreatorDashboard: () =>
-    withDemoFallback(() => http<CreatorDashboardPayload>(apiRoutes.creatorDashboard), getDemoCreatorDashboard),
-  getAdminDashboard: () =>
-    withDemoFallback(() => http<AdminDashboardPayload>(apiRoutes.adminDashboard), getDemoAdminDashboard),
+    http<ClassDetailPayload>(apiRoutes.classDetail(id), { authenticated: false }),
+  getViewerDashboard: () => http<ViewerDashboardPayload>(apiRoutes.viewerDashboard),
+  getCreatorDashboard: () => http<CreatorDashboardPayload>(apiRoutes.creatorDashboard),
+  getAdminDashboard: () => http<AdminDashboardPayload>(apiRoutes.adminDashboard),
   getNotifications: () =>
-    withDemoFallback(
-      () => http<ApiListResponse<NotificationRecord>>(apiRoutes.notifications),
-      getDemoNotifications,
-    ),
+    http<ApiListResponse<NotificationRecord>>(apiRoutes.notifications),
   getTransactions: () =>
-    withDemoFallback(
-      () => http<ApiListResponse<TransactionRecord>>(apiRoutes.transactions),
-      () => getDemoViewerDashboard().transactions,
-    ),
+    http<ApiListResponse<TransactionRecord>>(apiRoutes.transactions),
   search: (filters: SearchFilters) => {
     const search = new URLSearchParams();
 
@@ -243,24 +207,14 @@ export const webApi = {
     if (filters.category) search.set('category', filters.category);
     if (filters.type) search.set('type', filters.type);
 
-    return withDemoFallback(
-      () =>
-        http<SearchResultsPayload>(`${apiRoutes.search}?${search.toString()}`, {
-          authenticated: false,
-        }),
-      () => searchDemo(filters),
-    );
+    return http<SearchResultsPayload>(`${apiRoutes.search}?${search.toString()}`, {
+      authenticated: false,
+    });
   },
   createCheckout: (body: { productId: string; productType: 'live' | 'content' | 'class' }) =>
-    withDemoFallback(
-      () => http<CheckoutSummary>(apiRoutes.checkout, { method: 'POST', body }),
-      () => createDemoCheckout(body),
-    ),
+    http<CheckoutSummary>(apiRoutes.checkout, { method: 'POST', body }),
   requestPayout: (body: { amount: number; method: string; note?: string }) =>
-    withDemoFallback(
-      () => http<{ message: string }>(apiRoutes.creatorPayouts, { method: 'POST', body }),
-      () => requestDemoPayout(body),
-    ),
+    http<{ message: string }>(apiRoutes.creatorPayouts, { method: 'POST', body }),
   createLiveSession: async (body: CreateLiveSessionInput) => {
     const categoryId = await resolveCategoryId(body.categorySlug);
     const created = await http<{ id: string; title: string; status: string }>(apiRoutes.lives, {
@@ -289,26 +243,10 @@ export const webApi = {
 
     return created;
   },
-  getProfileSettings: () =>
-    withDemoFallback(
-      () => http<ProfileSettingsPayload>(apiRoutes.profileSettings),
-      () => {
-        const session = useSessionStore.getState().session;
-        return getDemoProfileSettings({
-          fullName: session?.user.fullName,
-          email: session?.user.email,
-          roles: session?.user.roles,
-          defaultRole: session?.user.role,
-        });
-      },
-    ),
+  getProfileSettings: () => http<ProfileSettingsPayload>(apiRoutes.profileSettings),
   saveProfileSettings: (body: ProfileSettingsPayload) =>
-    withDemoFallback(
-      () =>
-        http<SaveProfileSettingsResponse>(apiRoutes.profileSettings, {
-          method: 'PUT',
-          body,
-        }),
-      () => saveDemoProfileSettings(body),
-    ),
+    http<SaveProfileSettingsResponse>(apiRoutes.profileSettings, {
+      method: 'PUT',
+      body,
+    }),
 };

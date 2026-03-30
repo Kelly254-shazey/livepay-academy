@@ -9,6 +9,12 @@ import { mobileApi } from '@/api/client';
 import { Badge, Button, Heading, Screen, Surface, TextField } from '@/components/ui';
 import { useSessionStore } from '@/store/session-store';
 import { theme } from '@/theme';
+import {
+  getGoogleSignInHelpText,
+  initializeGoogleSignIn,
+  isGoogleSignInConfigured,
+  signInWithGoogle,
+} from '@/utils/google-signin';
 
 const linkPasswordSchema = z.object({
   password: z.string().min(8),
@@ -71,6 +77,8 @@ export function AccountLinkingScreen() {
 }
 
 function LinkPasswordForm({ onCancel }: { onCancel: () => void }) {
+  const session = useSessionStore((state) => state.session);
+  const setSession = useSessionStore((state) => state.setSession);
   const form = useForm<z.infer<typeof linkPasswordSchema>>({
     resolver: zodResolver(linkPasswordSchema),
     defaultValues: { password: '' },
@@ -78,7 +86,16 @@ function LinkPasswordForm({ onCancel }: { onCancel: () => void }) {
 
   const mutation = useMutation({
     mutationFn: mobileApi.linkPassword,
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (session) {
+        setSession({
+          ...session,
+          user: {
+            ...session.user,
+            ...result.user,
+          },
+        });
+      }
       alert('Password linked successfully');
       onCancel();
     },
@@ -110,9 +127,27 @@ function LinkPasswordForm({ onCancel }: { onCancel: () => void }) {
 }
 
 function LinkGoogleForm({ onCancel }: { onCancel: () => void }) {
+  const session = useSessionStore((state) => state.session);
+  const setSession = useSessionStore((state) => state.setSession);
+  const googleConfigured = isGoogleSignInConfigured();
+  const googleHelpText = getGoogleSignInHelpText();
+
+  React.useEffect(() => {
+    initializeGoogleSignIn();
+  }, []);
+
   const mutation = useMutation({
     mutationFn: mobileApi.linkGoogleAccount,
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (session) {
+        setSession({
+          ...session,
+          user: {
+            ...session.user,
+            ...result.user,
+          },
+        });
+      }
       alert('Google account linked successfully');
       onCancel();
     },
@@ -120,8 +155,8 @@ function LinkGoogleForm({ onCancel }: { onCancel: () => void }) {
 
   const handleGoogleLink = async () => {
     try {
-      // TODO: Integrate with actual Google Sign-In provider
-      alert('Google sign-in integration needed');
+      const result = await signInWithGoogle();
+      mutation.mutate({ idToken: result.idToken });
     } catch (error) {
       alert((error as Error).message);
     }
@@ -130,12 +165,15 @@ function LinkGoogleForm({ onCancel }: { onCancel: () => void }) {
   return (
     <View style={{ gap: theme.spacing.md }}>
       <Text style={styles.infoText}>
-        Tap below to link your Google account to this profile.
+        {googleConfigured
+          ? 'Tap below to link your Google account to this profile.'
+          : googleHelpText}
       </Text>
       {mutation.isError ? <Text style={styles.errorText}>{(mutation.error as Error).message}</Text> : null}
-      <Button 
+      <Button
         onPress={handleGoogleLink}
         title={mutation.isPending ? 'Linking...' : 'Link Google'}
+        disabled={!googleConfigured || mutation.isPending}
       />
       <Button onPress={onCancel} title="Back" variant="ghost" />
     </View>

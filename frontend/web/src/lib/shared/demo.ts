@@ -71,9 +71,12 @@ const live = (
   creator: overrides.creator ?? creator({}, category),
   category: overrides.category ?? category,
   price: overrides.price ?? 25,
+  currency: overrides.currency ?? 'USD',
+  isPaid: overrides.isPaid ?? (overrides.price ?? 25) > 0,
   startTime: overrides.startTime ?? NOW,
   endTime: overrides.endTime,
   isLive: overrides.isLive ?? true,
+  visibility: overrides.visibility ?? 'public',
   viewerCount: overrides.viewerCount ?? 126,
   accessGranted: overrides.accessGranted ?? true,
 });

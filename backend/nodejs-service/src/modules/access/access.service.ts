@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import jwt from "jsonwebtoken";
 import { Prisma, type AccessGrantTargetType, type PrismaClient, type UserRole } from "@prisma/client";
 
@@ -19,10 +20,40 @@ type ResolvedTarget = {
   isPaid: boolean;
 };
 
+const PAYMENT_IDENTIFIER_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._:-]{6,118}[A-Za-z0-9])?$/;
+
 function buildLiveJoinCode(source: string) {
   const normalized = source.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
   const body = normalized.slice(0, 10).padEnd(10, "X");
   return `LIV-${body}`;
+}
+
+function normalizePaymentIdentifier(value: string, fieldLabel: string) {
+  const normalized = value.trim();
+
+  if (!PAYMENT_IDENTIFIER_PATTERN.test(normalized)) {
+    throw new AppError(`${fieldLabel} format is invalid.`, 400);
+  }
+
+  return normalized;
+}
+
+function buildInternalIdempotencyKey(input: {
+  userId: string;
+  targetType: SupportedPurchaseTarget;
+  targetId: string;
+  providerReference: string;
+  idempotencyKey?: string;
+}) {
+  if (input.idempotencyKey?.trim()) {
+    return normalizePaymentIdentifier(input.idempotencyKey, "Idempotency key");
+  }
+
+  const digest = createHash("sha256")
+    .update(`${input.userId}:${input.targetType}:${input.targetId}:${input.providerReference}`)
+    .digest("hex");
+
+  return `conf-${digest.slice(0, 32)}`;
 }
 
 export class AccessService {
@@ -43,6 +74,14 @@ export class AccessService {
       idempotencyKey?: string;
     }
   ) {
+    const providerReference = normalizePaymentIdentifier(input.providerReference, "Provider reference");
+    const idempotencyKey = buildInternalIdempotencyKey({
+      userId,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      providerReference,
+      idempotencyKey: input.idempotencyKey
+    });
     const target = await this.resolveTarget(input.targetType, input.targetId);
     if (!target.isPaid) {
       throw new AppError("This resource does not require payment.", 409);
@@ -65,7 +104,7 @@ export class AccessService {
     }
 
     const existing = await this.db.accessGrant.findUnique({
-      where: { sourceReference: input.providerReference }
+      where: { sourceReference: providerReference }
     });
 
     if (existing) {
@@ -107,8 +146,8 @@ export class AccessService {
       targetId: input.targetId,
       amount: target.amount,
       currency: target.currency,
-      providerReference: input.providerReference,
-      idempotencyKey: input.idempotencyKey ?? input.providerReference
+      providerReference,
+      idempotencyKey
     });
 
     const grant = await this.db.$transaction(async (tx) => {
@@ -118,7 +157,7 @@ export class AccessService {
           grantedById: userId,
           targetType: input.targetType,
           targetId: input.targetId,
-          sourceReference: input.providerReference,
+          sourceReference: providerReference,
           price: target.amount,
           currency: target.currency,
           riskScore,
@@ -157,7 +196,8 @@ export class AccessService {
       resource: input.targetType,
       resourceId: input.targetId,
       metadata: {
-        providerReference: input.providerReference,
+        providerReference,
+        idempotencyKey,
         finance,
         riskScore
       }

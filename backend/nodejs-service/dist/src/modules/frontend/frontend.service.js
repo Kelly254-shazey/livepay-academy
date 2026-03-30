@@ -132,12 +132,14 @@ class FrontendService {
     accessService;
     javaFinanceClient;
     walletsService;
-    constructor(db, authService, accessService, javaFinanceClient, walletsService) {
+    liveSessionsService;
+    constructor(db, authService, accessService, javaFinanceClient, walletsService, liveSessionsService) {
         this.db = db;
         this.authService = authService;
         this.accessService = accessService;
         this.javaFinanceClient = javaFinanceClient;
         this.walletsService = walletsService;
+        this.liveSessionsService = liveSessionsService;
     }
     async getSession(actor) {
         const user = await this.db.user.findUnique({
@@ -192,8 +194,8 @@ class FrontendService {
     async completeProfile(actor, input) {
         return this.authService.completeProfile(actor.userId, input);
     }
-    async linkGoogleAccount(actor, idToken) {
-        return this.authService.linkGoogleAccount(actor.userId, idToken);
+    async linkGoogleAccount(actor, input) {
+        return this.authService.linkGoogleAccount(actor.userId, input);
     }
     async linkPasswordAccount(actor, password) {
         return this.authService.linkPassword(actor.userId, password);
@@ -242,6 +244,19 @@ class FrontendService {
                 }
                 : undefined
         };
+    }
+    async getCategoryCatalog() {
+        const categories = await this.db.category.findMany({
+            where: { status: "active" },
+            orderBy: { name: "asc" }
+        });
+        return categories.map((category) => ({
+            id: category.id,
+            slug: category.slug,
+            name: category.name,
+            description: category.description,
+            status: category.status
+        }));
     }
     async saveProfileSettings(actor, input) {
         const user = await this.db.user.findUnique({
@@ -575,6 +590,14 @@ class FrontendService {
             live: (await this.toLiveSummaries([live], actor))[0],
             relatedLives: listResponse(await this.toLiveSummaries(related, actor))
         };
+    }
+    async createLiveSession(actor, input) {
+        return this.liveSessionsService.create(actor.userId, actor.role, {
+            ...input
+        });
+    }
+    async publishLiveSession(actor, liveId) {
+        return this.liveSessionsService.publish(liveId, actor.userId, actor.role);
     }
     async getLiveRoom(actor, liveId) {
         const joinAccess = await this.accessService.assertLiveJoinAccess(actor.userId, actor.role, liveId);
@@ -1365,6 +1388,8 @@ class FrontendService {
                 creator: this.toCreatorSummary(item.creator, creatorStats.get(item.creator.id)),
                 category: normalizeCategorySlug(item.category?.slug ?? item.category?.name),
                 price: toNumber(item.price),
+                currency: readString(item.currency, env_1.env.DEFAULT_CURRENCY),
+                isPaid: readBoolean(item.isPaid, toNumber(item.price) > 0),
                 startTime: (item.startedAt ?? item.scheduledFor ?? item.createdAt).toISOString(),
                 endTime: item.endedAt?.toISOString(),
                 isLive: item.status === "live",

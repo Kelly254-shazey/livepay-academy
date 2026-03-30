@@ -1,0 +1,769 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model LearningClass {
+  id          String        @id @default(uuid())
+  creatorId   String
+  categoryId  String?
+  title       String
+  description String?       @db.Text
+  price       Decimal       @db.Decimal(12, 2)
+  currency    String        @default("USD")
+  isPaid      Boolean       @default(true)
+  status      ClassStatus   @default(draft)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  category    category?     @relation(fields: [categoryId], references: [id])
+  creator     user          @relation("UserClasses", fields: [creatorId], references: [id], onDelete: NoAction)
+  classlesson classlesson[]
+  enrollment  enrollment[]
+
+  @@index([creatorId, status])
+  @@index([categoryId, startsAt])
+  @@map("classes")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model accessgrant {
+  id                                 String                 @id
+  userId                             String
+  grantedById                        String?
+  targetType                         accessgrant_targetType
+  targetId                           String
+  status                             accessgrant_status     @default(active)
+  sourceReference                    String?                @unique(map: "AccessGrant_sourceReference_key")
+  price                              Decimal?               @db.Decimal(12, 2)
+  currency                           String?
+  riskScore                          Decimal?               @db.Decimal(5, 2)
+  expiresAt                          DateTime?
+  createdAt                          DateTime               @default(now())
+  updatedAt                          DateTime
+  user_accessgrant_grantedByIdTouser user?                  @relation("accessgrant_grantedByIdTouser", fields: [grantedById], references: [id], map: "AccessGrant_grantedById_fkey")
+  user_accessgrant_userIdTouser      user                   @relation("accessgrant_userIdTouser", fields: [userId], references: [id], onDelete: Cascade, map: "AccessGrant_userId_fkey")
+  enrollment                         enrollment[]
+
+  @@index([grantedById], map: "AccessGrant_grantedById_fkey")
+  @@index([targetType, targetId, status], map: "AccessGrant_targetType_targetId_status_idx")
+  @@index([userId, targetType, targetId, status], map: "AccessGrant_userId_targetType_targetId_status_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model auditlog {
+  id             String                  @id
+  actorId        String?
+  actorRole      auditlog_actorRole?
+  action         String
+  resource       String
+  resourceId     String?
+  ipAddress      String?
+  metadata       String?                 @db.LongText
+  createdAt      DateTime                @default(now())
+  actionCategory auditlog_actionCategory @default(admin)
+  resourceType   String?
+  status         String                  @default("success")
+  statusCode     Int?
+  description    String?
+  userAgent      String?
+  changes        String?                 @db.LongText
+  errorMessage   String?
+  duration       Int?
+  timestamp      DateTime                @default(now())
+  user           user?                   @relation(fields: [actorId], references: [id], map: "AuditLog_actorId_fkey")
+
+  @@index([actionCategory, status], map: "AuditLog_actionCategory_status_idx")
+  @@index([action, createdAt], map: "AuditLog_action_createdAt_idx")
+  @@index([action, timestamp], map: "AuditLog_action_timestamp_idx")
+  @@index([actorId, timestamp], map: "AuditLog_actorId_timestamp_idx")
+  @@index([resourceType, resourceId], map: "AuditLog_resourceType_resourceId_idx")
+  @@index([resource, resourceId], map: "AuditLog_resource_resourceId_idx")
+  @@index([status], map: "AuditLog_status_idx")
+  @@index([timestamp], map: "AuditLog_timestamp_idx")
+}
+
+model authidentity {
+  id             String   @id @db.VarChar(100)
+  userId         String   @db.VarChar(100)
+  provider       String   @db.VarChar(50)
+  providerUserId String   @db.VarChar(255)
+  email          String   @db.VarChar(255)
+  createdAt      DateTime @default(now()) @db.DateTime(0)
+  updatedAt      DateTime @default(now()) @db.DateTime(0)
+  user           user     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "AuthIdentity_userId_fkey")
+
+  @@unique([provider, providerUserId], map: "AuthIdentity_provider_providerUserId_key")
+  @@unique([userId, provider], map: "AuthIdentity_userId_provider_key")
+  @@index([email], map: "AuthIdentity_email_idx")
+  @@index([userId], map: "AuthIdentity_userId_idx")
+}
+
+model category {
+  id             String           @id
+  slug           String           @unique(map: "Category_slug_key")
+  name           String           @unique(map: "Category_name_key")
+  description    String?
+  icon           String?
+  status         category_status  @default(active)
+  createdById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  user           user?            @relation(fields: [createdById], references: [id], map: "Category_createdById_fkey")
+  classes        LearningClass[]
+  livesession    livesession[]
+  premiumcontent premiumcontent[]
+
+  @@index([createdById], map: "Category_createdById_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model classlesson {
+  id           String        @id
+  classId      String
+  title        String
+  description  String?       @db.Text
+  orderIndex   Int
+  isPreview    Boolean       @default(false)
+  assetUrl     String?
+  scheduledFor DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime
+  classes      LearningClass @relation(fields: [classId], references: [id], onDelete: Cascade, map: "ClassLesson_classId_fkey")
+
+  @@unique([classId, orderIndex], map: "ClassLesson_classId_orderIndex_key")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model contentaccessauditlog {
+  id               String    @id @db.VarChar(36)
+  userId           String    @db.VarChar(36)
+  contentType      String    @db.VarChar(50)
+  contentId        String    @db.VarChar(36)
+  creatorId        String?   @db.VarChar(36)
+  accessType       String    @db.VarChar(50)
+  accessDuration   Int?
+  bytesTransferred Int?
+  ipAddress        String?   @db.VarChar(45)
+  userAgent        String?   @db.Text
+  metadata         String?   @db.LongText
+  timestamp        DateTime? @default(now()) @db.DateTime(0)
+  user             user      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "contentaccessauditlog_ibfk_1")
+
+  @@index([contentType, contentId], map: "ContentAccessAuditLog_contentType_contentId_idx")
+  @@index([creatorId, timestamp], map: "ContentAccessAuditLog_creatorId_timestamp_idx")
+  @@index([userId, contentType], map: "ContentAccessAuditLog_userId_contentType_idx")
+  @@index([userId, timestamp], map: "ContentAccessAuditLog_userId_timestamp_idx")
+  @@index([contentType, contentId], map: "idx_content")
+  @@index([userId, timestamp(sort: Desc)], map: "idx_content_audit_user_time")
+  @@index([creatorId], map: "idx_creator_id")
+  @@index([timestamp], map: "idx_timestamp")
+  @@index([userId], map: "idx_user_id")
+  @@index([userId, timestamp], map: "idx_user_timestamp")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model countrypaymentreconciliation {
+  id                      String    @id @db.VarChar(36)
+  country                 String    @db.VarChar(2)
+  month                   Int
+  year                    Int
+  grossRevenue            Decimal   @default(0.00) @db.Decimal(19, 2)
+  platformCommission      Decimal   @default(0.00) @db.Decimal(19, 2)
+  creatorEarnings         Decimal   @default(0.00) @db.Decimal(19, 2)
+  totalTransactions       BigInt    @default(0)
+  failedTransactions      BigInt    @default(0)
+  refundedAmount          Decimal   @default(0.00) @db.Decimal(19, 2)
+  averageTransactionValue Decimal?  @db.Decimal(19, 2)
+  createdAt               DateTime? @default(now()) @db.DateTime(0)
+  updatedAt               DateTime? @default(now()) @db.DateTime(0)
+
+  @@unique([country, month, year], map: "unique_country_month")
+  @@index([country], map: "idx_country")
+  @@index([year, month], map: "idx_date")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model creatorprofile {
+  id                        String                            @id
+  userId                    String                            @unique(map: "CreatorProfile_userId_key")
+  handle                    String                            @unique(map: "CreatorProfile_handle_key")
+  displayName               String
+  headline                  String?
+  bio                       String?                           @db.Text
+  focusCategories           String?                           @db.LongText
+  verificationStatus        creatorprofile_verificationStatus @default(pending)
+  followersCount            Int                               @default(0)
+  averageRating             Decimal?                          @db.Decimal(5, 2)
+  payoutEligible            Boolean                           @default(false)
+  createdAt                 DateTime                          @default(now())
+  updatedAt                 DateTime
+  user                      user                              @relation(fields: [userId], references: [id], onDelete: Cascade, map: "CreatorProfile_userId_fkey")
+  creatorverificationreview creatorverificationreview[]
+
+  @@index([verificationStatus, payoutEligible], map: "CreatorProfile_verificationStatus_payoutEligible_idx")
+}
+
+model creatorverificationreview {
+  id               String                             @id
+  creatorProfileId String
+  reviewerId       String
+  decision         creatorverificationreview_decision
+  notes            String?                            @db.Text
+  createdAt        DateTime                           @default(now())
+  creatorprofile   creatorprofile                     @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade, map: "CreatorVerificationReview_creatorProfileId_fkey")
+  user             user                               @relation(fields: [reviewerId], references: [id], onDelete: NoAction, map: "CreatorVerificationReview_reviewerId_fkey")
+
+  @@index([creatorProfileId, createdAt], map: "CreatorVerificationReview_creatorProfileId_createdAt_idx")
+  @@index([reviewerId, createdAt], map: "CreatorVerificationReview_reviewerId_createdAt_idx")
+}
+
+model enrollment {
+  id            String            @id
+  classId       String
+  userId        String
+  accessGrantId String?
+  status        enrollment_status @default(pending)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime
+  accessgrant   accessgrant?      @relation(fields: [accessGrantId], references: [id], map: "Enrollment_accessGrantId_fkey")
+  classes       LearningClass     @relation(fields: [classId], references: [id], onDelete: Cascade, map: "Enrollment_classId_fkey")
+  user          user              @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Enrollment_userId_fkey")
+
+  @@unique([classId, userId], map: "Enrollment_classId_userId_key")
+  @@index([accessGrantId], map: "Enrollment_accessGrantId_idx")
+  @@index([userId, status], map: "Enrollment_userId_status_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model follow {
+  id         String   @id
+  followerId String
+  creatorId  String
+  createdAt  DateTime @default(now())
+
+  @@unique([followerId, creatorId], map: "Follow_followerId_creatorId_key")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model livechatmessage {
+  id            String                 @id
+  liveSessionId String
+  senderId      String
+  body          String                 @db.Text
+  status        livechatmessage_status @default(active)
+  metadata      String?                @db.LongText
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime
+  livesession   livesession            @relation(fields: [liveSessionId], references: [id], onDelete: Cascade, map: "LiveChatMessage_liveSessionId_fkey")
+  user          user                   @relation(fields: [senderId], references: [id], onDelete: Cascade, map: "LiveChatMessage_senderId_fkey")
+
+  @@index([liveSessionId, createdAt], map: "LiveChatMessage_liveSessionId_createdAt_idx")
+  @@index([senderId, createdAt], map: "LiveChatMessage_senderId_createdAt_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model liveparticipant {
+  id                String      @id
+  liveSessionId     String
+  userId            String
+  joinedAt          DateTime    @default(now())
+  leftAt            DateTime?
+  attendanceSeconds Int         @default(0)
+  livesession       livesession @relation(fields: [liveSessionId], references: [id], onDelete: Cascade, map: "LiveParticipant_liveSessionId_fkey")
+  user              user        @relation(fields: [userId], references: [id], onDelete: Cascade, map: "LiveParticipant_userId_fkey")
+
+  @@index([liveSessionId, userId], map: "LiveParticipant_liveSessionId_userId_idx")
+  @@index([userId, joinedAt], map: "LiveParticipant_userId_joinedAt_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model livesession {
+  id              String                 @id
+  creatorId       String
+  categoryId      String?
+  title           String
+  description     String?                @db.Text
+  price           Decimal                @db.Decimal(12, 2)
+  currency        String                 @default("USD")
+  isPaid          Boolean                @default(false)
+  visibility      livesession_visibility @default(public)
+  status          livesession_status     @default(draft)
+  scheduledFor    DateTime?
+  publishedAt     DateTime?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  roomId          String                 @unique(map: "LiveSession_roomId_key")
+  roomMetadata    String?                @db.LongText
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime
+  livechatmessage livechatmessage[]
+  liveparticipant liveparticipant[]
+  category        category?              @relation(fields: [categoryId], references: [id], map: "LiveSession_categoryId_fkey")
+  user            user                   @relation(fields: [creatorId], references: [id], onDelete: NoAction, map: "LiveSession_creatorId_fkey")
+
+  @@index([categoryId, scheduledFor], map: "LiveSession_categoryId_scheduledFor_idx")
+  @@index([creatorId, status], map: "LiveSession_creatorId_status_idx")
+  @@index([status, visibility, scheduledFor], map: "LiveSession_status_visibility_scheduledFor_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model moderationaction {
+  id          String                      @id
+  moderatorId String
+  reportId    String?
+  targetType  moderationaction_targetType
+  targetId    String
+  action      moderationaction_action
+  reason      String                      @db.Text
+  metadata    String?                     @db.LongText
+  createdAt   DateTime                    @default(now())
+  user        user                        @relation(fields: [moderatorId], references: [id], onDelete: NoAction, map: "ModerationAction_moderatorId_fkey")
+  report      report?                     @relation(fields: [reportId], references: [id], map: "ModerationAction_reportId_fkey")
+
+  @@index([moderatorId, createdAt], map: "ModerationAction_moderatorId_createdAt_idx")
+  @@index([reportId], map: "ModerationAction_reportId_idx")
+  @@index([targetType, targetId, createdAt], map: "ModerationAction_targetType_targetId_createdAt_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model notification {
+  id           String            @id
+  userId       String
+  type         notification_type
+  title        String
+  body         String            @db.Text
+  data         String?           @db.LongText
+  scheduledFor DateTime?
+  readAt       DateTime?
+  createdAt    DateTime          @default(now())
+  user         user              @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Notification_userId_fkey")
+
+  @@index([scheduledFor, readAt], map: "Notification_scheduledFor_readAt_idx")
+  @@index([userId, createdAt], map: "Notification_userId_createdAt_idx")
+}
+
+model onetimecode {
+  id         String              @id
+  userId     String
+  purpose    onetimecode_purpose
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime            @default(now())
+  user       user                @relation(fields: [userId], references: [id], onDelete: Cascade, map: "OneTimeCode_userId_fkey")
+
+  @@index([purpose, codeHash], map: "OneTimeCode_purpose_codeHash_idx")
+  @@index([userId, purpose, expiresAt], map: "OneTimeCode_userId_purpose_expiresAt_idx")
+}
+
+model passwordresettoken {
+  id        String    @id
+  userId    String
+  tokenHash String    @unique(map: "PasswordResetToken_tokenHash_key")
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      user      @relation(fields: [userId], references: [id], onDelete: Cascade, map: "PasswordResetToken_userId_fkey")
+
+  @@index([expiresAt], map: "PasswordResetToken_expiresAt_idx")
+  @@index([userId], map: "PasswordResetToken_userId_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model paymentauditlog {
+  id              String    @id @db.VarChar(36)
+  paymentId       String    @db.VarChar(64)
+  userId          String    @db.VarChar(36)
+  paymentType     String    @db.VarChar(50)
+  action          String    @db.VarChar(100)
+  previousStatus  String?   @db.VarChar(50)
+  newStatus       String?   @db.VarChar(50)
+  amount          Decimal?  @db.Decimal(19, 2)
+  currency        String?   @db.VarChar(3)
+  paymentMethod   String?   @db.VarChar(50)
+  paymentProvider String?   @db.VarChar(50)
+  failureReason   String?   @db.VarChar(500)
+  ipAddress       String?   @db.VarChar(45)
+  metadata        String?   @db.LongText
+  timestamp       DateTime? @default(now()) @db.DateTime(0)
+  user            user      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "paymentauditlog_ibfk_1")
+
+  @@index([action, timestamp], map: "PaymentAuditLog_action_timestamp_idx")
+  @@index([paymentId, timestamp], map: "PaymentAuditLog_paymentId_timestamp_idx")
+  @@index([userId, action], map: "PaymentAuditLog_userId_action_idx")
+  @@index([userId, timestamp], map: "PaymentAuditLog_userId_timestamp_idx")
+  @@index([action], map: "idx_action")
+  @@index([userId, timestamp(sort: Desc)], map: "idx_payment_audit_user_time")
+  @@index([paymentId], map: "idx_payment_id")
+  @@index([timestamp], map: "idx_timestamp")
+  @@index([userId], map: "idx_user_id")
+  @@index([userId, timestamp], map: "idx_user_timestamp")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model paymentmethod {
+  id        String    @id @db.VarChar(36)
+  userId    String    @db.VarChar(36)
+  type      String    @db.VarChar(50)
+  provider  String    @db.VarChar(50)
+  country   String?   @db.VarChar(2)
+  lastFour  String?   @db.VarChar(4)
+  brand     String?   @db.VarChar(50)
+  isDefault Boolean?  @default(false)
+  isActive  Boolean?  @default(true)
+  expiresAt DateTime? @db.DateTime(0)
+  metadata  String?   @db.LongText
+  createdAt DateTime? @default(now()) @db.DateTime(0)
+  updatedAt DateTime? @default(now()) @db.DateTime(0)
+  user      user      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "paymentmethod_ibfk_1")
+
+  @@unique([userId, provider, type, lastFour], map: "unique_provider_token")
+  @@index([type, country], map: "PaymentMethod_type_country_idx")
+  @@index([userId, isActive], map: "PaymentMethod_userId_isActive_idx")
+  @@index([country], map: "idx_country")
+  @@index([type], map: "idx_type")
+  @@index([userId], map: "idx_user_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model paymentproviderconfig {
+  id               String    @id @db.VarChar(36)
+  provider         String    @unique(map: "provider") @db.VarChar(50)
+  countries        String    @db.LongText
+  paymentTypes     String    @db.LongText
+  fees             String    @db.LongText
+  settingsOverride String?   @db.LongText
+  isActive         Boolean?  @default(true)
+  createdAt        DateTime? @default(now()) @db.DateTime(0)
+  updatedAt        DateTime? @default(now()) @db.DateTime(0)
+
+  @@index([isActive], map: "PaymentProviderConfig_isActive_idx")
+  @@index([isActive], map: "idx_active")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model premiumcontent {
+  id           String                @id
+  creatorId    String
+  categoryId   String?
+  title        String
+  excerpt      String?
+  description  String?               @db.Text
+  price        Decimal               @db.Decimal(12, 2)
+  currency     String                @default("USD")
+  isPaid       Boolean               @default(true)
+  status       premiumcontent_status @default(draft)
+  previewAsset String?
+  contentAsset String?
+  publishedAt  DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime
+  category     category?             @relation(fields: [categoryId], references: [id], map: "PremiumContent_categoryId_fkey")
+  user         user                  @relation(fields: [creatorId], references: [id], onDelete: NoAction, map: "PremiumContent_creatorId_fkey")
+
+  @@index([categoryId, publishedAt], map: "PremiumContent_categoryId_publishedAt_idx")
+  @@index([creatorId, status], map: "PremiumContent_creatorId_status_idx")
+  @@index([status, publishedAt], map: "PremiumContent_status_publishedAt_idx")
+}
+
+model refreshtoken {
+  id         String    @id
+  userId     String
+  tokenHash  String    @unique(map: "RefreshToken_tokenHash_key")
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  ipAddress  String?
+  userAgent  String?
+  lastUsedAt DateTime?
+  user       user      @relation(fields: [userId], references: [id], onDelete: Cascade, map: "RefreshToken_userId_fkey")
+
+  @@index([expiresAt], map: "RefreshToken_expiresAt_idx")
+  @@index([userId], map: "RefreshToken_userId_idx")
+}
+
+model report {
+  id               String             @id
+  reporterId       String
+  targetType       report_targetType
+  targetId         String
+  reason           String
+  details          String?            @db.Text
+  status           report_status      @default(open)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  moderationaction moderationaction[]
+  user             user               @relation(fields: [reporterId], references: [id], onDelete: Cascade, map: "Report_reporterId_fkey")
+
+  @@index([reporterId], map: "Report_reporterId_fkey")
+  @@index([status, createdAt], map: "Report_status_createdAt_idx")
+  @@index([targetType, targetId, status], map: "Report_targetType_targetId_status_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model review {
+  id         String            @id
+  authorId   String
+  targetType review_targetType
+  targetId   String
+  rating     Int
+  comment    String?           @db.Text
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime
+  user       user              @relation(fields: [authorId], references: [id], onDelete: Cascade, map: "Review_authorId_fkey")
+
+  @@unique([authorId, targetType, targetId], map: "Review_authorId_targetType_targetId_key")
+  @@index([targetType, targetId, createdAt], map: "Review_targetType_targetId_createdAt_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model sessionauditlog {
+  id           String    @id @db.VarChar(36)
+  userId       String    @db.VarChar(36)
+  sessionId    String?   @db.VarChar(36)
+  eventType    String    @db.VarChar(50)
+  ipAddress    String    @db.VarChar(45)
+  userAgent    String    @db.Text
+  country      String?   @db.VarChar(2)
+  city         String?   @db.VarChar(100)
+  isSuspicious Boolean?  @default(false)
+  metadata     String?   @db.LongText
+  timestamp    DateTime? @default(now()) @db.DateTime(0)
+  user         user      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "sessionauditlog_ibfk_1")
+
+  @@index([eventType, timestamp], map: "SessionAuditLog_eventType_timestamp_idx")
+  @@index([isSuspicious], map: "SessionAuditLog_isSuspicious_idx")
+  @@index([userId, eventType], map: "SessionAuditLog_userId_eventType_idx")
+  @@index([userId, timestamp], map: "SessionAuditLog_userId_timestamp_idx")
+  @@index([eventType], map: "idx_event_type")
+  @@index([userId, timestamp(sort: Desc)], map: "idx_session_audit_user_time")
+  @@index([isSuspicious], map: "idx_suspicious")
+  @@index([timestamp], map: "idx_timestamp")
+  @@index([userId], map: "idx_user_id")
+  @@index([userId, timestamp], map: "idx_user_timestamp")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model user {
+  id                                        String                      @id
+  email                                     String                      @unique(map: "User_email_key")
+  passwordHash                              String?
+  firstName                                 String
+  lastName                                  String
+  username                                  String                      @unique(map: "username")
+  role                                      user_role                   @default(viewer)
+  settings                                  String?                     @db.LongText
+  notificationPreferences                   String?                     @db.LongText
+  isSuspended                               Boolean                     @default(false)
+  createdAt                                 DateTime                    @default(now())
+  updatedAt                                 DateTime
+  country                                   String?                     @db.VarChar(2)
+  countryDetectedAt                         DateTime?                   @db.DateTime(0)
+  ipAddress                                 String?                     @db.VarChar(45)
+  preferredCurrency                         String?                     @db.VarChar(3)
+  clerkId                                   String?                     @unique(map: "clerkId") @db.VarChar(255)
+  clerkMetadata                             String?                     @db.LongText
+  avatarUrl                                 String?
+  dateOfBirth                               DateTime?                   @db.Date
+  gender                                    String?
+  customGender                              String?
+  emailVerifiedAt                           DateTime?
+  profileCompletedAt                        DateTime?
+  lastLoginAt                               DateTime?
+  accessgrant_accessgrant_grantedByIdTouser accessgrant[]               @relation("accessgrant_grantedByIdTouser")
+  accessgrant_accessgrant_userIdTouser      accessgrant[]               @relation("accessgrant_userIdTouser")
+  auditlog                                  auditlog[]
+  authidentity                              authidentity[]
+  category                                  category[]
+  classes                                   LearningClass[]             @relation("UserClasses")
+  contentaccessauditlog                     contentaccessauditlog[]
+  creatorprofile                            creatorprofile?
+  creatorverificationreview                 creatorverificationreview[]
+  enrollment                                enrollment[]
+  livechatmessage                           livechatmessage[]
+  liveparticipant                           liveparticipant[]
+  livesession                               livesession[]
+  moderationaction                          moderationaction[]
+  notification                              notification[]
+  onetimecode                               onetimecode[]
+  passwordresettoken                        passwordresettoken[]
+  paymentauditlog                           paymentauditlog[]
+  paymentmethod                             paymentmethod[]
+  premiumcontent                            premiumcontent[]
+  refreshtoken                              refreshtoken[]
+  report                                    report[]
+  review                                    review[]
+  sessionauditlog                           sessionauditlog[]
+}
+
+enum ClassStatus {
+  draft
+  published
+  archived
+  suspended
+}
+
+enum auditlog_actorRole {
+  viewer
+  creator
+  moderator
+  admin
+}
+
+enum notification_type {
+  live_reminder
+  purchase
+  creator_announcement
+  system_alert
+  moderation
+}
+
+enum onetimecode_purpose {
+  email_verification
+  password_reset
+}
+
+enum report_targetType {
+  live_session
+  premium_content
+  class
+  user
+  message
+}
+
+enum review_targetType {
+  creator
+  live_session
+  premium_content
+  class
+}
+
+enum accessgrant_targetType {
+  live_session
+  premium_content
+  class
+  lesson
+  private_live_invite
+}
+
+enum creatorverificationreview_decision {
+  approved
+  rejected
+  needs_changes
+}
+
+enum moderationaction_targetType {
+  user
+  creator_profile
+  live_session
+  premium_content
+  class
+  live_chat_message
+  review
+  report
+}
+
+enum enrollment_status {
+  pending
+  active
+  refunded
+  cancelled
+  completed
+}
+
+enum livechatmessage_status {
+  active
+  hidden
+  removed
+}
+
+enum accessgrant_status {
+  active
+  revoked
+  expired
+  pending_review
+}
+
+enum category_status {
+  active
+  archived
+}
+
+enum moderationaction_action {
+  creator_approved
+  creator_rejected
+  creator_suspended
+  account_suspended
+  account_restored
+  content_suspended
+  content_restored
+  message_removed
+  report_resolved
+  report_dismissed
+}
+
+enum report_status {
+  open
+  under_review
+  resolved
+  dismissed
+}
+
+enum user_role {
+  viewer
+  creator
+  moderator
+  admin
+}
+
+enum creatorprofile_verificationStatus {
+  pending
+  approved
+  rejected
+  suspended
+}
+
+enum livesession_visibility {
+  public
+  followers_only
+  private
+}
+
+enum auditlog_actionCategory {
+  auth
+  payment
+  content_access
+  session
+  security
+  moderation
+  admin
+}
+
+enum livesession_status {
+  draft
+  scheduled
+  published
+  live
+  ended
+  cancelled
+  suspended
+}
+
+enum premiumcontent_status {
+  draft
+  published
+  archived
+  suspended
+}

@@ -97,6 +97,16 @@ export class AuthRepository {
         }
       });
 
+      if (input.role === "creator") {
+        await tx.creatorProfile.create({
+          data: {
+            userId: user.id,
+            handle: input.username,
+            displayName: `${input.firstName} ${input.lastName}`.trim()
+          }
+        });
+      }
+
       return tx.user.findUniqueOrThrow({
         where: { id: user.id },
         include: { identities: true, creatorProfile: true }
@@ -145,18 +155,62 @@ export class AuthRepository {
       customGender?: string | null;
     }
   ) {
-    return this.db.user.update({
-      where: { id: userId },
-      data: {
-        username: data.username,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        dateOfBirth: data.dateOfBirth,
-        gender: data.gender,
-        customGender: data.customGender ?? null,
-        profileCompletedAt: new Date()
-      },
-      include: { identities: true, creatorProfile: true }
+    return this.db.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: {
+          username: data.username,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          dateOfBirth: data.dateOfBirth,
+          gender: data.gender,
+          customGender: data.customGender ?? null,
+          profileCompletedAt: new Date()
+        },
+        include: { identities: true, creatorProfile: true }
+      });
+
+      if (user.role === "creator" || user.creatorProfile) {
+        await tx.creatorProfile.upsert({
+          where: { userId },
+          update: {
+            handle: data.username,
+            displayName: `${data.firstName} ${data.lastName}`.trim()
+          },
+          create: {
+            userId,
+            handle: data.username,
+            displayName: `${data.firstName} ${data.lastName}`.trim()
+          }
+        });
+      }
+
+      return tx.user.findUniqueOrThrow({
+        where: { id: userId },
+        include: { identities: true, creatorProfile: true }
+      });
+    });
+  }
+
+  ensureCreatorProfile(userId: string, data: { username: string; firstName: string; lastName: string }) {
+    return this.db.$transaction(async (tx) => {
+      await tx.creatorProfile.upsert({
+        where: { userId },
+        update: {
+          handle: data.username,
+          displayName: `${data.firstName} ${data.lastName}`.trim()
+        },
+        create: {
+          userId,
+          handle: data.username,
+          displayName: `${data.firstName} ${data.lastName}`.trim()
+        }
+      });
+
+      return tx.user.findUniqueOrThrow({
+        where: { id: userId },
+        include: { identities: true, creatorProfile: true }
+      });
     });
   }
 

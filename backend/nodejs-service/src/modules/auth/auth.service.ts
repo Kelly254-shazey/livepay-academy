@@ -1,6 +1,7 @@
 import { createHash, randomInt, randomUUID } from "crypto";
 
 import type { AuthProvider, UserRole } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 
 import { env } from "../../config/env";
 import { AppError } from "../../common/errors/app-error";
@@ -8,6 +9,7 @@ import { hashPassword, verifyPassword } from "../../common/security/password";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../../common/security/jwt";
 import { AuditService } from "../../common/audit/audit.service";
 import { EmailService } from "../../infrastructure/communications/email.service";
+import { ClerkService } from "../../infrastructure/auth/clerk.service";
 import { GoogleAuthService } from "../../infrastructure/auth/google-auth.service";
 import { AuthRepository } from "./auth.repository";
 import { AuthSecurityService } from "./auth-security.service";
@@ -59,9 +61,11 @@ function toIsoDate(value: Date | null | undefined) {
 
 export class AuthService {
   constructor(
+    private readonly db: PrismaClient,
     private readonly repository: AuthRepository,
     private readonly auditService: AuditService,
     private readonly emailService: EmailService,
+    private readonly clerkService: ClerkService,
     private readonly googleAuthService: GoogleAuthService,
     private readonly authSecurityService: AuthSecurityService
   ) {}
@@ -118,23 +122,24 @@ export class AuthService {
       }
     });
 
-    const verification = await this.sendEmailVerificationCode(user);
-    const tokens = await this.issueTokens(user.id, user.email, user.role, input.ipAddress, input.userAgent);
+    const sessionUser = await this.ensureCreatorProfileIfNeeded(user);
+    const verification = await this.sendEmailVerificationCode(sessionUser);
+    const tokens = await this.issueTokens(sessionUser.id, sessionUser.email, sessionUser.role, input.ipAddress, input.userAgent);
 
     await this.auditService.record({
-      actorId: user.id,
-      actorRole: user.role,
+      actorId: sessionUser.id,
+      actorRole: sessionUser.role,
       action: "auth.register",
       resource: "user",
-      resourceId: user.id,
+      resourceId: sessionUser.id,
       ipAddress: input.ipAddress,
       metadata: {
         authProvider: "local",
-        username: user.username
+        username: sessionUser.username
       }
     });
 
-    return this.buildSessionResponse(user, tokens, verification);
+    return this.buildSessionResponse(sessionUser, tokens, verification);
   }
 
   async login(input: { identifier: string; password: string; ipAddress?: string; userAgent?: string }) {
@@ -153,29 +158,93 @@ export class AuthService {
 
     await this.authSecurityService.clearLoginFailures(normalizedIdentifier, input.ipAddress);
     await this.repository.updateLastLogin(user.id);
-    const tokens = await this.issueTokens(user.id, user.email, user.role, input.ipAddress, input.userAgent);
+    const sessionUser = await this.ensureCreatorProfileIfNeeded(user);
+    const tokens = await this.issueTokens(sessionUser.id, sessionUser.email, sessionUser.role, input.ipAddress, input.userAgent);
 
     await this.auditService.record({
-      actorId: user.id,
-      actorRole: user.role,
+      actorId: sessionUser.id,
+      actorRole: sessionUser.role,
       action: "auth.login",
       resource: "user",
-      resourceId: user.id,
+      resourceId: sessionUser.id,
       ipAddress: input.ipAddress,
       metadata: {
         authProvider: "local"
       }
     });
 
-    return this.buildSessionResponse(user, tokens);
+    return this.buildSessionResponse(sessionUser, tokens);
   }
 
   async signInWithGoogle(input: {
-    idToken: string;
+    idToken?: string;
+    clerkToken?: string;
     role?: "viewer" | "creator";
     ipAddress?: string;
     userAgent?: string;
   }) {
+    if (input.clerkToken) {
+      const clerkSession = await this.clerkService.verifyGoogleSession(input.clerkToken);
+      const existingIdentity = await this.repository.findIdentity("google", clerkSession.user.googleProviderUserId);
+
+      const user = await this.clerkService.syncToDatabase(
+        {
+          id: clerkSession.user.id,
+          primaryEmailAddressId: null,
+          emailAddresses: [
+            {
+              emailAddress: clerkSession.user.email,
+              verification: {
+                status: clerkSession.user.emailVerified ? "verified" : "unverified"
+              }
+            }
+          ],
+          firstName: clerkSession.user.firstName,
+          lastName: clerkSession.user.lastName,
+          imageUrl: clerkSession.user.imageUrl,
+          publicMetadata: clerkSession.user.publicMetadata,
+          externalAccounts: [
+            {
+              provider: "google",
+              providerUserId: clerkSession.user.googleProviderUserId
+            }
+          ]
+        },
+        this.db,
+        (input.role ?? "viewer") as UserRole
+      );
+
+      if (user.isSuspended) {
+        throw new AppError("Account is suspended.", 403);
+      }
+
+      await this.repository.updateLastLogin(user.id);
+      const sessionUser = await this.ensureCreatorProfileIfNeeded(user);
+      const tokens = await this.issueTokens(sessionUser.id, sessionUser.email, sessionUser.role, input.ipAddress, input.userAgent);
+
+      await this.auditService.record({
+        actorId: sessionUser.id,
+        actorRole: sessionUser.role,
+        action: "auth.google.login",
+        resource: "user",
+        resourceId: sessionUser.id,
+        ipAddress: input.ipAddress,
+        metadata: {
+          authProvider: "google",
+          broker: "clerk",
+          clerkUserId: clerkSession.user.id,
+          clerkSessionId: clerkSession.sessionId,
+          linkedByEmail: !existingIdentity
+        }
+      });
+
+      return this.buildSessionResponse(sessionUser, tokens);
+    }
+
+    if (!input.idToken) {
+      throw new AppError("Google token is required.", 400);
+    }
+
     const googleProfile = await this.googleAuthService.verifyIdToken(input.idToken);
     const existingIdentity = await this.repository.findIdentity("google", googleProfile.providerUserId);
 
@@ -233,14 +302,15 @@ export class AuthService {
     }
 
     await this.repository.updateLastLogin(user.id);
-    const tokens = await this.issueTokens(user.id, user.email, user.role, input.ipAddress, input.userAgent);
+    const sessionUser = await this.ensureCreatorProfileIfNeeded(user);
+    const tokens = await this.issueTokens(sessionUser.id, sessionUser.email, sessionUser.role, input.ipAddress, input.userAgent);
 
     await this.auditService.record({
-      actorId: user.id,
-      actorRole: user.role,
+      actorId: sessionUser.id,
+      actorRole: sessionUser.role,
       action: "auth.google.login",
       resource: "user",
-      resourceId: user.id,
+      resourceId: sessionUser.id,
       ipAddress: input.ipAddress,
       metadata: {
         authProvider: "google",
@@ -248,7 +318,7 @@ export class AuthService {
       }
     });
 
-    return this.buildSessionResponse(user, tokens);
+    return this.buildSessionResponse(sessionUser, tokens);
   }
 
   async refresh(refreshToken: string, context?: { ipAddress?: string; userAgent?: string }) {
@@ -289,8 +359,9 @@ export class AuthService {
       throw new AppError("Account is unavailable.", 403);
     }
 
-    const tokens = await this.issueTokens(user.id, user.email, user.role, context?.ipAddress, context?.userAgent);
-    return this.buildSessionResponse(user, tokens);
+    const sessionUser = await this.ensureCreatorProfileIfNeeded(user);
+    const tokens = await this.issueTokens(sessionUser.id, sessionUser.email, sessionUser.role, context?.ipAddress, context?.userAgent);
+    return this.buildSessionResponse(sessionUser, tokens);
   }
 
   async logout(refreshToken: string, actor?: { userId: string; role: UserRole; ipAddress?: string }) {
@@ -522,19 +593,37 @@ export class AuthService {
     };
   }
 
-  async linkGoogleAccount(userId: string, idToken: string) {
+  async linkGoogleAccount(userId: string, input: { idToken?: string; clerkToken?: string }) {
     const user = await this.repository.findUserById(userId);
     if (!user) {
       throw new AppError("User not found.", 404);
     }
 
-    const googleProfile = await this.googleAuthService.verifyIdToken(idToken);
-    const existingIdentity = await this.repository.findIdentity("google", googleProfile.providerUserId);
+    const googleProfile = input.idToken
+      ? await this.googleAuthService.verifyIdToken(input.idToken)
+      : null;
+    const clerkProfile = input.clerkToken
+      ? await this.clerkService.verifyGoogleSession(input.clerkToken)
+      : null;
+
+    if (!googleProfile && !clerkProfile) {
+      throw new AppError("Google token is required.", 400);
+    }
+
+    const providerUserId = googleProfile?.providerUserId ?? clerkProfile?.user.googleProviderUserId;
+    const email = googleProfile?.email ?? clerkProfile?.user.email;
+    const emailVerified = googleProfile?.emailVerified ?? clerkProfile?.user.emailVerified ?? false;
+
+    if (!providerUserId || !email) {
+      throw new AppError("Google account could not be verified.", 400);
+    }
+
+    const existingIdentity = await this.repository.findIdentity("google", providerUserId);
     if (existingIdentity && existingIdentity.userId !== user.id) {
       throw new AppError("This Google account is already linked to another user.", 409);
     }
 
-    if (googleProfile.email !== user.email) {
+    if (email !== user.email) {
       throw new AppError("The Google account email must match your LiveGate account email.", 400);
     }
 
@@ -542,12 +631,12 @@ export class AuthService {
     if (!linked) {
       await this.repository.linkIdentity(user.id, {
         provider: "google",
-        providerUserId: googleProfile.providerUserId,
-        email: googleProfile.email
+        providerUserId,
+        email
       });
     }
 
-    const updatedUser = googleProfile.emailVerified && !user.emailVerifiedAt
+    const updatedUser = emailVerified && !user.emailVerifiedAt
       ? await this.repository.updateEmailVerification(user.id, new Date())
       : await this.repository.findUserById(user.id);
 
@@ -878,6 +967,18 @@ export class AuthService {
       provider: "local",
       providerUserId: user.email,
       email: user.email
+    });
+  }
+
+  private async ensureCreatorProfileIfNeeded(user: AuthUser) {
+    if (user.role !== "creator" || user.creatorProfile) {
+      return user;
+    }
+
+    return this.repository.ensureCreatorProfile(user.id, {
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName
     });
   }
 

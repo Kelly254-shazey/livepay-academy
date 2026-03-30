@@ -38,11 +38,22 @@ export const frontendSignUpSchema = z.object({
   query: z.object({}).default({})
 });
 
+const frontendGoogleAuthBodySchema = z.object({
+  idToken: z.string().min(20).optional(),
+  clerkToken: z.string().min(20).optional(),
+  role: z.enum(["viewer", "creator"]).default("viewer")
+}).superRefine((value, ctx) => {
+  if (!value.idToken && !value.clerkToken) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["idToken"],
+      message: "A Google token or Clerk token is required."
+    });
+  }
+});
+
 export const frontendGoogleAuthSchema = z.object({
-  body: z.object({
-    idToken: z.string().min(20),
-    role: z.enum(["viewer", "creator"]).default("viewer")
-  }),
+  body: frontendGoogleAuthBodySchema,
   params: z.object({}).default({}),
   query: z.object({}).default({})
 });

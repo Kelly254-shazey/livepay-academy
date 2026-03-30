@@ -1,6 +1,7 @@
 import {
   demoParticipants,
   normalizeAuthSession,
+  type AuthSession,
   type DemoParticipant,
   type UserRole,
 } from '../shared';
@@ -25,6 +26,12 @@ import { mobileApi } from '@/api/client';
 import { Dialog, Screen } from '@/components/ui';
 import { useSessionStore } from '@/store/session-store';
 import { theme } from '@/theme';
+import {
+  getGoogleSignInHelpText,
+  initializeGoogleSignIn,
+  isGoogleSignInConfigured,
+  signInWithGoogle,
+} from '@/utils/google-signin';
 
 const publicModes = [
   {
@@ -90,10 +97,23 @@ function normalizePreferredRoles(
   return normalized.length ? normalized : [fallbackRole];
 }
 
-function nextPathForRole(role: UserRole, roles: UserRole[] = [role]) {
+function nextPathForRole(role: UserRole, roles?: UserRole[]) {
+  void roles;
   if (role === 'creator') return '/(creator)/(tabs)/dashboard';
   if (role === 'admin' || role === 'moderator') return '/(staff)/dashboard';
   return '/(viewer)/(tabs)/home';
+}
+
+function getPostAuthRoute(session: AuthSession) {
+  if (session.nextStep === 'verify-email') {
+    return '/(public)/email-verification';
+  }
+
+  if (session.nextStep === 'complete-profile') {
+    return '/(public)/profile-completion';
+  }
+
+  return nextPathForRole(session.user.role, session.user.roles);
 }
 
 function formatRoleLabel(role: UserRole) {
@@ -177,7 +197,6 @@ const googleSignInSchema = z.object({
   idToken: z.string().min(20),
 });
 
-const GOOGLE_AUTH_HELP = 'Google sign-in is not configured yet. Use email and password for now.';
 const publicPalette = {
   background: '#f4f7fb',
   surface: '#ffffff',
@@ -439,7 +458,7 @@ function SignInFormDialogContent({
         const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
         setSession(normalized);
         onSuccess();
-        router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
+        router.replace(getPostAuthRoute(normalized));
       }
     },
   });
@@ -535,13 +554,8 @@ function SignUpFormDialogContent({
       if (session) {
         const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
         setSession(normalized);
-        if (normalized.user.emailVerified) {
-          onSuccess();
-          router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
-        } else {
-          onSuccess();
-          router.replace('/(public)/email-verification');
-        }
+        onSuccess();
+        router.replace(getPostAuthRoute(normalized));
       }
     },
   });
@@ -789,10 +803,16 @@ export function SignInScreen() {
   const preferredRoles = normalizePreferredRoles(rawPreferredRoles, preferredRole);
   const setPreferredRoles = useSessionStore((state) => state.setPreferredRoles);
   const setSession = useSessionStore((state) => state.setSession);
+  const googleConfigured = isGoogleSignInConfigured();
+  const googleHelpText = getGoogleSignInHelpText();
   const form = useForm<z.infer<typeof signInSchema>>({
     resolver: zodResolver(signInSchema),
     defaultValues: { identifier: '', password: '' },
   });
+
+  React.useEffect(() => {
+    initializeGoogleSignIn();
+  }, []);
 
   const mutation = useMutation({
     mutationFn: (values: z.infer<typeof signInSchema>) =>
@@ -801,8 +821,23 @@ export function SignInScreen() {
       if (session) {
         const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
         setSession(normalized);
-        router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
+        router.replace(getPostAuthRoute(normalized));
       }
+    },
+  });
+  const googleMutation = useMutation({
+    mutationFn: async () => {
+      const result = await signInWithGoogle();
+      return mobileApi.signInWithGoogle({
+        idToken: result.idToken,
+        role: preferredRole,
+        roles: preferredRoles,
+      });
+    },
+    onSuccess: (session) => {
+      const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
+      setSession(normalized);
+      router.replace(getPostAuthRoute(normalized));
     },
   });
 
@@ -818,12 +853,15 @@ export function SignInScreen() {
       <PublicSurface>
         <Text style={styles.sectionEyebrow}>Google sign-in</Text>
         <Button
-          onPress={() => {}}
-          title="Continue with Google (Coming soon)"
+          onPress={() => googleMutation.mutate()}
+          title={googleMutation.isPending ? 'Connecting Google...' : 'Continue with Google'}
           variant="secondary"
-          disabled
+          disabled={!googleConfigured || googleMutation.isPending}
         />
-        <Text style={styles.statusText}>{GOOGLE_AUTH_HELP}</Text>
+        <Text style={styles.statusText}>{googleHelpText}</Text>
+        {googleMutation.isError ? (
+          <Text style={styles.errorText}>{(googleMutation.error as Error).message}</Text>
+        ) : null}
         <Text style={styles.dividerText}>or</Text>
         
         <Controller
@@ -883,13 +921,15 @@ export function SignUpScreen() {
   const preferredRole = normalizePreferredRole(rawPreferredRole);
   const preferredRoles = normalizePreferredRoles(rawPreferredRoles, preferredRole);
   const setSession = useSessionStore((state) => state.setSession);
+  const googleConfigured = isGoogleSignInConfigured();
+  const googleHelpText = getGoogleSignInHelpText();
   const [showGenderCustom, setShowGenderCustom] = React.useState(false);
-  
+
   const form = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { 
-      fullName: '', 
-      email: '', 
+    defaultValues: {
+      fullName: '',
+      email: '',
       password: '',
       username: '',
       dateOfBirth: '',
@@ -898,23 +938,38 @@ export function SignUpScreen() {
     },
   });
 
+  React.useEffect(() => {
+    initializeGoogleSignIn();
+  }, []);
+
   const mutation = useMutation({
     mutationFn: (values: z.infer<typeof signUpSchema>) =>
-      mobileApi.signUp({ 
-        ...values, 
-        role: preferredRole, 
-        roles: preferredRoles 
+      mobileApi.signUp({
+        ...values,
+        role: preferredRole,
+        roles: preferredRoles
       }),
     onSuccess: (session) => {
       if (session) {
         const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
         setSession(normalized);
-        if (normalized.user.emailVerified) {
-          router.replace(nextPathForRole(normalized.user.role, normalized.user.roles));
-        } else {
-          router.replace('/(public)/email-verification');
-        }
+        router.replace(getPostAuthRoute(normalized));
       }
+    },
+  });
+  const googleMutation = useMutation({
+    mutationFn: async () => {
+      const result = await signInWithGoogle();
+      return mobileApi.signInWithGoogle({
+        idToken: result.idToken,
+        role: preferredRole,
+        roles: preferredRoles,
+      });
+    },
+    onSuccess: (session) => {
+      const normalized = normalizeAuthSession(session, preferredRoles, preferredRole);
+      setSession(normalized);
+      router.replace(getPostAuthRoute(normalized));
     },
   });
 
@@ -928,15 +983,18 @@ export function SignUpScreen() {
       <PublicSurface>
         <Text style={styles.sectionEyebrow}>Google sign-up</Text>
         <Button
-          onPress={() => {}}
-          title="Continue with Google (Coming soon)"
+          onPress={() => googleMutation.mutate()}
+          title={googleMutation.isPending ? 'Connecting Google...' : 'Create account with Google'}
           variant="secondary"
-          disabled
+          disabled={!googleConfigured || googleMutation.isPending}
         />
-        <Text style={styles.statusText}>{GOOGLE_AUTH_HELP}</Text>
+        <Text style={styles.statusText}>{googleHelpText}</Text>
+        {googleMutation.isError ? (
+          <Text style={styles.errorText}>{(googleMutation.error as Error).message}</Text>
+        ) : null}
         <Text style={styles.dividerText}>or</Text>
         <Text style={styles.sectionEyebrow}>Standard registration</Text>
-        
+
         <Controller
           control={form.control}
           name="fullName"

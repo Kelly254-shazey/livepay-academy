@@ -1,6 +1,7 @@
 import type {
   ClassSummary,
   CreatorSummary,
+  LiveChatMessageRecord,
   LiveSessionSummary,
   ManagedContentRecord,
   NotificationRecord,
@@ -10,7 +11,7 @@ import type {
 } from '../../lib/shared';
 import { formatCompactNumber, formatCurrency, formatDateTime } from '../../lib/shared';
 import { Link } from 'react-router-dom';
-import { Badge, Button, Card, EmptyState } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, Input } from '@/components/ui';
 
 export function CategoryPill({ title, href }: { title: string; href: string }) {
   return (
@@ -47,11 +48,16 @@ export function CreatorCard({ creator }: { creator: CreatorSummary }) {
 }
 
 export function LiveCard({ live }: { live: LiveSessionSummary }) {
+  const pricingLabel = live.isPaid ? formatCurrency(live.price, live.currency) : 'Free';
+
   return (
     <Card className="space-y-5 transition duration-200 hover:-translate-y-1 hover:shadow-panel">
       <div className="flex items-start justify-between gap-4">
         <Badge tone={live.isLive ? 'success' : 'accent'}>{live.isLive ? 'Live now' : 'Upcoming'}</Badge>
-        <p className="text-sm text-muted">{formatCurrency(live.price)}</p>
+        <div className="text-right">
+          <p className="text-sm text-muted">{pricingLabel}</p>
+          <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted">{live.isPaid ? 'Paid live' : 'Free live'}</p>
+        </div>
       </div>
       <div className="space-y-2">
         <h3 className="text-lg font-semibold tracking-[-0.03em]">{live.title}</h3>
@@ -242,24 +248,102 @@ export function NotificationsPanel({ items }: { items: NotificationRecord[] }) {
   );
 }
 
-export function LiveChatPanel({ messages }: { messages?: Array<{ id: string; author: string; message: string }> }) {
-  if (!messages?.length) {
-    return (
-      <EmptyState
-        title="Live chat placeholder"
-        body="The chat panel is ready for websocket events. Messages will appear here once the live-room feed is connected."
-      />
-    );
-  }
+export function LiveChatPanel({
+  messages = [],
+  viewerCount,
+  chatEnabled = true,
+  connectionState = 'idle',
+  connectionMessage,
+  draft = '',
+  onDraftChange,
+  onSend,
+  sendDisabled = false,
+}: {
+  messages?: LiveChatMessageRecord[];
+  viewerCount?: number;
+  chatEnabled?: boolean;
+  connectionState?: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error';
+  connectionMessage?: string | null;
+  draft?: string;
+  onDraftChange?: (value: string) => void;
+  onSend?: () => void;
+  sendDisabled?: boolean;
+}) {
+  const statusTone =
+    connectionState === 'connected'
+      ? 'success'
+      : connectionState === 'error'
+        ? 'danger'
+        : connectionState === 'disconnected'
+          ? 'warning'
+          : 'default';
+  const statusLabel =
+    connectionState === 'connected'
+      ? 'Realtime synced'
+      : connectionState === 'connecting'
+        ? 'Connecting'
+        : connectionState === 'disconnected'
+          ? 'Disconnected'
+          : connectionState === 'error'
+            ? 'Connection issue'
+            : 'Ready';
 
   return (
-    <Card className="space-y-3">
-      {messages.map((message) => (
-        <div className="rounded-2xl bg-surface-muted/70 p-3" key={message.id}>
-          <p className="text-sm font-medium">{message.author}</p>
-          <p className="mt-1 text-sm text-muted">{message.message}</p>
+    <Card className="flex h-full min-h-[32rem] flex-col gap-0 overflow-hidden p-0">
+      <div className="flex items-center justify-between gap-4 border-b border-stroke px-5 py-4">
+        <div>
+          <h3 className="text-lg font-semibold tracking-[-0.03em]">Live chat</h3>
+          <p className="mt-1 text-sm text-muted">
+            {typeof viewerCount === 'number' ? `${formatCompactNumber(viewerCount)} viewers in the room` : 'Room conversation'}
+          </p>
         </div>
-      ))}
+        <Badge tone={statusTone}>{statusLabel}</Badge>
+      </div>
+
+      <div className="flex-1 space-y-3 overflow-y-auto bg-surface-muted/35 px-5 py-5">
+        {messages.length ? (
+          messages.map((message) => (
+            <div className="rounded-2xl bg-white/75 p-3 shadow-[0_10px_30px_rgba(16,33,29,0.06)]" key={message.id}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">{message.authorName}</p>
+                <p className="text-xs uppercase tracking-[0.14em] text-muted">{formatDateTime(message.sentAt)}</p>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-muted">{message.body}</p>
+            </div>
+          ))
+        ) : (
+          <div className="flex h-full min-h-48 items-center justify-center rounded-[28px] border border-dashed border-stroke bg-white/55 px-6 text-center">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-text">No messages yet</p>
+              <p className="text-sm leading-6 text-muted">
+                {chatEnabled
+                  ? 'Be the first person to say something in this room.'
+                  : 'Chat will unlock automatically when the host is fully live.'}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3 border-t border-stroke px-5 py-4">
+        {connectionMessage ? <p className="text-sm leading-6 text-muted">{connectionMessage}</p> : null}
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Input
+            onChange={(event) => onDraftChange?.(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                onSend?.();
+              }
+            }}
+            placeholder={chatEnabled ? 'Type a message for the room' : 'Chat becomes active when the live session starts'}
+            value={draft}
+          />
+          <Button disabled={sendDisabled} onClick={onSend} type="button">
+            Send
+          </Button>
+        </div>
+      </div>
     </Card>
   );
 }

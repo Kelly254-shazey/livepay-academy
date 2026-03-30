@@ -112,6 +112,8 @@ export interface LiveSessionSummary {
   creator: CreatorSummary;
   category: CategorySlug;
   price: number;
+  currency: string;
+  isPaid: boolean;
   startTime: string;
   endTime?: string;
   isLive: boolean;

@@ -1,4 +1,4 @@
-import { categories } from '../../lib/shared';
+import { categories, formatCurrency, formatDateTime } from '../../lib/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -11,6 +11,7 @@ import {
   LiveChatPanel,
   PaymentGateCard,
 } from '@/components/domain';
+import { useLiveRoomRealtime } from '@/hooks/use-live-room-realtime';
 import { webApi } from '@/lib/api';
 import {
   Badge,
@@ -228,23 +229,46 @@ export function LiveDetailsPage() {
         ) : query.data ? (
           <>
             <Card className="space-y-4">
-              <Badge tone={query.data.live.isLive ? 'success' : 'accent'}>
-                {query.data.live.isLive ? 'Live now' : 'Upcoming paid live'}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge tone={query.data.live.isLive ? 'success' : 'accent'}>
+                  {query.data.live.isLive
+                    ? 'Live now'
+                    : query.data.live.endTime
+                      ? 'Ended live'
+                      : query.data.live.isPaid
+                        ? 'Upcoming paid live'
+                        : 'Upcoming free live'}
+                </Badge>
+                <Badge>{query.data.live.isPaid ? 'Paid access' : 'Free access'}</Badge>
+              </div>
               <SectionTitle body={query.data.live.description} title={query.data.live.title} />
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
                 <span>{query.data.live.creator.displayName}</span>
                 <span>{query.data.live.viewerCount} viewers</span>
                 <span>{query.data.live.category.replace(/-/g, ' ')}</span>
+                <span>{query.data.live.isPaid ? formatCurrency(query.data.live.price, query.data.live.currency) : 'Free'}</span>
               </div>
             </Card>
             {query.data.live.accessGranted ? (
-              <Button onClick={() => navigate(`/lives/${query.data?.live.id}/room`)}>Join live room</Button>
+              <Button onClick={() => navigate(`/lives/${query.data?.live.id}/room`)}>
+                {query.data.live.isLive ? 'Join live room' : 'Open live room'}
+              </Button>
+            ) : !query.data.live.isPaid ? (
+              <Card className="space-y-4">
+                <Badge tone="warning">Access controlled by visibility</Badge>
+                <p className="text-sm leading-7 text-muted">
+                  This live is free, but the backend still enforces the creator visibility rules. Follow the creator or
+                  wait for a private invite, then refresh access.
+                </p>
+                <Button onClick={() => void query.refetch()} variant="secondary">
+                  Refresh access
+                </Button>
+              </Card>
             ) : (
               <PaymentGateCard
                 body="Users must pay before joining paid live sessions. This flow is wired to the checkout endpoint and honors creator-set pricing."
                 onContinue={() => setOpen(true)}
-                price={`Price: ${query.data.live.price}`}
+                price={`Price: ${formatCurrency(query.data.live.price, query.data.live.currency)}`}
                 title="Unlock access"
               />
             )}
@@ -267,15 +291,50 @@ export function LiveDetailsPage() {
 
 export function LiveRoomPage() {
   const params = useParams();
+  const [chatDraft, setChatDraft] = useState('');
+  const [chatFeedback, setChatFeedback] = useState<string | null>(null);
   const query = useQuery({
     queryKey: ['live-room', params.liveId],
     queryFn: () => webApi.getLiveRoom(params.liveId ?? ''),
     enabled: Boolean(params.liveId),
   });
+  const realtime = useLiveRoomRealtime({
+    liveId: params.liveId,
+    enabled: Boolean(params.liveId && query.data?.live.accessGranted),
+    realtimeEnabled: Boolean(
+      params.liveId && query.data?.live.accessGranted && query.data?.roomAccessToken && query.data?.chatEnabled,
+    ),
+    roomAccessToken: query.data?.roomAccessToken,
+    initialViewerCount: query.data?.live.viewerCount ?? 0,
+  });
+
+  const handleSendChatMessage = () => {
+    if (!params.liveId || !chatDraft.trim() || !query.data) {
+      return;
+    }
+
+    if (!query.data.chatEnabled) {
+      setChatFeedback('Chat is paused until this live session is fully active.');
+      return;
+    }
+
+    if (realtime.connectionState !== 'connected') {
+      setChatFeedback('Live chat is still connecting. Try again in a moment.');
+      return;
+    }
+
+    try {
+      realtime.sendMessage(chatDraft.trim());
+      setChatDraft('');
+      setChatFeedback(null);
+    } catch (error) {
+      setChatFeedback(error instanceof Error ? error.message : 'Unable to send message right now.');
+    }
+  };
 
   return (
     <PageFrame>
-      <div className="mx-auto max-w-6xl grid gap-6 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="mx-auto grid max-w-7xl gap-6 px-6 py-10 xl:grid-cols-[minmax(0,1.35fr)_420px]">
         {query.isLoading ? (
           <>
             <LoadingBlock lines={8} />
@@ -287,16 +346,128 @@ export function LiveRoomPage() {
           </div>
         ) : query.data ? (
           <>
-            <Card className="space-y-4">
-              <Badge tone={query.data.live.isLive ? 'success' : 'accent'}>
-                {query.data.live.isLive ? 'Connected to live room' : 'Room waiting for host'}
-              </Badge>
-              <SectionTitle body={query.data.live.description} title={query.data.live.title} />
-              <p className="text-sm leading-7 text-muted">
-                Embedded streaming surfaces should mount here once the live delivery provider is chosen.
-              </p>
+            <Card className="overflow-hidden p-0">
+              <div className="bg-[radial-gradient(circle_at_top_left,_rgba(240,180,42,0.22),_transparent_40%),linear-gradient(135deg,#172033_0%,#111827_55%,#10211d_100%)] px-6 py-6 text-white">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Badge tone={query.data.live.isLive ? 'success' : 'warning'}>
+                      {query.data.live.isLive ? 'Live now' : 'Room waiting for host'}
+                    </Badge>
+                    <Badge>{query.data.live.isPaid ? 'Paid live' : 'Free live'}</Badge>
+                    <Badge>{query.data.chatEnabled ? 'Chat active' : 'Chat paused'}</Badge>
+                  </div>
+                  <p className="text-sm uppercase tracking-[0.18em] text-white/70">
+                    {query.data.live.isPaid ? formatCurrency(query.data.live.price, query.data.live.currency) : 'Free'}
+                  </p>
+                </div>
+                <div className="mt-6 space-y-4">
+                  <SectionTitle body={query.data.live.description} title={query.data.live.title} />
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-white/75">
+                    <span>{query.data.live.creator.displayName}</span>
+                    <span>{query.data.live.category.replace(/-/g, ' ')}</span>
+                    <span>{formatDateTime(query.data.live.startTime)}</span>
+                    <span>
+                      {query.data.live.isLive ? realtime.viewerCount : query.data.live.viewerCount} viewers in room
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+                <div className="space-y-4">
+                  <div className="flex min-h-[24rem] flex-col justify-between rounded-[30px] border border-white/10 bg-[#172033] p-6 text-white shadow-[0_24px_60px_rgba(15,23,42,0.35)]">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.22em] text-white/60">Live stage</p>
+                        <p className="mt-2 text-lg font-semibold">
+                          {query.data.live.isLive ? 'Stream is active and viewers can chat in real time.' : 'The room is ready for the host.'}
+                        </p>
+                      </div>
+                      <div className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm text-white/80">
+                        Room {query.data.roomId ?? 'pending'}
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <p className="max-w-2xl text-sm leading-7 text-white/72">
+                        This stage is controlled by the backend room state. It stays aligned with the stored session
+                        visibility, pricing, join access, and realtime viewer presence.
+                      </p>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-2xl bg-white/10 p-4">
+                          <p className="text-xs uppercase tracking-[0.16em] text-white/60">Access</p>
+                          <p className="mt-2 text-lg font-semibold">{query.data.live.accessGranted ? 'Granted' : 'Locked'}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/10 p-4">
+                          <p className="text-xs uppercase tracking-[0.16em] text-white/60">Visibility</p>
+                          <p className="mt-2 text-lg font-semibold">{(query.data.live.visibility ?? 'public').replace(/_/g, ' ')}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/10 p-4">
+                          <p className="text-xs uppercase tracking-[0.16em] text-white/60">Status</p>
+                          <p className="mt-2 text-lg font-semibold">{query.data.live.isLive ? 'Broadcasting' : 'Waiting'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {query.data.hostNotes?.length ? (
+                    <div className="rounded-[28px] border border-stroke bg-surface-muted/45 p-5">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Host notes</p>
+                      <div className="mt-3 space-y-3">
+                        {query.data.hostNotes.map((note) => (
+                          <p className="rounded-2xl bg-white/65 px-4 py-3 text-sm leading-6 text-muted" key={note}>
+                            {note}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-[28px] border border-stroke bg-surface-muted/45 p-5">
+                    <p className="text-xs uppercase tracking-[0.18em] text-muted">Room summary</p>
+                    <div className="mt-4 space-y-3 text-sm text-muted">
+                      <div className="flex items-center justify-between gap-4">
+                        <span>Viewer count</span>
+                        <span className="font-medium text-text">
+                          {query.data.live.isLive ? realtime.viewerCount : query.data.live.viewerCount}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <span>Price model</span>
+                        <span className="font-medium text-text">{query.data.live.isPaid ? 'Paid' : 'Free'}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <span>Starts</span>
+                        <span className="font-medium text-text">{formatDateTime(query.data.live.startTime)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </Card>
-            <LiveChatPanel />
+
+            <LiveChatPanel
+              chatEnabled={query.data.chatEnabled}
+              connectionMessage={
+                chatFeedback ??
+                (!query.data.chatEnabled
+                  ? 'Chat is available only while the host is actively live.'
+                  : realtime.connectionError ??
+                    (realtime.connectionState === 'connecting'
+                      ? 'Connecting to secure live chat...'
+                      : realtime.connectionState === 'disconnected'
+                        ? 'Live connection dropped. Reconnecting when available.'
+                        : null))
+              }
+              connectionState={query.data.chatEnabled ? realtime.connectionState : 'idle'}
+              draft={chatDraft}
+              messages={realtime.messages}
+              onDraftChange={setChatDraft}
+              onSend={handleSendChatMessage}
+              sendDisabled={!query.data.chatEnabled || !chatDraft.trim() || realtime.connectionState !== 'connected'}
+              viewerCount={query.data.live.isLive ? realtime.viewerCount : query.data.live.viewerCount}
+            />
           </>
         ) : null}
       </div>

@@ -4,14 +4,32 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AccessService = void 0;
+const crypto_1 = require("crypto");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const env_1 = require("../../config/env");
 const app_error_1 = require("../../common/errors/app-error");
 const prisma_json_1 = require("../../common/db/prisma-json");
+const PAYMENT_IDENTIFIER_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._:-]{6,118}[A-Za-z0-9])?$/;
 function buildLiveJoinCode(source) {
     const normalized = source.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
     const body = normalized.slice(0, 10).padEnd(10, "X");
     return `LIV-${body}`;
+}
+function normalizePaymentIdentifier(value, fieldLabel) {
+    const normalized = value.trim();
+    if (!PAYMENT_IDENTIFIER_PATTERN.test(normalized)) {
+        throw new app_error_1.AppError(`${fieldLabel} format is invalid.`, 400);
+    }
+    return normalized;
+}
+function buildInternalIdempotencyKey(input) {
+    if (input.idempotencyKey?.trim()) {
+        return normalizePaymentIdentifier(input.idempotencyKey, "Idempotency key");
+    }
+    const digest = (0, crypto_1.createHash)("sha256")
+        .update(`${input.userId}:${input.targetType}:${input.targetId}:${input.providerReference}`)
+        .digest("hex");
+    return `conf-${digest.slice(0, 32)}`;
 }
 class AccessService {
     db;
@@ -25,6 +43,14 @@ class AccessService {
         this.pythonClient = pythonClient;
     }
     async confirmPurchase(userId, role, input) {
+        const providerReference = normalizePaymentIdentifier(input.providerReference, "Provider reference");
+        const idempotencyKey = buildInternalIdempotencyKey({
+            userId,
+            targetType: input.targetType,
+            targetId: input.targetId,
+            providerReference,
+            idempotencyKey: input.idempotencyKey
+        });
         const target = await this.resolveTarget(input.targetType, input.targetId);
         if (!target.isPaid) {
             throw new app_error_1.AppError("This resource does not require payment.", 409);
@@ -42,7 +68,7 @@ class AccessService {
             await this.assertLiveVisibilityAccess(live, userId, role, false);
         }
         const existing = await this.db.accessGrant.findUnique({
-            where: { sourceReference: input.providerReference }
+            where: { sourceReference: providerReference }
         });
         if (existing) {
             return {
@@ -80,8 +106,8 @@ class AccessService {
             targetId: input.targetId,
             amount: target.amount,
             currency: target.currency,
-            providerReference: input.providerReference,
-            idempotencyKey: input.idempotencyKey ?? input.providerReference
+            providerReference,
+            idempotencyKey
         });
         const grant = await this.db.$transaction(async (tx) => {
             const createdGrant = await tx.accessGrant.create({
@@ -90,7 +116,7 @@ class AccessService {
                     grantedById: userId,
                     targetType: input.targetType,
                     targetId: input.targetId,
-                    sourceReference: input.providerReference,
+                    sourceReference: providerReference,
                     price: target.amount,
                     currency: target.currency,
                     riskScore,
@@ -126,7 +152,8 @@ class AccessService {
             resource: input.targetType,
             resourceId: input.targetId,
             metadata: {
-                providerReference: input.providerReference,
+                providerReference,
+                idempotencyKey,
                 finance,
                 riskScore
             }

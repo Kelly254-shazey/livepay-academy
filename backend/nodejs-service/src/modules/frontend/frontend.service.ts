@@ -4,6 +4,7 @@ import { env } from "../../config/env";
 import { AppError } from "../../common/errors/app-error";
 import { AccessService } from "../access/access.service";
 import { AuthService } from "../auth/auth.service";
+import { LiveSessionsService } from "../live-sessions/live-sessions.service";
 import { JavaFinanceClient } from "../../infrastructure/integrations/java-finance.client";
 import { WalletsService } from "../wallets/wallets.service";
 
@@ -190,7 +191,8 @@ export class FrontendService {
     private readonly authService: AuthService,
     private readonly accessService: AccessService,
     private readonly javaFinanceClient: JavaFinanceClient,
-    private readonly walletsService: WalletsService
+    private readonly walletsService: WalletsService,
+    private readonly liveSessionsService: LiveSessionsService
   ) {}
 
   async getSession(actor: Actor) {
@@ -229,7 +231,13 @@ export class FrontendService {
     return this.authService.register(input);
   }
 
-  async signInWithGoogle(input: { idToken: string; role: "viewer" | "creator"; ipAddress?: string; userAgent?: string }) {
+  async signInWithGoogle(input: {
+    idToken?: string;
+    clerkToken?: string;
+    role: "viewer" | "creator";
+    ipAddress?: string;
+    userAgent?: string;
+  }) {
     return this.authService.signInWithGoogle(input);
   }
 
@@ -277,8 +285,8 @@ export class FrontendService {
     return this.authService.completeProfile(actor.userId, input);
   }
 
-  async linkGoogleAccount(actor: Actor, idToken: string) {
-    return this.authService.linkGoogleAccount(actor.userId, idToken);
+  async linkGoogleAccount(actor: Actor, input: { idToken?: string; clerkToken?: string }) {
+    return this.authService.linkGoogleAccount(actor.userId, input);
   }
 
   async linkPasswordAccount(actor: Actor, password: string) {
@@ -335,6 +343,21 @@ export class FrontendService {
             }
           : undefined
     };
+  }
+
+  async getCategoryCatalog() {
+    const categories = await this.db.category.findMany({
+      where: { status: "active" },
+      orderBy: { name: "asc" }
+    });
+
+    return categories.map((category) => ({
+      id: category.id,
+      slug: category.slug,
+      name: category.name,
+      description: category.description,
+      status: category.status
+    }));
   }
 
   async saveProfileSettings(
@@ -723,6 +746,29 @@ export class FrontendService {
       live: (await this.toLiveSummaries([live], actor))[0],
       relatedLives: listResponse(await this.toLiveSummaries(related, actor))
     };
+  }
+
+  async createLiveSession(
+    actor: Actor,
+    input: {
+      categoryId: string;
+      title: string;
+      description?: string;
+      price?: number;
+      currency?: string;
+      isPaid?: boolean;
+      visibility?: "public" | "followers_only" | "private";
+      scheduledFor?: string;
+      roomMetadata?: Record<string, unknown>;
+    }
+  ) {
+    return this.liveSessionsService.create(actor.userId, actor.role as "creator" | "admin", {
+      ...input
+    });
+  }
+
+  async publishLiveSession(actor: Actor, liveId: string) {
+    return this.liveSessionsService.publish(liveId, actor.userId, actor.role as "creator" | "admin");
   }
 
   async getLiveRoom(actor: Actor, liveId: string) {
@@ -1612,6 +1658,8 @@ export class FrontendService {
         creator: this.toCreatorSummary(item.creator, creatorStats.get(item.creator.id)),
         category: normalizeCategorySlug(item.category?.slug ?? item.category?.name),
         price: toNumber(item.price),
+        currency: readString(item.currency, env.DEFAULT_CURRENCY),
+        isPaid: readBoolean(item.isPaid, toNumber(item.price) > 0),
         startTime: (item.startedAt ?? item.scheduledFor ?? item.createdAt).toISOString(),
         endTime: item.endedAt?.toISOString(),
         isLive: item.status === "live",

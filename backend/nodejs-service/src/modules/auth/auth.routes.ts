@@ -145,7 +145,10 @@ export function createAuthRouter(service: AuthService) {
     authenticate,
     validate(googleSignInSchema),
     asyncHandler(async (req, res) => {
-      const result = await service.linkGoogleAccount(req.auth!.userId, req.body.idToken);
+      const result = await service.linkGoogleAccount(req.auth!.userId, {
+        idToken: req.body.idToken,
+        clerkToken: req.body.clerkToken
+      });
       res.json(result);
     })
   );

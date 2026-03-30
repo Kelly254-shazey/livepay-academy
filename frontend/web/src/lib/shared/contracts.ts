@@ -112,17 +112,31 @@ export interface LiveSessionSummary {
   creator: CreatorSummary;
   category: CategorySlug;
   price: number;
+  currency: string;
+  isPaid: boolean;
   startTime: string;
   endTime?: string;
   isLive: boolean;
+  visibility?: 'public' | 'followers_only' | 'private';
   viewerCount: number;
   accessGranted: boolean;
 }
 
 export interface LiveRoomPayload {
   live: LiveSessionSummary;
+  roomAccessToken?: string;
+  roomId?: string;
   hostNotes?: string[];
   chatEnabled: boolean;
+}
+
+export interface LiveChatMessageRecord {
+  id: string;
+  body: string;
+  senderId: string;
+  authorName: string;
+  sentAt: string;
+  status?: string;
 }
 
 export interface PremiumContentSummary {

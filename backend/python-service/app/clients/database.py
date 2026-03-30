@@ -1,3 +1,4 @@
+import ssl
 from collections.abc import Mapping
 from typing import Any
 
@@ -6,11 +7,28 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 
 class DatabaseClient:
-    def __init__(self, source_database_url: str) -> None:
+    def __init__(
+        self,
+        source_database_url: str,
+        *,
+        ssl_enabled: bool = False,
+        ssl_verify: bool = True,
+        ssl_ca_path: str | None = None,
+    ) -> None:
+        connect_args: dict[str, Any] = {}
+        ssl_context = self._build_ssl_context(
+            ssl_enabled=ssl_enabled,
+            ssl_verify=ssl_verify,
+            ssl_ca_path=ssl_ca_path,
+        )
+        if ssl_context is not None:
+            connect_args["ssl"] = ssl_context
+
         self._engine: AsyncEngine = create_async_engine(
             source_database_url,
             pool_pre_ping=True,
             future=True,
+            connect_args=connect_args,
         )
 
     async def ping(self) -> bool:
@@ -22,10 +40,10 @@ class DatabaseClient:
         query = text(
             """
             SELECT
-              (SELECT COUNT(*) FROM `User`) AS users,
-              (SELECT COUNT(*) FROM `CreatorProfile`) AS creators,
-              (SELECT COUNT(*) FROM `LiveSession`) AS live_sessions,
-              (SELECT COUNT(*) FROM `PremiumContent`) AS premium_content,
+              (SELECT COUNT(*) FROM `user`) AS users,
+              (SELECT COUNT(*) FROM `creatorprofile`) AS creators,
+              (SELECT COUNT(*) FROM `livesession`) AS live_sessions,
+              (SELECT COUNT(*) FROM `premiumcontent`) AS premium_content,
               (SELECT COUNT(*) FROM `classes`) AS classes
             """
         )
@@ -39,8 +57,8 @@ class DatabaseClient:
               cp.displayName AS title,
               cp.followersCount AS followers,
               COUNT(ls.id) AS publishedLives
-            FROM `CreatorProfile` cp
-            LEFT JOIN `LiveSession` ls
+            FROM `creatorprofile` cp
+            LEFT JOIN `livesession` ls
               ON ls.creatorId = cp.userId
              AND ls.status IN ('published', 'live', 'ended')
             GROUP BY cp.userId, cp.displayName, cp.followersCount
@@ -59,9 +77,9 @@ class DatabaseClient:
               COUNT(DISTINCT ls.id) AS liveCount,
               COUNT(DISTINCT pc.id) AS contentCount,
               COUNT(DISTINCT cl.id) AS classCount
-            FROM `Category` c
-            LEFT JOIN `LiveSession` ls ON ls.categoryId = c.id
-            LEFT JOIN `PremiumContent` pc ON pc.categoryId = c.id
+            FROM `category` c
+            LEFT JOIN `livesession` ls ON ls.categoryId = c.id
+            LEFT JOIN `premiumcontent` pc ON pc.categoryId = c.id
             LEFT JOIN `classes` cl ON cl.categoryId = c.id
             GROUP BY c.id, c.name
             ORDER BY (COUNT(DISTINCT ls.id) + COUNT(DISTINCT pc.id) + COUNT(DISTINCT cl.id)) DESC, c.name ASC
@@ -79,8 +97,8 @@ class DatabaseClient:
               ls.status AS status,
               ls.scheduledFor AS scheduledFor,
               cp.displayName AS creatorName
-            FROM `LiveSession` ls
-            LEFT JOIN `CreatorProfile` cp ON cp.userId = ls.creatorId
+            FROM `livesession` ls
+            LEFT JOIN `creatorprofile` cp ON cp.userId = ls.creatorId
             WHERE ls.status IN ('published', 'live')
             ORDER BY CASE WHEN ls.status = 'live' THEN 0 ELSE 1 END, ls.scheduledFor ASC, ls.createdAt DESC
             LIMIT :limit
@@ -96,8 +114,8 @@ class DatabaseClient:
               pc.title AS title,
               pc.price AS price,
               cp.displayName AS creatorName
-            FROM `PremiumContent` pc
-            LEFT JOIN `CreatorProfile` cp ON cp.userId = pc.creatorId
+            FROM `premiumcontent` pc
+            LEFT JOIN `creatorprofile` cp ON cp.userId = pc.creatorId
             WHERE pc.status = 'published'
             ORDER BY pc.publishedAt DESC, pc.createdAt DESC
             LIMIT :limit
@@ -114,7 +132,7 @@ class DatabaseClient:
               cl.startsAt AS startsAt,
               cp.displayName AS creatorName
             FROM `classes` cl
-            LEFT JOIN `CreatorProfile` cp ON cp.userId = cl.creatorId
+            LEFT JOIN `creatorprofile` cp ON cp.userId = cl.creatorId
             WHERE cl.status = 'published'
             ORDER BY cl.startsAt ASC, cl.createdAt DESC
             LIMIT :limit
@@ -133,9 +151,9 @@ class DatabaseClient:
               COUNT(DISTINCT CASE WHEN ls.status IN ('published', 'live', 'ended') THEN ls.id END) AS publishedLives,
               COUNT(DISTINCT CASE WHEN pc.status = 'published' THEN pc.id END) AS premiumContentItems,
               COUNT(DISTINCT CASE WHEN cl.status = 'published' THEN cl.id END) AS publishedClasses
-            FROM `CreatorProfile` cp
-            LEFT JOIN `LiveSession` ls ON ls.creatorId = cp.userId
-            LEFT JOIN `PremiumContent` pc ON pc.creatorId = cp.userId
+            FROM `creatorprofile` cp
+            LEFT JOIN `livesession` ls ON ls.creatorId = cp.userId
+            LEFT JOIN `premiumcontent` pc ON pc.creatorId = cp.userId
             LEFT JOIN `classes` cl ON cl.creatorId = cp.userId
             WHERE cp.userId = :creator_id
             GROUP BY cp.userId, cp.displayName, cp.followersCount, cp.averageRating
@@ -145,8 +163,41 @@ class DatabaseClient:
             row = (await connection.execute(query, {"creator_id": creator_id})).mappings().first()
         return dict(row) if row else None
 
+    async def recent_user_ids(self, limit: int) -> list[str]:
+        rows = await self._fetch_many_dicts(
+            text(
+                """
+                SELECT id
+                FROM `user`
+                WHERE isSuspended = FALSE
+                ORDER BY COALESCE(lastLoginAt, updatedAt, createdAt) DESC, createdAt DESC
+                LIMIT :limit
+                """
+            ),
+            {"limit": limit},
+        )
+        return [str(row["id"]) for row in rows]
+
     async def close(self) -> None:
         await self._engine.dispose()
+
+    @staticmethod
+    def _build_ssl_context(
+        *,
+        ssl_enabled: bool,
+        ssl_verify: bool,
+        ssl_ca_path: str | None,
+    ) -> ssl.SSLContext | None:
+        if not ssl_enabled:
+            return None
+
+        if ssl_verify:
+            return ssl.create_default_context(cafile=ssl_ca_path)
+
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        return context
 
     async def _fetch_one_dict(self, query: Any, params: Mapping[str, Any] | None = None) -> dict[str, Any]:
         async with self._engine.connect() as connection:

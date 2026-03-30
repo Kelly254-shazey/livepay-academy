@@ -79,6 +79,7 @@ const envSchema = zod_1.z.object({
     EMAIL_CODE_TTL_MINUTES: zod_1.z.coerce.number().positive().default(15),
     PASSWORD_RESET_CODE_TTL_MINUTES: zod_1.z.coerce.number().positive().default(30),
     GOOGLE_CLIENT_ID: zod_1.z.string().optional(),
+    CLERK_SECRET_KEY: zod_1.z.string().optional(),
     INTERNAL_API_KEY: zod_1.z.string().min(8),
     JAVA_FINANCE_URL: zod_1.z.string().url().default("http://127.0.0.1:8080"),
     PYTHON_INTELLIGENCE_URL: zod_1.z.string().url().default("http://127.0.0.1:8000"),
