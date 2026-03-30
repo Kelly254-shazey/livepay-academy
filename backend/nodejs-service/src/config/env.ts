@@ -38,6 +38,17 @@ if (!runtimeEnv.JWT_REFRESH_SECRET && runtimeEnv.JWT_ACCESS_SECRET) {
   runtimeEnv.JWT_REFRESH_SECRET = `${runtimeEnv.JWT_ACCESS_SECRET}-refresh`;
 }
 
+// Service URLs: prefer explicit env vars over defaults
+// The run-services.sh script provides defaults like http://127.0.0.1:PORT if not set
+const serverPort = process.env.SERVER_PORT ?? "8080";
+const pythonServicePort = process.env.PYTHON_SERVICE_PORT ?? "8000";
+if (!runtimeEnv.JAVA_FINANCE_URL) {
+  runtimeEnv.JAVA_FINANCE_URL = `http://127.0.0.1:${serverPort}`;
+}
+if (!runtimeEnv.PYTHON_INTELLIGENCE_URL) {
+  runtimeEnv.PYTHON_INTELLIGENCE_URL = `http://127.0.0.1:${pythonServicePort}`;
+}
+
 const booleanString = z
   .string()
   .trim()
@@ -95,8 +106,8 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   CLERK_SECRET_KEY: z.string().optional(),
   INTERNAL_API_KEY: z.string().min(8),
-  JAVA_FINANCE_URL: z.string().url().default("http://127.0.0.1:8080"),
-  PYTHON_INTELLIGENCE_URL: z.string().url().default("http://127.0.0.1:8000"),
+  JAVA_FINANCE_URL: z.string().url(),
+  PYTHON_INTELLIGENCE_URL: z.string().url(),
   STREAMING_PROVIDER_BASE_URL: z.string().url().default("http://streaming-provider-placeholder.internal"),
   STREAMING_PROVIDER_API_KEY: z.string().min(8).default("replace-me"),
   DEFAULT_CURRENCY: z.string().default("USD"),

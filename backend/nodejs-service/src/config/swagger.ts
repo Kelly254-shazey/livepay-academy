@@ -1,6 +1,7 @@
 import { env } from "./env";
 
 export function createSwaggerDocument() {
+  const baseUrl = `http://${process.env.HOSTNAME || "localhost"}:${process.env.PORT || 3000}`;
   return {
     openapi: "3.1.0",
     info: {
@@ -8,7 +9,7 @@ export function createSwaggerDocument() {
       version: "1.0.0",
       description: "Public orchestration API for LiveGate."
     },
-    servers: [{ url: `http://localhost:${env.PORT}` }],
+    servers: [{ url: process.env.NODE_ENV === "production" ? process.env.APP_BASE_URL || baseUrl : baseUrl }],
     tags: [
       { name: "health" },
       { name: "auth" },

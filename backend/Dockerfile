@@ -4,9 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     NODE_ENV=production \
     PRISMA_SKIP_POSTINSTALL_GENERATE=true \
     SERVER_PORT=8080 \
-    PYTHON_SERVICE_PORT=8000 \
-    JAVA_FINANCE_URL=http://127.0.0.1:8080 \
-    PYTHON_INTELLIGENCE_URL=http://127.0.0.1:8000
+    PYTHON_SERVICE_PORT=8000
 
 RUN apt-get update \
     && apt-get install -y ca-certificates curl gnupg build-essential \

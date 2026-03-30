@@ -9,8 +9,9 @@ SERVICE_TYPE = "all"
 NODE_ENV = "production"
 SERVER_PORT = "8080"
 PYTHON_SERVICE_PORT = "8000"
-JAVA_FINANCE_URL = "http://127.0.0.1:8080"
-PYTHON_INTELLIGENCE_URL = "http://127.0.0.1:8000"
+# Service URLs must be set in Railway dashboard Variables
+# JAVA_FINANCE_URL: defaults to http://127.0.0.1:8080 if not set (for single-container deployments)
+# PYTHON_INTELLIGENCE_URL: defaults to http://127.0.0.1:8000 if not set (for single-container deployments)
 
 # Database Configuration (set in Railway dashboard)
 # DATABASE_URL = "mysql://user:password@host:3306/livegate"
