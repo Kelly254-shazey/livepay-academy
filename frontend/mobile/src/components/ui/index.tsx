@@ -44,6 +44,8 @@ interface TextFieldProps {
   placeholder?: string;
   error?: string;
   multiline?: boolean;
+  numberOfLines?: number;
+  maxLength?: number;
   secureTextEntry?: boolean;
   editable?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -375,6 +377,8 @@ export function TextField({
   placeholder,
   error,
   multiline = false,
+  numberOfLines,
+  maxLength,
   secureTextEntry = false,
   editable = true,
   style,
@@ -393,8 +397,9 @@ export function TextField({
           error && styles.textInputError,
         ]}
         editable={editable}
+        maxLength={maxLength}
         multiline={multiline}
-        numberOfLines={multiline ? 4 : 1}
+        numberOfLines={numberOfLines ?? (multiline ? 4 : 1)}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={theme.colors.textMuted}

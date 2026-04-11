@@ -160,9 +160,11 @@ class AuthSecurityService {
         return Number.isFinite(value) ? value : 0;
     }
     async bumpCounter(key, ttlSeconds) {
-        const existing = await this.cache.get(key);
+        // Atomically increment. If the key did not exist before (incr returns 1),
+        // set the TTL immediately. This closes the TOCTOU race where two concurrent
+        // requests both see null and both skip setting the expiry.
         const next = await this.cache.incr(key);
-        if (existing === null) {
+        if (next === 1) {
             await this.cache.set(key, String(next), { EX: ttlSeconds });
         }
         return next;

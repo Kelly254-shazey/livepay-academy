@@ -7,6 +7,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ComprehensiveAuditService = void 0;
 const env_1 = require("../../config/env");
+const logger_1 = require("../../config/logger");
 const prisma_json_1 = require("../db/prisma-json");
 function inferActionCategory(action, resourceType) {
     const normalizedAction = action.toLowerCase();
@@ -109,7 +110,7 @@ class ComprehensiveAuditService {
                 userAgent: input.userAgent,
                 country: input.country,
                 device: this.inferDevice(input.userAgent)
-            }, input.userId).catch((err) => console.warn("Failed to sync with Java audit:", err));
+            }, input.userId).catch((err) => logger_1.logger.error({ error: err }, "Failed to sync with Java audit"));
         }
     }
     /**
@@ -166,7 +167,7 @@ class ComprehensiveAuditService {
                 role: input.metadata?.role ?? "viewer",
                 requiresPayment: Boolean(input.metadata?.requiresPayment),
                 paymentVerified: Boolean(input.metadata?.paymentVerified)
-            }, input.userId).catch((err) => console.warn("Failed to sync with Java audit:", err));
+            }, input.userId).catch((err) => logger_1.logger.error({ error: err }, "Failed to sync with Java audit"));
         }
     }
     /**
@@ -274,17 +275,24 @@ class ComprehensiveAuditService {
      */
     async callJavaAuditService(endpoint, data, userId) {
         try {
+            // Validate service URL to prevent SSRF
+            if (!this.javaServiceUrl.startsWith(env_1.env.JAVA_FINANCE_URL)) {
+                throw new Error('Invalid service URL');
+            }
             const response = await fetch(`${this.javaServiceUrl}/api/v1/audit${endpoint}`, {
                 method: "POST",
                 headers: this.buildJavaHeaders(userId),
                 body: JSON.stringify(data),
             });
             if (!response.ok) {
-                console.warn(`Java audit service returned ${response.status}`);
+                logger_1.logger.warn({
+                    service: 'java-audit',
+                    status: response.status
+                }, "Audit service error");
             }
         }
         catch (error) {
-            console.warn("Failed to call Java audit service:", error);
+            logger_1.logger.error({ error }, "Failed to call Java audit service");
         }
     }
     buildJavaHeaders(userId) {

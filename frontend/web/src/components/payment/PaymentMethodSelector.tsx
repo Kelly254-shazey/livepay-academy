@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import { http } from '@/lib/http';
 
 interface PaymentMethod {
   id: string;
@@ -32,30 +33,32 @@ export function PaymentMethodSelector({ onSelect, amount, currency }: Props) {
   const [showAddNew, setShowAddNew] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchPaymentMethods = async () => {
       try {
-        // Detect user country
-        const geoResponse = await fetch('https://ip-api.com/json/');
-        const geoData = await geoResponse.json();
-        if (geoData.status === 'success') {
-          setUserCountry(geoData.countryCode);
+        const data = await http<{ methods: PaymentMethod[]; providers: PaymentProvider[] }>('/payment-methods');
+
+        if (!isMounted) {
+          return;
         }
 
-        // Get available payment methods
-        const response = await fetch('/api/payment-methods');
-        if (response.ok) {
-          const data = await response.json();
-          setMethods(data.methods);
-          setAvailableProviders(data.providers);
-        }
+        setMethods(Array.isArray(data.methods) ? data.methods : []);
+        setAvailableProviders(Array.isArray(data.providers) ? data.providers : []);
+        setUserCountry(data.methods.find((method) => method.country)?.country ?? null);
       } catch (error) {
         console.error('Failed to fetch payment methods:', error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchPaymentMethods();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const calculateFees = (provider: string) => {

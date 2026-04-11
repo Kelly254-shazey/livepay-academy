@@ -57,11 +57,12 @@ export function verifyAccessToken(token: string) {
     algorithms: ["HS256"]
   }) as jwt.JwtPayload;
 
+  // Enforce tokenType BEFORE returning — prevents refresh tokens being used as access tokens
   if (
     typeof payload.sub !== "string" ||
     typeof payload.email !== "string" ||
     typeof payload.role !== "string" ||
-    payload.tokenType !== "access"
+    payload["tokenType"] !== "access"
   ) {
     throw new Error("Invalid access token payload.");
   }
@@ -80,10 +81,11 @@ export function verifyRefreshToken(token: string) {
     algorithms: ["HS256"]
   }) as jwt.JwtPayload;
 
+  // Enforce tokenType — prevents access tokens being used as refresh tokens
   if (
     typeof payload.sub !== "string" ||
     typeof payload.email !== "string" ||
-    payload.tokenType !== "refresh"
+    payload["tokenType"] !== "refresh"
   ) {
     throw new Error("Invalid refresh token payload.");
   }

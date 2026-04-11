@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createSwaggerDocument = createSwaggerDocument;
-const env_1 = require("./env");
 function createSwaggerDocument() {
+    const baseUrl = `http://${process.env.HOSTNAME || "localhost"}:${process.env.PORT || 3000}`;
     return {
         openapi: "3.1.0",
         info: {
@@ -10,7 +10,7 @@ function createSwaggerDocument() {
             version: "1.0.0",
             description: "Public orchestration API for LiveGate."
         },
-        servers: [{ url: `http://localhost:${env_1.env.PORT}` }],
+        servers: [{ url: process.env.NODE_ENV === "production" ? process.env.APP_BASE_URL || baseUrl : baseUrl }],
         tags: [
             { name: "health" },
             { name: "auth" },

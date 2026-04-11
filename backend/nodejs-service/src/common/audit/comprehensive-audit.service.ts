@@ -6,6 +6,7 @@
 
 import type { PrismaClient, UserRole } from "@prisma/client";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 import { toPrismaNullableJson } from "../db/prisma-json";
 
 type AuditActionCategoryValue =
@@ -196,7 +197,7 @@ export class ComprehensiveAuditService {
           device: this.inferDevice(input.userAgent)
         },
         input.userId
-      ).catch((err) => console.warn("Failed to sync with Java audit:", err));
+      ).catch((err) => logger.error({ error: err }, "Failed to sync with Java audit"));
     }
   }
 
@@ -261,7 +262,7 @@ export class ComprehensiveAuditService {
           paymentVerified: Boolean(input.metadata?.paymentVerified)
         },
         input.userId
-      ).catch((err) => console.warn("Failed to sync with Java audit:", err));
+      ).catch((err) => logger.error({ error: err }, "Failed to sync with Java audit"));
     }
   }
 
@@ -391,6 +392,10 @@ export class ComprehensiveAuditService {
    */
   private async callJavaAuditService(endpoint: string, data: any, userId?: string): Promise<void> {
     try {
+      // Validate service URL to prevent SSRF
+      if (!this.javaServiceUrl.startsWith(env.JAVA_FINANCE_URL)) {
+        throw new Error('Invalid service URL');
+      }
       const response = await fetch(`${this.javaServiceUrl}/api/v1/audit${endpoint}`, {
         method: "POST",
         headers: this.buildJavaHeaders(userId),
@@ -398,10 +403,13 @@ export class ComprehensiveAuditService {
       });
 
       if (!response.ok) {
-        console.warn(`Java audit service returned ${response.status}`);
+        logger.warn({
+          service: 'java-audit',
+          status: response.status
+        }, "Audit service error");
       }
     } catch (error) {
-      console.warn("Failed to call Java audit service:", error);
+      logger.error({ error }, "Failed to call Java audit service");
     }
   }
 

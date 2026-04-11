@@ -92,6 +92,14 @@ function createFrontendRouter(service) {
         const result = await service.linkPasswordAccount(req.auth, req.body.password);
         res.json(result);
     }));
+    router.get("/profiles/me", authenticate_1.authenticate, (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.getProfileSettings(req.auth);
+        res.json(result);
+    }));
+    router.put("/profiles/me", authenticate_1.authenticate, (0, validate_1.validate)(frontend_schemas_1.profileSettingsSchema), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.saveProfileSettings(req.auth, req.body);
+        res.json(result);
+    }));
     router.get("/users/settings", authenticate_1.authenticate, (0, async_handler_1.asyncHandler)(async (req, res) => {
         const result = await service.getProfileSettings(req.auth);
         res.json(result);
@@ -155,8 +163,8 @@ function createFrontendRouter(service) {
         const result = await service.getCreatorDashboard(req.auth);
         res.json(result);
     }));
-    router.get("/admin/dashboard", authenticate_1.authenticate, (0, authorize_1.authorize)("admin", "moderator"), (0, async_handler_1.asyncHandler)(async (_req, res) => {
-        const result = await service.getAdminDashboard();
+    router.get("/admin/dashboard", authenticate_1.authenticate, (0, authorize_1.authorize)("admin", "moderator"), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.getAdminDashboard(req.auth);
         res.json(result);
     }));
     router.get("/notifications", authenticate_1.authenticate, (0, async_handler_1.asyncHandler)(async (req, res) => {

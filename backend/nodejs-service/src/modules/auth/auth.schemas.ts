@@ -22,7 +22,8 @@ export const registerSchema = z.object({
     role: z.enum(["viewer", "creator"]).default("viewer"),
     dateOfBirth: dateSchema,
     gender: genderSchema,
-    customGender: z.string().trim().max(80).optional()
+    customGender: z.string().trim().max(80).optional(),
+    country: z.string().trim().length(2).optional()
   }),
   params: z.object({}).default({}),
   query: z.object({}).default({})

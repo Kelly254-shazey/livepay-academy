@@ -44,7 +44,7 @@ const COUNTRY_CURRENCY_MAP = {
     GH: "GHS",
     UG: "UGX",
     TN: "TND",
-    eg: "EGP",
+    EG: "EGP",
     AE: "AED",
     SA: "SAR",
     KW: "KWD",

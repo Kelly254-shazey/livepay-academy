@@ -46,6 +46,11 @@ export interface UserAccount {
   role: UserRole;
   roles?: UserRole[];
   avatarUrl?: string | null;
+  profilePhotoUrl?: string | null;
+  coverPhotoUrl?: string | null;
+  bio?: string;
+  website?: string;
+  location?: string;
   emailVerified?: boolean;
   profileCompleted?: boolean;
   dateOfBirth?: string;
@@ -90,6 +95,11 @@ export interface CreatorSummary {
   bio?: string;
   avatarUrl?: string | null;
   bannerUrl?: string | null;
+  profilePhotoUrl?: string | null;
+  coverPhotoUrl?: string | null;
+  website?: string;
+  location?: string;
+  socialLinks?: Record<string, string>;
   verificationStatus: VerificationStatus;
   rating?: number;
   followerCount: number;
@@ -146,6 +156,7 @@ export interface PremiumContentSummary {
   creator: CreatorSummary;
   category: CategorySlug;
   price: number;
+  currency: string;
   accessGranted: boolean;
   attachmentCount: number;
 }
@@ -184,11 +195,17 @@ export interface CheckoutSummary {
   sessionStatus?: 'draft' | 'ready';
   accessPolicy?: string;
   paymentMethods?: string[];
+  paymentProcessingAvailable?: boolean;
 }
 
 export interface ProfileSettingsPayload {
   fullName: string;
   email: string;
+  bio?: string;
+  profilePhotoUrl?: string;
+  coverPhotoUrl?: string;
+  website?: string;
+  location?: string;
   roles: UserRole[];
   defaultRole: UserRole;
   notificationPreferences: {
@@ -287,6 +304,7 @@ export interface CreatorDashboardPayload {
 }
 
 export interface AdminDashboardPayload {
+  financeVisible?: boolean;
   totalUsers: number;
   totalCreators: number;
   activeLiveSessions: number;

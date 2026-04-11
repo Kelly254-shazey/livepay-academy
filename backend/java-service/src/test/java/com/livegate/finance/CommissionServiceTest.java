@@ -12,9 +12,13 @@ class CommissionServiceTest {
 
     @Test
     void calculatesPlatformAndCreatorSplit() {
-        CommissionService commissionService = new CommissionService(
-                new FinanceProperties("internal", new BigDecimal("0.20"), new BigDecimal("0.80"), 7)
+        FinanceProperties props = new FinanceProperties(
+                "test-api-key",
+                new BigDecimal("0.20"),
+                new BigDecimal("0.80"),
+                7
         );
+        CommissionService commissionService = new CommissionService(props);
 
         CommissionBreakdownResponse response = commissionService.calculate(new BigDecimal("100.00"));
 

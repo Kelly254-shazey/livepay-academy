@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const crypto_1 = require("crypto");
+const roles_1 = require("../../common/auth/roles");
 const env_1 = require("../../config/env");
 const app_error_1 = require("../../common/errors/app-error");
 const password_1 = require("../../common/security/password");
@@ -86,6 +87,7 @@ class AuthService {
             dateOfBirth,
             gender: gender.gender,
             customGender: gender.customGender,
+            country: input.country?.trim().toUpperCase(),
             profileCompletedAt: new Date(),
             identity: {
                 provider: "local",
@@ -650,13 +652,17 @@ class AuthService {
         };
     }
     toSessionUser(user) {
+        const roles = (0, roles_1.deriveUserRoles)({
+            role: user.role,
+            hasCreatorProfile: Boolean(user.creatorProfile)
+        });
         return {
             id: user.id,
             fullName: `${user.firstName} ${user.lastName}`.trim(),
             email: user.email,
             username: user.username,
             role: user.role,
-            roles: [user.role],
+            roles,
             avatarUrl: user.avatarUrl,
             emailVerified: Boolean(user.emailVerifiedAt),
             profileCompleted: Boolean(user.profileCompletedAt),

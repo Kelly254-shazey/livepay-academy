@@ -11,8 +11,7 @@ class StreamingProviderClient {
             visibility: input.visibility,
             publishUrl: `${baseUrl}/publish/${input.roomId}`,
             playbackUrl: `${baseUrl}/play/${input.roomId}`,
-            controlUrl: `${baseUrl}/internal/rooms/${input.liveSessionId}`,
-            apiKeyHint: `${env_1.env.STREAMING_PROVIDER_API_KEY.slice(0, 4)}***`
+            controlUrl: `${baseUrl}/internal/rooms/${input.liveSessionId}`
         };
     }
 }

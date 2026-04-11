@@ -204,6 +204,10 @@ model User {
   preferredCurrency       String?             @db.Char(3) // ISO 4217 currency code
   clerkId                 String?             @unique
   clerkMetadata           Json?
+  profilePhotoUrl         String?             @db.VarChar(500)
+  coverPhotoUrl           String?             @db.VarChar(500)
+  website                 String?
+  location                String?
   settings                Json?
   notificationPreferences Json?
   isSuspended             Boolean             @default(false)
@@ -313,11 +317,16 @@ model CreatorProfile {
   displayName        String
   headline           String?
   bio                String?
+  profilePhotoUrl    String?
+  coverPhotoUrl      String?
+  website            String?
+  location           String?
   focusCategories    Json?
   verificationStatus CreatorVerificationStatus   @default(pending)
   followersCount     Int                         @default(0)
   averageRating      Decimal?                    @db.Decimal(5, 2)
   payoutEligible     Boolean                     @default(false)
+  socialLinks        Json?
   createdAt          DateTime                    @default(now())
   updatedAt          DateTime                    @updatedAt
   user               User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -389,6 +398,7 @@ model LiveParticipant {
   liveSession       LiveSession @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)
   user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([liveSessionId, userId])
   @@index([liveSessionId, userId])
   @@index([userId, joinedAt])
 
@@ -533,6 +543,7 @@ model AccessGrant {
 
   @@index([userId, targetType, targetId, status])
   @@index([targetType, targetId, status])
+  @@index([expiresAt])
 
   @@map("accessgrant")
 }

@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "crypto";
+
 import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
@@ -11,6 +13,7 @@ import { corsCredentials, corsOriginDelegate } from "./config/cors";
 import { env } from "./config/env";
 import { createSwaggerDocument } from "./config/swagger";
 import { requestContext } from "./common/middleware/request-context";
+import { csrfProtection } from "./common/middleware/csrf";
 import { prisma } from "./infrastructure/db/prisma";
 import { redis } from "./infrastructure/cache/redis";
 import { EmailService } from "./infrastructure/communications/email.service";
@@ -20,6 +23,7 @@ import { AuditService } from "./common/audit/audit.service";
 import { JavaFinanceClient } from "./infrastructure/integrations/java-finance.client";
 import { PythonIntelligenceClient } from "./infrastructure/integrations/python-intelligence.client";
 import { StreamingProviderClient } from "./infrastructure/integrations/streaming-provider.client";
+import { MediaAccessService } from "./infrastructure/media/media-access.service";
 import { createHealthRouter } from "./modules/health/health.routes";
 import { AuthRepository } from "./modules/auth/auth.repository";
 import { AuthService } from "./modules/auth/auth.service";
@@ -58,9 +62,13 @@ import { ReviewsService } from "./modules/reviews/reviews.service";
 import { createReviewsRouter } from "./modules/reviews/reviews.routes";
 import { ReportsRepository } from "./modules/reports/reports.repository";
 import { ReportsService } from "./modules/reports/reports.service";
+import { ProfileService } from "./modules/profiles/profile.service";
+import { createProfileRouter } from "./modules/profiles/profile.routes";
 import { createReportsRouter } from "./modules/reports/reports.routes";
 import { FrontendService } from "./modules/frontend/frontend.service";
 import { createFrontendRouter } from "./modules/frontend/frontend.routes";
+import { createMediaRouter } from "./modules/media/media.routes";
+import paymentMethodRoutes from "./modules/payments/payment-methods.routes";
 
 export function createApp() {
   const app = express();
@@ -73,6 +81,7 @@ export function createApp() {
   const javaFinanceClient = new JavaFinanceClient();
   const pythonClient = new PythonIntelligenceClient();
   const streamingProviderClient = new StreamingProviderClient();
+  const mediaAccessService = new MediaAccessService();
   const authService = new AuthService(
     prisma,
     new AuthRepository(prisma),
@@ -97,13 +106,21 @@ export function createApp() {
     new PremiumContentRepository(prisma),
     accessService,
     auditService,
-    pythonClient
+    pythonClient,
+    mediaAccessService
   );
-  const classesService = new ClassesService(new ClassesRepository(prisma), accessService, auditService, pythonClient);
+  const classesService = new ClassesService(
+    new ClassesRepository(prisma),
+    accessService,
+    auditService,
+    pythonClient,
+    mediaAccessService
+  );
   const notificationsService = new NotificationsService(new NotificationsRepository(prisma), auditService);
   const walletsService = new WalletsService(javaFinanceClient, auditService);
   const reviewsService = new ReviewsService(new ReviewsRepository(prisma), auditService);
   const reportsService = new ReportsService(new ReportsRepository(prisma), auditService, pythonClient);
+  const profileService = new ProfileService(prisma, auditService);
   const adminService = new AdminService(new AdminRepository(prisma), auditService, pythonClient, javaFinanceClient);
   const frontendService = new FrontendService(
     prisma,
@@ -133,9 +150,10 @@ export function createApp() {
     })
   );
   app.use(express.json({ limit: "1mb" }));
+  app.use(csrfProtection);
 
-  if (env.SWAGGER_ENABLED) {
-    app.use("/docs", swaggerUi.serve, swaggerUi.setup(createSwaggerDocument()));
+  if (env.SWAGGER_ENABLED && env.SWAGGER_USERNAME && env.SWAGGER_PASSWORD) {
+    app.use("/docs", swaggerBasicAuth, swaggerUi.serve, swaggerUi.setup(createSwaggerDocument()));
   }
 
   app.get("/", (_req, res) => {
@@ -146,6 +164,8 @@ export function createApp() {
   });
 
   app.use("/api", createFrontendRouter(frontendService));
+  app.use("/api/media", createMediaRouter(mediaAccessService));
+  app.use("/api/payment-methods", paymentMethodRoutes);
   app.use("/health", createHealthRouter(prisma, redis, {
     javaFinance: javaFinanceClient,
     pythonIntelligence: pythonClient
@@ -164,10 +184,51 @@ export function createApp() {
   api.use("/wallets", createWalletsRouter(walletsService));
   api.use("/reviews", createReviewsRouter(reviewsService));
   api.use("/reports", createReportsRouter(reportsService));
+  api.use("/profiles", createProfileRouter(profileService));
   api.use("/admin", createAdminRouter(adminService));
 
   app.use(API_PREFIX, api);
   app.use(errorHandler);
 
   return app;
+}
+
+function swaggerBasicAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith("Basic ")) {
+    res.setHeader("WWW-Authenticate", 'Basic realm="LiveGate API Docs"');
+    res.status(401).send("Authentication required.");
+    return;
+  }
+
+  const encoded = authorization.slice("Basic ".length).trim();
+  const decoded = Buffer.from(encoded, "base64").toString("utf8");
+  const separatorIndex = decoded.indexOf(":");
+  const username = separatorIndex >= 0 ? decoded.slice(0, separatorIndex) : "";
+  const password = separatorIndex >= 0 ? decoded.slice(separatorIndex + 1) : "";
+
+  if (!env.SWAGGER_USERNAME || !env.SWAGGER_PASSWORD) {
+    res.status(503).send("Swagger credentials are not configured.");
+    return;
+  }
+
+  const validUsername = constantTimeEquals(username, env.SWAGGER_USERNAME);
+  const validPassword = constantTimeEquals(password, env.SWAGGER_PASSWORD);
+  if (!validUsername || !validPassword) {
+    res.setHeader("WWW-Authenticate", 'Basic realm="LiveGate API Docs"');
+    res.status(401).send("Invalid credentials.");
+    return;
+  }
+
+  next();
+}
+
+function constantTimeEquals(left: string, right: string) {
+  const leftBuffer = Buffer.from(left, "utf8");
+  const rightBuffer = Buffer.from(right, "utf8");
+  if (leftBuffer.length !== rightBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(leftBuffer, rightBuffer);
 }

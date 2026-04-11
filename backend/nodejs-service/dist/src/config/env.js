@@ -18,17 +18,15 @@ const runtimeEnv = { ...process.env };
 if (!runtimeEnv.DATABASE_URL) {
     runtimeEnv.DATABASE_URL = runtimeEnv.DATABASE_PUBLIC_URL ?? runtimeEnv.MYSQL_URL ?? deriveMysqlUrl(process.env);
 }
-if (!runtimeEnv.JWT_ACCESS_SECRET && runtimeEnv.JWT_SECRET) {
-    runtimeEnv.JWT_ACCESS_SECRET = runtimeEnv.JWT_SECRET;
+// Service URLs: prefer explicit env vars over defaults
+// The run-services.sh script provides defaults like http://127.0.0.1:PORT if not set
+const serverPort = process.env.SERVER_PORT ?? "8080";
+const pythonServicePort = process.env.PYTHON_SERVICE_PORT ?? "8000";
+if (!runtimeEnv.JAVA_FINANCE_URL) {
+    runtimeEnv.JAVA_FINANCE_URL = `http://127.0.0.1:${serverPort}`;
 }
-if (!runtimeEnv.JWT_REFRESH_SECRET && runtimeEnv.JWT_SECRET) {
-    runtimeEnv.JWT_REFRESH_SECRET = `${runtimeEnv.JWT_SECRET}-refresh`;
-}
-if (!runtimeEnv.JWT_ACCESS_SECRET && runtimeEnv.JWT_REFRESH_SECRET) {
-    runtimeEnv.JWT_ACCESS_SECRET = `${runtimeEnv.JWT_REFRESH_SECRET}-access`;
-}
-if (!runtimeEnv.JWT_REFRESH_SECRET && runtimeEnv.JWT_ACCESS_SECRET) {
-    runtimeEnv.JWT_REFRESH_SECRET = `${runtimeEnv.JWT_ACCESS_SECRET}-refresh`;
+if (!runtimeEnv.PYTHON_INTELLIGENCE_URL) {
+    runtimeEnv.PYTHON_INTELLIGENCE_URL = `http://127.0.0.1:${pythonServicePort}`;
 }
 const booleanString = zod_1.z
     .string()
@@ -68,10 +66,11 @@ const envSchema = zod_1.z.object({
     REDIS_URL: zod_1.z.string().trim().min(1).optional(),
     CORS_ORIGIN: corsOrigins,
     APP_BASE_URL: zod_1.z.string().url().default("http://localhost:5173"),
-    JWT_ACCESS_SECRET: zod_1.z.string().min(16),
-    JWT_REFRESH_SECRET: zod_1.z.string().min(16),
-    ACCESS_TOKEN_TTL_MINUTES: zod_1.z.coerce.number().positive().default(30),
-    REFRESH_TOKEN_TTL_DAYS: zod_1.z.coerce.number().positive().default(30),
+    PUBLIC_API_BASE_URL: zod_1.z.string().url().optional(),
+    JWT_ACCESS_SECRET: zod_1.z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
+    JWT_REFRESH_SECRET: zod_1.z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
+    ACCESS_TOKEN_TTL_MINUTES: zod_1.z.coerce.number().positive().default(15),
+    REFRESH_TOKEN_TTL_DAYS: zod_1.z.coerce.number().positive().default(7),
     EMAIL_PROVIDER: zod_1.z.enum(["log", "resend"]).default("log"),
     EMAIL_FROM: zod_1.z.string().email().default("no-reply@livegate.app"),
     RESEND_API_BASE_URL: zod_1.z.string().url().default("https://api.resend.com"),
@@ -80,12 +79,14 @@ const envSchema = zod_1.z.object({
     PASSWORD_RESET_CODE_TTL_MINUTES: zod_1.z.coerce.number().positive().default(30),
     GOOGLE_CLIENT_ID: zod_1.z.string().optional(),
     CLERK_SECRET_KEY: zod_1.z.string().optional(),
-    INTERNAL_API_KEY: zod_1.z.string().min(8),
-    JAVA_FINANCE_URL: zod_1.z.string().url().default("http://127.0.0.1:8080"),
-    PYTHON_INTELLIGENCE_URL: zod_1.z.string().url().default("http://127.0.0.1:8000"),
+    INTERNAL_API_KEY: zod_1.z.string().min(32, "INTERNAL_API_KEY must be at least 32 characters"),
+    JAVA_FINANCE_URL: zod_1.z.string().url(),
+    PYTHON_INTELLIGENCE_URL: zod_1.z.string().url(),
     STREAMING_PROVIDER_BASE_URL: zod_1.z.string().url().default("http://streaming-provider-placeholder.internal"),
-    STREAMING_PROVIDER_API_KEY: zod_1.z.string().min(8).default("replace-me"),
+    STREAMING_PROVIDER_API_KEY: zod_1.z.string().min(8).refine((v) => v !== "replace-me", "STREAMING_PROVIDER_API_KEY must be set to a real value").default("replace-me"),
     DEFAULT_CURRENCY: zod_1.z.string().default("USD"),
-    SWAGGER_ENABLED: booleanEnv.default(true)
+    SWAGGER_ENABLED: booleanEnv.default(false),
+    SWAGGER_USERNAME: zod_1.z.string().min(1).optional(),
+    SWAGGER_PASSWORD: zod_1.z.string().min(1).optional()
 });
 exports.env = envSchema.parse(runtimeEnv);

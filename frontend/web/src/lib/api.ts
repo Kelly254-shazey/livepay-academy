@@ -90,14 +90,26 @@ export const webApi = {
     username: string;
     email: string;
     password: string;
+    confirmPassword?: string;
     role: string;
     dateOfBirth: string;
     gender: 'male' | 'female' | 'prefer_not_to_say' | 'custom';
     customGender?: string;
+    country?: string;
   }) =>
     http<AuthSession>(apiRoutes.auth.signUp, {
       method: 'POST',
-      body,
+      body: {
+        fullName: body.fullName,
+        username: body.username,
+        email: body.email,
+        password: body.password,
+        role: body.role,
+        dateOfBirth: body.dateOfBirth,
+        gender: body.gender,
+        customGender: body.customGender,
+        country: body.country,
+      },
       authenticated: false,
     }),
   signInWithGoogle: (body: { idToken?: string; clerkToken?: string; role?: string; roles?: UserRole[] }) =>

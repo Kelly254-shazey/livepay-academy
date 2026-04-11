@@ -1,6 +1,7 @@
 package com.livegate.finance.finance.repository;
 
 import com.livegate.finance.finance.domain.PaymentMethod;
+import com.livegate.finance.finance.domain.PaymentMethodType;
 import com.livegate.finance.finance.domain.PaymentProvider;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -21,6 +22,19 @@ public interface PaymentMethodRepository extends JpaRepository<PaymentMethod, St
     List<PaymentMethod> findByUserIdAndProviderAndIsActiveTrue(String userId, PaymentProvider provider);
 
     List<PaymentMethod> findByUserIdAndTypeAndIsActiveTrue(String userId, String type);
+
+    Optional<PaymentMethod> findByUserIdAndProviderAndTypeAndLastFourAndIsActiveTrue(
+            String userId,
+            PaymentProvider provider,
+            PaymentMethodType type,
+            String lastFour
+    );
+
+    Optional<PaymentMethod> findByUserIdAndProviderAndTypeAndLastFourIsNullAndIsActiveTrue(
+            String userId,
+            PaymentProvider provider,
+            PaymentMethodType type
+    );
 
     Optional<PaymentMethod> findByUserIdAndIdAndIsActiveTrue(String userId, String methodId);
 

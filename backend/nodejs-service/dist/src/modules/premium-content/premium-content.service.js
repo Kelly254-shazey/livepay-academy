@@ -7,11 +7,13 @@ class PremiumContentService {
     accessService;
     auditService;
     pythonClient;
-    constructor(repository, accessService, auditService, pythonClient) {
+    mediaAccessService;
+    constructor(repository, accessService, auditService, pythonClient, mediaAccessService) {
         this.repository = repository;
         this.accessService = accessService;
         this.auditService = auditService;
         this.pythonClient = pythonClient;
+        this.mediaAccessService = mediaAccessService;
     }
     async create(creatorId, role, data) {
         await this.pythonClient.analyzeContent({
@@ -19,7 +21,7 @@ class PremiumContentService {
             description: data.description,
             contentType: "premium_content"
         });
-        const content = await this.repository.create(creatorId, data);
+        const content = await this.repository.create(creatorId, this.normalizeContentAssets(data));
         await this.auditService.record({
             actorId: creatorId,
             actorRole: role,
@@ -30,7 +32,7 @@ class PremiumContentService {
         return content;
     }
     async update(contentId, creatorId, role, data) {
-        const updated = await this.repository.update(contentId, creatorId, data);
+        const updated = await this.repository.update(contentId, creatorId, this.normalizeContentAssets(data));
         if (!updated.count) {
             throw new app_error_1.AppError("Content not found or not owned by actor.", 404);
         }
@@ -88,6 +90,17 @@ class PremiumContentService {
             resourceId: contentId
         });
         return this.repository.getById(contentId);
+    }
+    normalizeContentAssets(data) {
+        return {
+            ...data,
+            previewAsset: data.previewAsset
+                ? this.mediaAccessService.validateSourceUrl(data.previewAsset)
+                : undefined,
+            contentAsset: data.contentAsset
+                ? this.mediaAccessService.validateSourceUrl(data.contentAsset)
+                : undefined
+        };
     }
 }
 exports.PremiumContentService = PremiumContentService;

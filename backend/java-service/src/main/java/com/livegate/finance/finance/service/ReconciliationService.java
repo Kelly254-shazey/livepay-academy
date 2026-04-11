@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -63,7 +64,7 @@ public class ReconciliationService {
                 "reconciliation.completed",
                 "reconciliation_report",
                 report.getId(),
-                "{\"cutoffDate\":\"" + request.cutoffDate() + "\"}"
+                Map.of("cutoffDate", request.cutoffDate())
         );
 
         return new ReconciliationResponse(
@@ -75,4 +76,3 @@ public class ReconciliationService {
         );
     }
 }
-

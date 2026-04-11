@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from threading import Thread
 
 from app.clients.service_database import ServiceDatabaseClient
 from app.schemas.moderation import ContentAnalysisRequest, ContentAnalysisResponse
@@ -46,7 +47,17 @@ class ModerationService:
             review_required=risk_score >= 25,
             sanitized_excerpt=excerpt,
         )
-        asyncio.create_task(self._record_event(request, response))
+        coroutine = self._record_event(request, response)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            Thread(
+                target=lambda: asyncio.run(coroutine),
+                name="moderation-record",
+                daemon=True,
+            ).start()
+        else:
+            asyncio.ensure_future(coroutine, loop=loop)
         return response
 
     async def _record_event(

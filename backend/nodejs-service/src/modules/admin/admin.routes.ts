@@ -22,8 +22,8 @@ export function createAdminRouter(service: AdminService) {
   router.get(
     "/overview",
     authorize("moderator", "admin"),
-    asyncHandler(async (_req, res) => {
-      const result = await service.overview();
+    asyncHandler(async (req, res) => {
+      const result = await service.overview({ role: req.auth!.role as "admin" | "moderator" });
       res.json(result);
     })
   );

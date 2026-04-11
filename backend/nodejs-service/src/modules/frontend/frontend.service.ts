@@ -1,5 +1,6 @@
 import type { NotificationType, PrismaClient, UserRole } from "@prisma/client";
 
+import { deriveUserRoles } from "../../common/auth/roles";
 import { env } from "../../config/env";
 import { AppError } from "../../common/errors/app-error";
 import { AccessService } from "../access/access.service";
@@ -33,6 +34,7 @@ const SUPPORTED_PAYOUT_METHODS = ["Bank transfer", "Mobile money", "PayPal", "Wi
 type Actor = {
   userId: string;
   role: UserRole;
+  roles?: UserRole[];
   email: string;
 };
 
@@ -181,8 +183,11 @@ function formatScheduleLabel(startsAt?: Date | null, endsAt?: Date | null) {
   return "Schedule to be announced";
 }
 
-function getAllowedSettingsRoles(role: UserRole) {
-  return [role];
+function getAllowedSettingsRoles(role: UserRole, hasCreatorProfile: boolean) {
+  return deriveUserRoles({
+    role,
+    hasCreatorProfile
+  });
 }
 
 export class FrontendService {
@@ -225,6 +230,7 @@ export class FrontendService {
     dateOfBirth: string;
     gender: string;
     customGender?: string;
+    country?: string;
     ipAddress?: string;
     userAgent?: string;
   }) {
@@ -303,7 +309,7 @@ export class FrontendService {
       throw new AppError("Account is unavailable.", 403);
     }
 
-    const allowedRoles = getAllowedSettingsRoles(user.role);
+    const allowedRoles = getAllowedSettingsRoles(user.role, Boolean(user.creatorProfile));
     const settings = isRecord(user.settings) ? user.settings : {};
     const appearance = isRecord(settings.appearancePreferences) ? settings.appearancePreferences : {};
     const privacy = isRecord(settings.privacyPreferences) ? settings.privacyPreferences : {};
@@ -401,7 +407,7 @@ export class FrontendService {
       throw new AppError("Email changes require a dedicated verification flow.", 400);
     }
 
-    const allowedRoles = getAllowedSettingsRoles(user.role);
+    const allowedRoles = getAllowedSettingsRoles(user.role, Boolean(user.creatorProfile));
     if (
       input.roles.length !== allowedRoles.length ||
       input.roles.some((role) => !allowedRoles.includes(role))
@@ -1025,11 +1031,12 @@ export class FrontendService {
     };
   }
 
-  async getAdminDashboard() {
+  async getAdminDashboard(actor: Actor) {
     const to = new Date();
     const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const fromDate = from.toISOString().slice(0, 10);
     const toDate = to.toISOString().slice(0, 10);
+    const financeVisible = actor.role === "admin";
 
     const [totalUsers, totalCreators, activeLiveSessions, revenue, commission, creatorApprovals, flaggedContent, suspiciousPayments, managedContent] = await Promise.all([
       this.db.user.count(),
@@ -1037,8 +1044,12 @@ export class FrontendService {
       this.db.liveSession.count({
         where: { status: "live" }
       }),
-      this.javaFinanceClient.getRevenueSummary(fromDate, toDate).catch(() => ({ grossRevenue: 0 })),
-      this.javaFinanceClient.getPlatformCommission(fromDate, toDate).catch(() => ({ platformCommission: 0 })),
+      financeVisible
+        ? this.javaFinanceClient.getRevenueSummary(fromDate, toDate).catch(() => ({ grossRevenue: 0 }))
+        : Promise.resolve({ grossRevenue: 0 }),
+      financeVisible
+        ? this.javaFinanceClient.getPlatformCommission(fromDate, toDate).catch(() => ({ platformCommission: 0 }))
+        : Promise.resolve({ platformCommission: 0 }),
       this.db.creatorProfile.count({
         where: { verificationStatus: "pending" }
       }),
@@ -1057,6 +1068,7 @@ export class FrontendService {
     ]);
 
     return {
+      financeVisible,
       totalUsers,
       totalCreators,
       activeLiveSessions,
@@ -1127,7 +1139,7 @@ export class FrontendService {
       );
     }
 
-    return listResponse([]);
+    return this.getViewerTransactions(actor.userId);
   }
 
   async search(input: { query?: string; category?: string; type: "creator" | "live" | "content" | "class" | "all" }) {
@@ -1252,6 +1264,8 @@ export class FrontendService {
   }
 
   async createCheckout(actor: Actor, input: { productId: string; productType: "live" | "content" | "class" }) {
+    const paymentAccessPolicy =
+      "Checkout totals are prepared by the backend, but payment confirmation is disabled until a verified provider callback flow is integrated.";
     const commissionBreakdown = async (amount: number) => {
       const finance = await this.javaFinanceClient.calculateCommission({ amount: amount.toFixed(2) });
       return {
@@ -1285,9 +1299,10 @@ export class FrontendService {
           productType: "live",
           category: normalizeCategorySlug(live.category?.slug ?? live.category?.name),
           creatorName: live.creator.creatorProfile?.displayName ?? `${live.creator.firstName} ${live.creator.lastName}`.trim(),
-          sessionStatus: "ready",
-          accessPolicy: "Payment is confirmed by the backend before live access is granted.",
-          paymentMethods: [...SUPPORTED_PAYMENT_METHODS],
+          sessionStatus: "draft",
+          accessPolicy: paymentAccessPolicy,
+          paymentMethods: [],
+          paymentProcessingAvailable: false,
           ...breakdown
         };
       }
@@ -1314,9 +1329,10 @@ export class FrontendService {
           productType: "content",
           category: normalizeCategorySlug(content.category?.slug ?? content.category?.name),
           creatorName: content.creator.creatorProfile?.displayName ?? content.creator.id,
-          sessionStatus: "ready",
-          accessPolicy: "Payment is confirmed by the backend before premium access is granted.",
-          paymentMethods: [...SUPPORTED_PAYMENT_METHODS],
+          sessionStatus: "draft",
+          accessPolicy: paymentAccessPolicy,
+          paymentMethods: [],
+          paymentProcessingAvailable: false,
           ...breakdown
         };
       }
@@ -1343,9 +1359,10 @@ export class FrontendService {
           productType: "class",
           category: normalizeCategorySlug(learningClass.category?.slug ?? learningClass.category?.name),
           creatorName: learningClass.creator.creatorProfile?.displayName ?? learningClass.creator.id,
-          sessionStatus: "ready",
-          accessPolicy: "Payment is confirmed by the backend before class enrollment is activated.",
-          paymentMethods: [...SUPPORTED_PAYMENT_METHODS],
+          sessionStatus: "draft",
+          accessPolicy: paymentAccessPolicy,
+          paymentMethods: [],
+          paymentProcessingAvailable: false,
           ...breakdown
         };
       }
@@ -1370,10 +1387,18 @@ export class FrontendService {
       }
     }
 
+    const walletSummary = await this.walletsService
+      .getMyWalletSummary(actor.userId)
+      .catch(() => null as Awaited<ReturnType<WalletsService["getMyWalletSummary"]>> | null);
+    const payoutCurrency =
+      typeof walletSummary?.currency === "string" && walletSummary.currency.trim()
+        ? walletSummary.currency
+        : env.DEFAULT_CURRENCY;
+
     await this.walletsService.requestPayout(
       { userId: actor.userId, role: actor.role as "creator" | "admin" },
       input.amount,
-      env.DEFAULT_CURRENCY
+      payoutCurrency
     );
 
     await this.db.notification.create({
@@ -1381,7 +1406,7 @@ export class FrontendService {
         userId: actor.userId,
         type: "system_alert",
         title: "Payout request submitted",
-        body: `Your ${input.method} payout request for ${input.amount.toFixed(2)} ${env.DEFAULT_CURRENCY} is now under review.`
+        body: `Your ${input.method} payout request for ${input.amount.toFixed(2)} ${payoutCurrency} is now under review.`
       }
     });
 
@@ -1698,6 +1723,7 @@ export class FrontendService {
       }),
       category: normalizeCategorySlug(content.category?.slug ?? content.category?.name),
       price: toNumber(content.price),
+      currency: content.currency,
       accessGranted: content.creatorId === actorUserId || !content.isPaid || Boolean(grant),
       attachmentCount: content.contentAsset ? 1 : 0
     };
@@ -1779,13 +1805,18 @@ export class FrontendService {
   }
 
   private toUserAccount(user: CreatorRecord) {
+    const roles = deriveUserRoles({
+      role: user.role,
+      hasCreatorProfile: Boolean(user.creatorProfile)
+    });
+
     return {
       id: user.id,
       fullName: `${user.firstName} ${user.lastName}`.trim(),
       email: user.email,
       username: user.username,
       role: user.role,
-      roles: [user.role],
+      roles,
       avatarUrl: user.avatarUrl ?? null,
       emailVerified: Boolean(user.emailVerifiedAt),
       profileCompleted: Boolean(user.profileCompletedAt),

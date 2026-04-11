@@ -7,6 +7,7 @@ declare global {
       auth?: {
         userId: string;
         role: UserRole;
+        roles: UserRole[];
         email: string;
       };
     }
@@ -14,4 +15,3 @@ declare global {
 }
 
 export {};
-

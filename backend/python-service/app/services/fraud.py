@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from threading import Thread
 
 from app.clients.service_database import ServiceDatabaseClient
 from app.schemas.fraud import RiskScoreRequest, RiskScoreResponse
@@ -90,9 +91,19 @@ class FraudService:
         )
 
     def _record(self, event_type: str, request: RiskScoreRequest, response: RiskScoreResponse) -> None:
-        asyncio.create_task(
-            self._record_event(event_type, request, response)
-        )
+        coroutine = self._record_event(event_type, request, response)
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            Thread(
+                target=lambda: asyncio.run(coroutine),
+                name=f"fraud-record-{event_type}",
+                daemon=True,
+            ).start()
+            return
+
+        asyncio.ensure_future(coroutine, loop=loop)
 
     async def _record_event(
         self,

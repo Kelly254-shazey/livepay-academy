@@ -69,7 +69,7 @@ export function Card({ className, children }: PropsWithChildren<{ className?: st
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className="w-full rounded-[22px] border border-white/40 bg-white/28 px-4 py-3.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] outline-none backdrop-blur-xl transition placeholder:text-muted/80 focus:border-white/60 focus:bg-white/40 focus:shadow-[0_0_0_4px_rgba(16,33,29,0.08)]"
+      className="w-full rounded-lg border border-stroke bg-surface px-3 py-2.5 text-sm text-text outline-none transition placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/10"
       {...props}
     />
   );
@@ -78,7 +78,7 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
-      className="min-h-28 w-full rounded-[22px] border border-white/40 bg-white/28 px-4 py-3.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] outline-none backdrop-blur-xl transition placeholder:text-muted/80 focus:border-white/60 focus:bg-white/40 focus:shadow-[0_0_0_4px_rgba(16,33,29,0.08)]"
+      className="min-h-28 w-full rounded-lg border border-stroke bg-surface px-3 py-2.5 text-sm text-text outline-none transition placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/10"
       {...props}
     />
   );
@@ -177,14 +177,14 @@ export function InlineNotice({
   return (
     <div
       className={cx(
-        'rounded-[26px] border px-4 py-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] backdrop-blur-xl',
+        'rounded-lg border px-4 py-3 text-sm',
         tone === 'danger'
-          ? 'border-danger/25 bg-danger/12 text-danger'
-          : 'border-white/35 bg-white/20 text-muted',
+          ? 'border-danger/20 bg-danger/10 text-danger'
+          : 'border-stroke bg-surface-muted text-text',
       )}
     >
       <p className="font-medium">{title}</p>
-      <p className="mt-1 leading-6">{body}</p>
+      <p className="mt-1 leading-6 text-muted">{body}</p>
     </div>
   );
 }
@@ -226,13 +226,15 @@ export function Tabs({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="inline-flex rounded-full border border-white/35 bg-white/22 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] backdrop-blur-xl">
+    <div className="inline-flex flex-wrap gap-2">
       {items.map((item) => (
         <button
           key={item.value}
           className={cx(
-            'rounded-full px-4 py-2 text-sm font-medium transition',
-            value === item.value ? 'bg-white/55 text-text shadow-glass' : 'text-muted hover:text-text',
+            'rounded-full border px-4 py-2 text-sm font-medium transition',
+            value === item.value
+              ? 'border-text bg-text text-canvas'
+              : 'border-stroke bg-surface text-muted hover:border-text hover:text-text',
           )}
           onClick={() => onChange(item.value)}
           type="button"
@@ -283,7 +285,7 @@ export function Select({
     <div className="space-y-2">
       {label ? <label className="text-sm font-medium block">{label}</label> : null}
       <select
-        className="w-full rounded-[22px] border border-white/40 bg-white/28 px-4 py-3.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] outline-none backdrop-blur-xl transition placeholder:text-muted/80 focus:border-white/60 focus:bg-white/40 focus:shadow-[0_0_0_4px_rgba(16,33,29,0.08)]"
+        className="w-full rounded-lg border border-stroke bg-surface px-3 py-2.5 text-sm text-text outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/10"
         {...props}
       >
         {placeholder ? <option value="">{placeholder}</option> : null}
@@ -306,7 +308,7 @@ export function Checkbox({
   description?: string;
 }) {
   return (
-    <label className="flex items-start gap-3 rounded-[24px] border border-white/35 bg-white/20 p-4 backdrop-blur-xl cursor-pointer transition hover:bg-white/25 hover:border-white/45">
+    <label className="flex items-start gap-3 rounded-lg border border-stroke bg-surface p-4 cursor-pointer transition hover:border-text/30">
       <input type="checkbox" className="mt-1 h-4 w-4 accent-accent rounded" {...props} />
       {label ? (
         <div className="flex-1">

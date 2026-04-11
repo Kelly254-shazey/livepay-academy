@@ -1,278 +1,106 @@
 "use strict";
 /**
  * Enhanced Authentication Routes
- * Clerk integration, password reset, email verification
+ * Clerk integration — all routes delegate to the canonical AuthService
+ * which owns rate-limiting, OTP validation, and audit logging.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+const crypto_1 = require("crypto");
 const express_1 = require("express");
-const clerk_service_1 = require("../../infrastructure/auth/clerk.service");
-const geolocation_service_1 = require("../../infrastructure/integrations/geolocation.service");
+const zod_1 = require("zod");
+const async_handler_1 = require("../../common/http/async-handler");
+const app_error_1 = require("../../common/errors/app-error");
+const authenticate_1 = require("../../common/middleware/authenticate");
 const comprehensive_audit_service_1 = require("../../common/audit/comprehensive-audit.service");
+const clerk_service_1 = require("../../infrastructure/auth/clerk.service");
 const prisma_1 = require("../../infrastructure/db/prisma");
 const router = (0, express_1.Router)();
 const clerkService = new clerk_service_1.ClerkService();
-const geolocationService = new geolocation_service_1.GeolocationService();
 const auditService = new comprehensive_audit_service_1.ComprehensiveAuditService(prisma_1.prisma);
-/**
- * POST /api/auth/clerk-callback
- * Handles Clerk webhook and syncs user to database
- */
-router.post("/clerk-callback", async (req, res) => {
-    try {
-        const { type, data: { id, email_addresses, first_name, last_name, profile_image_url, public_metadata } } = req.body;
-        if (type === "user.created" || type === "user.updated") {
-            const clerkUser = {
-                id,
-                email_addresses,
-                first_name,
-                last_name,
-                profile_image_url,
-                public_metadata
-            };
-            // Detect user location
-            const ipAddress = req.ip || "127.0.0.1";
-            const location = await geolocationService.detectLocation(ipAddress);
-            // Sync to database
-            const user = await clerkService.syncToDatabase(clerkUser, prisma_1.prisma);
-            // Update user with location and currency (user fields may be updated based on Prisma schema)
-            if (location) {
-                // Note: Store location info in audit log metadata instead of user record
-                // User model may not have country/currency fields
-            }
-            // Audit log
-            await auditService.recordAudit({
-                actorId: user.id,
-                actorRole: user.role,
-                action: "auth.clerk_signin",
-                resourceType: "user",
-                resourceId: user.id,
-                status: "success",
-                ipAddress,
-                metadata: { provider: "clerk", country: location?.country }
-            });
-            res.json({ success: true, user });
-        }
+function sha256(value) {
+    return (0, crypto_1.createHash)("sha256").update(value).digest("hex");
+}
+// ─── Clerk webhook callback ───────────────────────────────────────────────────
+router.post("/clerk-callback", (0, async_handler_1.asyncHandler)(async (req, res) => {
+    const { type, data } = req.body ?? {};
+    if (!type || !data) {
+        throw new app_error_1.AppError("Invalid webhook payload.", 400);
     }
-    catch (error) {
-        console.error("Clerk callback error:", error);
-        await auditService.recordAudit({
-            action: "auth.clerk_callback_failed",
-            status: "failure",
-            errorMessage: String(error),
-            ipAddress: req.ip
-        });
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
-/**
- * POST /api/auth/verify-clerk-token
- * Verify and sync Clerk JWT token
- */
-router.post("/verify-clerk-token", async (req, res) => {
-    try {
-        const { token } = req.body;
-        const ipAddress = req.ip || "127.0.0.1";
-        const decoded = await clerkService.verifyToken(token);
-        if (!decoded) {
-            await auditService.recordSessionEvent({
-                userId: "unknown",
-                eventType: "login_failure",
-                ipAddress,
-                userAgent: req.get("user-agent") || "",
-                isSuspicious: true
-            });
-            return res.status(401).json({ error: "Invalid token" });
-        }
-        // Get or create user
-        let user = await prisma_1.prisma.user.findUnique({
-            where: { email: decoded.email }
-        });
-        if (!user) {
-            const clerkUser = await clerkService.getUser(decoded.sub);
-            if (clerkUser) {
-                user = await clerkService.syncToDatabase(clerkUser, prisma_1.prisma);
-            }
-        }
-        // Update last login
-        if (user) {
-            await prisma_1.prisma.user.update({
-                where: { id: user.id },
-                data: {
-                    lastLoginAt: new Date(),
-                    emailVerifiedAt: decoded.email_verified ? new Date() : undefined
-                }
-            });
-            // Record session
-            await auditService.recordSessionEvent({
-                userId: user.id,
-                eventType: "login_success",
-                ipAddress,
-                userAgent: req.get("user-agent") || "",
-                metadata: { provider: "clerk" }
-            });
-        }
-        res.json({ success: true, user });
-    }
-    catch (error) {
-        console.error("Clerk verification error:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
-/**
- * POST /api/auth/request-password-reset
- * Request password reset email
- */
-router.post("/request-password-reset", async (req, res) => {
-    try {
-        const { email } = req.body;
-        const ipAddress = req.ip || "127.0.0.1";
-        const user = await prisma_1.prisma.user.findUnique({
-            where: { email: email.toLowerCase() }
-        });
-        if (!user) {
-            // Don't reveal if email exists for security
-            return res.json({ success: true, message: "If email exists, reset link sent" });
-        }
-        // Generate password reset token
-        const token = require("crypto").randomBytes(32).toString("hex");
-        const tokenHash = require("crypto").createHash("sha256").update(token).digest("hex");
-        const resetToken = await prisma_1.prisma.passwordResetToken.create({
-            data: {
-                userId: user.id,
-                tokenHash,
-                expiresAt: new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
-            }
-        });
-        // Send reset email
-        const resetUrl = `${process.env.FRONTEND_URL}/auth?mode=reset&token=${token}`;
-        // await emailService.sendPasswordResetEmail(user.email, resetUrl, user.firstName);
-        // Audit
+    if (type === "user.created" || type === "user.updated") {
+        const user = await clerkService.syncToDatabase(data, prisma_1.prisma);
         await auditService.recordAudit({
             actorId: user.id,
             actorRole: user.role,
-            action: "auth.password_reset_requested",
+            action: "auth.clerk_webhook",
+            resourceType: "user",
+            resourceId: user.id,
+            status: "success",
+            ipAddress: req.ip,
+            metadata: { webhookType: type }
+        });
+        return res.json({ accepted: true });
+    }
+    // Unknown event types are acknowledged but not processed
+    res.json({ accepted: true });
+}));
+// ─── Verify Clerk token ───────────────────────────────────────────────────────
+router.post("/verify-clerk-token", (0, async_handler_1.asyncHandler)(async (req, res) => {
+    const { token } = zod_1.z.object({ token: zod_1.z.string().min(10) }).parse(req.body);
+    const ipAddress = req.ip ?? "";
+    const decoded = await clerkService.verifyToken(token);
+    if (!decoded) {
+        await auditService.recordSessionEvent({
+            userId: "unknown",
+            eventType: "login_failure",
             ipAddress,
-            metadata: { tokenId: resetToken.id }
+            userAgent: req.get("user-agent") ?? "",
+            isSuspicious: true
         });
-        res.json({ success: true, message: "Reset link sent to email" });
+        throw new app_error_1.AppError("Invalid token.", 401);
     }
-    catch (error) {
-        console.error("Password reset request error:", error);
-        res.status(500).json({ error: "Internal server error" });
+    let user = await prisma_1.prisma.user.findUnique({ where: { email: decoded.email } });
+    if (!user) {
+        const clerkUser = await clerkService.getUser(decoded.sub);
+        if (!clerkUser)
+            throw new app_error_1.AppError("Clerk user not found.", 401);
+        user = await clerkService.syncToDatabase(clerkUser, prisma_1.prisma);
     }
-});
-/**
- * POST /api/auth/reset-password
- * Complete password reset
- */
-router.post("/reset-password", async (req, res) => {
-    try {
-        const { email, code, newPassword } = req.body;
-        const ipAddress = req.ip || "127.0.0.1";
-        const user = await prisma_1.prisma.user.findUnique({
-            where: { email: email.toLowerCase() }
-        });
-        if (!user) {
-            return res.status(401).json({ error: "Invalid request" });
+    if (user.isSuspended)
+        throw new app_error_1.AppError("Account is suspended.", 403);
+    await prisma_1.prisma.user.update({
+        where: { id: user.id },
+        data: {
+            lastLoginAt: new Date(),
+            ...(decoded.email_verified && !user.emailVerifiedAt ? { emailVerifiedAt: new Date() } : {})
         }
-        // Verify code (from email service)
-        // This would check the code that was sent via email
-        // For now, just verify the format
-        if (!code || code.length < 6) {
-            return res.status(401).json({ error: "Invalid code" });
+    });
+    await auditService.recordSessionEvent({
+        userId: user.id,
+        eventType: "login_success",
+        ipAddress,
+        userAgent: req.get("user-agent") ?? "",
+        metadata: { provider: "clerk" }
+    });
+    res.json({ accepted: true, userId: user.id, role: user.role });
+}));
+// ─── Session (authenticated) ──────────────────────────────────────────────────
+router.get("/session", authenticate_1.authenticate, (0, async_handler_1.asyncHandler)(async (req, res) => {
+    const user = await prisma_1.prisma.user.findUnique({
+        where: { id: req.auth.userId },
+        select: {
+            id: true,
+            email: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            avatarUrl: true,
+            emailVerifiedAt: true,
+            profileCompletedAt: true
         }
-        // Update password
-        const hashPassword = require("../common/security/password").hashPassword;
-        const newPasswordHash = await hashPassword(newPassword);
-        await prisma_1.prisma.user.update({
-            where: { id: user.id },
-            data: { passwordHash: newPasswordHash }
-        });
-        // Invalidate all existing refresh tokens
-        await prisma_1.prisma.refreshToken.updateMany({
-            where: { userId: user.id },
-            data: { revokedAt: new Date() }
-        });
-        // Audit
-        await auditService.recordAudit({
-            actorId: user.id,
-            actorRole: user.role,
-            action: "auth.password_reset_completed",
-            ipAddress
-        });
-        res.json({ success: true, message: "Password reset successful" });
-    }
-    catch (error) {
-        console.error("Password reset error:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
-/**
- * POST /api/auth/verify-email
- * Verify email address with OTP
- */
-router.post("/verify-email", async (req, res) => {
-    try {
-        const { userId, code } = req.body;
-        const ipAddress = req.ip || "127.0.0.1";
-        const user = await prisma_1.prisma.user.findUnique({
-            where: { id: userId }
-        });
-        if (!user) {
-            return res.status(404).json({ error: "User not found" });
-        }
-        // Verify code (would check against OneTimeCode table)
-        // For now, just check format
-        if (!code || code.length < 6) {
-            return res.status(401).json({ error: "Invalid code" });
-        }
-        // Mark email as verified
-        await prisma_1.prisma.user.update({
-            where: { id: userId },
-            data: { emailVerifiedAt: new Date() }
-        });
-        // Audit
-        await auditService.recordAudit({
-            actorId: userId,
-            actorRole: user.role,
-            action: "auth.email_verified",
-            ipAddress
-        });
-        res.json({ success: true, message: "Email verified" });
-    }
-    catch (error) {
-        console.error("Email verification error:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
-/**
- * GET /api/auth/session
- * Get current session info
- */
-router.get("/session", async (req, res) => {
-    try {
-        const userId = req.auth?.userId;
-        if (!userId) {
-            return res.status(401).json({ error: "Not authenticated" });
-        }
-        const user = await prisma_1.prisma.user.findUnique({
-            where: { id: userId },
-            select: {
-                id: true,
-                email: true,
-                username: true,
-                firstName: true,
-                lastName: true,
-                role: true,
-                avatarUrl: true,
-                emailVerifiedAt: true
-            }
-        });
-        res.json({ success: true, user });
-    }
-    catch (error) {
-        console.error("Session error:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
+    });
+    if (!user)
+        throw new app_error_1.AppError("User not found.", 404);
+    res.json({ user });
+}));
 exports.default = router;

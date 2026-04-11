@@ -8,6 +8,7 @@ import com.livegate.finance.finance.domain.LedgerEntryType;
 import com.livegate.finance.finance.dto.AdjustmentRequest;
 import com.livegate.finance.finance.repository.AdjustmentRepository;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -59,9 +60,8 @@ public class AdjustmentService {
                 "adjustment.applied",
                 "adjustment",
                 adjustment.getId(),
-                "{\"type\":\"" + request.type().name() + "\"}"
+                Map.of("type", request.type().name())
         );
         return adjustment;
     }
 }
-

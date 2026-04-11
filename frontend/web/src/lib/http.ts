@@ -30,7 +30,9 @@ export async function http<T>(path: string, options: RequestOptions = {}) {
     throw new ApiConfigurationError('Set VITE_API_BASE_URL before using LiveGate web data flows.');
   }
 
-  const token = useSessionStore.getState().session?.tokens.accessToken;
+  const session = useSessionStore.getState().session;
+  const token = session?.tokens.accessToken;
+  const activeRole = session?.activeRole ?? session?.user.role;
   const headers = new Headers(options.headers);
 
   if (!headers.has('Content-Type') && options.body !== undefined) {
@@ -39,6 +41,9 @@ export async function http<T>(path: string, options: RequestOptions = {}) {
 
   if (options.authenticated !== false && token) {
     headers.set('Authorization', `Bearer ${token}`);
+    if (activeRole) {
+      headers.set('x-active-role', activeRole);
+    }
   }
 
   let response: Response;

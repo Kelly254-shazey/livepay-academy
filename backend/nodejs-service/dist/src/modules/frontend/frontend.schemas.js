@@ -29,10 +29,12 @@ exports.frontendSignUpSchema = zod_1.z.object({
         username: usernameSchema,
         email: zod_1.z.string().email(),
         password: passwordSchema,
+        confirmPassword: zod_1.z.string().optional(),
         role: zod_1.z.enum(["viewer", "creator"]).default("viewer"),
         dateOfBirth: dateSchema,
         gender: genderSchema,
-        customGender: zod_1.z.string().trim().max(80).optional()
+        customGender: zod_1.z.string().trim().max(80).optional(),
+        country: zod_1.z.string().min(2).max(2).optional()
     }),
     params: zod_1.z.object({}).default({}),
     query: zod_1.z.object({}).default({})

@@ -1,27 +1,20 @@
 "use strict";
-/**
- * Global Payment Method Service
- * Delegates to Java service for payment processing
- * Node.js acts as gateway/orchestration layer
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GlobalPaymentMethodService = void 0;
+const app_error_1 = require("../../common/errors/app-error");
 const env_1 = require("../../config/env");
+const TIMEOUT_MS = 10_000;
 class GlobalPaymentMethodService {
     prisma;
-    javaServiceUrl;
+    // Always use the validated env value — never allow an unvalidated override
+    javaServiceUrl = env_1.env.JAVA_FINANCE_URL;
     constructor(prisma) {
         this.prisma = prisma;
-        this.javaServiceUrl = process.env.JAVA_SERVICE_URL || env_1.env.JAVA_FINANCE_URL;
     }
-    /**
-     * Add a payment method for a user
-     * Delegates to Java service
-     */
     async addPaymentMethod(input) {
-        const response = await fetch(`${this.javaServiceUrl}/api/v1/payment-methods`, {
+        const response = await this.javaFetch(`/api/v1/payment-methods`, {
             method: "POST",
-            headers: this.buildJavaHeaders(input.userId),
+            headers: this.buildHeaders(input.userId),
             body: JSON.stringify({
                 type: this.toJavaEnum(input.type),
                 provider: this.toJavaEnum(input.provider),
@@ -30,64 +23,37 @@ class GlobalPaymentMethodService {
                 brand: input.brand,
                 expiresAt: input.expiresAt,
                 metadata: input.metadata,
-                isDefault: false,
-            }),
+                isDefault: false
+            })
         });
-        if (!response.ok) {
-            throw new Error(`Failed to add payment method: ${response.statusText}`);
-        }
         return this.normalizePaymentMethod(await response.json());
     }
-    /**
-     * Get payment methods for a user
-     * Delegates to Java service
-     */
     async getPaymentMethods(userId) {
-        const response = await fetch(`${this.javaServiceUrl}/api/v1/payment-methods`, {
+        const response = await this.javaFetch(`/api/v1/payment-methods`, {
             method: "GET",
-            headers: this.buildJavaHeaders(userId, false),
+            headers: this.buildHeaders(userId, false)
         });
-        if (!response.ok) {
-            throw new Error(`Failed to get payment methods: ${response.statusText}`);
-        }
-        return (await response.json()).map((method) => this.normalizePaymentMethod(method));
+        return (await response.json()).map((m) => this.normalizePaymentMethod(m));
     }
-    /**
-     * Get payment methods available for user's country
-     * Delegates to Java service
-     */
     async getAvailablePaymentMethods(userId) {
-        // Get user's country
         const user = await this.prisma.user.findUnique({
             where: { id: userId },
-            select: { id: true, country: true },
+            select: { id: true, country: true }
         });
-        if (!user) {
-            throw new Error("User not found");
-        }
-        // Get available methods from Java service
-        const [methods, availableProviders] = await Promise.all([
+        if (!user)
+            throw new app_error_1.AppError("User not found.", 404);
+        const [methods, providers] = await Promise.all([
             this.getPaymentMethods(userId),
             this.getAvailableProvidersForCountry(user.country ?? "US")
         ]);
-        return { methods, providers: availableProviders };
+        return { methods, providers };
     }
-    /**
-     * Calculate transaction fees
-     * Delegates to Java service
-     */
     async calculateFees(provider, amount, currency) {
-        const response = await fetch(`${this.javaServiceUrl}/api/v1/payment-methods/calculate-fees`, {
+        const response = await this.javaFetch(`/api/v1/payment-methods/calculate-fees`, {
             method: "POST",
-            headers: this.buildJavaHeaders(undefined, true),
-            body: JSON.stringify({
-                amount,
-                provider: this.toJavaEnum(provider),
-            }),
+            headers: this.buildHeaders(undefined, true),
+            body: JSON.stringify({ amount, provider: this.toJavaEnum(provider) })
         });
-        if (!response.ok) {
-            throw new Error(`Failed to calculate fees: ${response.statusText}`);
-        }
         const result = await response.json();
         return {
             subtotal: Number(result.amount ?? amount),
@@ -97,107 +63,66 @@ class GlobalPaymentMethodService {
             provider: this.toNodeValue(provider)
         };
     }
-    /**
-     * Get recommended payment methods for country
-     * Delegates to Java service
-     */
     async getRecommendedPaymentMethods(countryCode) {
         return this.getAvailableProvidersForCountry(countryCode);
     }
-    /**
-     * Get providers available for specific country
-     * Delegates to Java service
-     */
-    async getAvailableProvidersForCountry(countryCode) {
-        const normalizedCountry = countryCode.trim().toUpperCase();
-        const providers = await this.getProviderConfigurations();
-        return providers.filter((provider) => provider.countries.some((country) => country.toUpperCase() === normalizedCountry));
-    }
     async getProviderConfigurations() {
-        const response = await fetch(`${this.javaServiceUrl}/api/v1/payment-methods/providers`, {
+        const response = await this.javaFetch(`/api/v1/payment-methods/providers`, {
             method: "GET",
-            headers: this.buildJavaHeaders(undefined, true)
+            headers: this.buildHeaders(undefined, true)
         });
-        if (!response.ok) {
-            throw new Error(`Failed to get providers: ${response.statusText}`);
-        }
-        return (await response.json()).map((provider) => this.normalizeProvider(provider));
+        return (await response.json()).map((p) => this.normalizeProvider(p));
     }
-    /**
-     * Set default payment method
-     * Delegates to Java service
-     */
     async setDefaultPaymentMethod(userId, paymentMethodId) {
-        const response = await fetch(`${this.javaServiceUrl}/api/v1/payment-methods/${paymentMethodId}/default`, {
+        await this.javaFetch(`/api/v1/payment-methods/${paymentMethodId}/default`, {
             method: "PATCH",
-            headers: this.buildJavaHeaders(userId, false),
+            headers: this.buildHeaders(userId, false)
         });
-        if (!response.ok) {
-            throw new Error(`Failed to set default payment method: ${response.statusText}`);
-        }
     }
-    /**
-     * Deactivate a payment method
-     * Delegates to Java service
-     */
     async deactivatePaymentMethod(userId, paymentMethodId) {
-        const response = await fetch(`${this.javaServiceUrl}/api/v1/payment-methods/${paymentMethodId}`, {
+        await this.javaFetch(`/api/v1/payment-methods/${paymentMethodId}`, {
             method: "DELETE",
-            headers: this.buildJavaHeaders(userId, false),
+            headers: this.buildHeaders(userId, false)
         });
-        if (!response.ok) {
-            throw new Error(`Failed to deactivate payment method: ${response.statusText}`);
-        }
     }
-    /**
-     * Initialize payment providers (Java service handles this on startup)
-     */
-    async initializeProviders() {
-        // Java service initializes providers automatically
-        // This is kept for compatibility but does nothing in Node.js
-        console.log("Payment providers are initialized by Java service");
-    }
-    /**
-     * Detect available payment methods from location
-     */
-    async detectPaymentMethodsFromLocation(ipAddress) {
-        // For now, return default set
-        // In production, integrate with geolocation service
-        return ["credit_card", "debit_card", "paypal", "bank_transfer"];
-    }
-    /**
-     * Get payment statistics
-     * Delegates to Java service
-     */
     async getPaymentStatisticsByCountry(country, days = 30) {
-        const response = await fetch(`${this.javaServiceUrl}/api/v1/audit/payment?hoursAgo=${days * 24}`, {
-            method: "GET",
-            headers: this.buildJavaHeaders(undefined, true),
-        });
-        if (!response.ok) {
+        try {
+            const response = await this.javaFetch(`/api/v1/audit/payment?hoursAgo=${days * 24}`, { method: "GET", headers: this.buildHeaders(undefined, true) });
+            return response.json();
+        }
+        catch {
             return null;
         }
-        return response.json();
     }
-    buildJavaHeaders(userId, includeContentType = true) {
+    // ── private helpers ────────────────────────────────────────────────────────
+    async javaFetch(path, init) {
+        const response = await fetch(`${this.javaServiceUrl}${path}`, {
+            ...init,
+            signal: AbortSignal.timeout(TIMEOUT_MS)
+        });
+        if (!response.ok) {
+            throw new app_error_1.AppError(`Java finance service error on ${init.method} ${path}: ${response.status}`, response.status >= 400 && response.status < 500 ? response.status : 503);
+        }
+        return response;
+    }
+    buildHeaders(userId, includeContentType = true) {
         const headers = {
             "x-internal-api-key": env_1.env.INTERNAL_API_KEY,
             "x-source-service": "nodejs-service"
         };
-        if (includeContentType) {
+        if (includeContentType)
             headers["Content-Type"] = "application/json";
-        }
-        if (userId) {
+        if (userId)
             headers["User-ID"] = userId;
-        }
         return headers;
     }
+    async getAvailableProvidersForCountry(countryCode) {
+        const normalized = countryCode.trim().toUpperCase();
+        const providers = await this.getProviderConfigurations();
+        return providers.filter((p) => p.countries.some((c) => c.toUpperCase() === normalized));
+    }
     toJavaEnum(value) {
-        return value
-            .trim()
-            .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
-            .replace(/[\s-]+/g, "_")
-            .toUpperCase();
+        return value.trim().replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/[\s-]+/g, "_").toUpperCase();
     }
     toNodeValue(value) {
         return value.trim().toLowerCase();
@@ -214,7 +139,7 @@ class GlobalPaymentMethodService {
             provider: this.toNodeValue(String(provider.provider ?? "")),
             countries: Array.isArray(provider.countries) ? provider.countries : [],
             paymentTypes: Array.isArray(provider.paymentTypes)
-                ? provider.paymentTypes.map((type) => this.toNodeValue(type))
+                ? provider.paymentTypes.map((t) => this.toNodeValue(t))
                 : [],
             fees: typeof provider.fees === "object" && provider.fees !== null ? provider.fees : {},
             settingsOverride: typeof provider.settingsOverride === "object" && provider.settingsOverride !== null

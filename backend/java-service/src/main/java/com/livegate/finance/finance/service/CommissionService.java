@@ -4,14 +4,16 @@ import com.livegate.finance.config.FinanceProperties;
 import com.livegate.finance.finance.dto.CommissionBreakdownResponse;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
-@RequiredArgsConstructor
 public class CommissionService {
 
     private final FinanceProperties financeProperties;
+
+    public CommissionService(FinanceProperties financeProperties) {
+        this.financeProperties = financeProperties;
+    }
 
     public CommissionBreakdownResponse calculate(BigDecimal grossAmount) {
         BigDecimal normalized = grossAmount.setScale(2, RoundingMode.HALF_UP);

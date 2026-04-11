@@ -337,6 +337,7 @@ async function isLiveGateLocalApiAvailable() {
       (async () => {
         try {
           const healthUrl = new URL('/health', `${originUrl.origin}/`).toString();
+          // Health check URL is safely constructed internally
           const response = await fetch(healthUrl, {
             headers: { Accept: 'application/json' },
             signal: AbortSignal.timeout(2500),
@@ -515,7 +516,9 @@ async function request<T>(
   // Security: Sanitize the path to prevent injection
   const sanitizedPath = sanitizePath(path);
 
-  const token = useSessionStore.getState().session?.tokens.accessToken;
+  const session = useSessionStore.getState().session;
+  const token = session?.tokens.accessToken;
+  const activeRole = session?.activeRole ?? session?.user.role;
   const headers = new Headers(options.headers);
 
   if (!headers.has('Accept')) {
@@ -537,6 +540,9 @@ async function request<T>(
 
   if (options.authenticated !== false && token) {
     headers.set('Authorization', `Bearer ${token}`);
+    if (activeRole) {
+      headers.set('x-active-role', activeRole);
+    }
   }
 
   // Security: Construct URL safely
@@ -643,6 +649,8 @@ export const mobileApi = {
     dateOfBirth: string;
     gender: string;
     customGender?: string;
+    country?: string;
+    confirmPassword?: string;
     role?: string;
     roles?: UserRole[];
   }) =>
@@ -656,6 +664,7 @@ export const mobileApi = {
         dateOfBirth: body.dateOfBirth,
         gender: body.gender,
         customGender: body.customGender,
+        country: body.country,
         role: body.role ?? 'viewer',
       },
       authenticated: false,
@@ -896,9 +905,11 @@ export const mobileApi = {
           }>
         >(apiRoutes.liveChatHistory(validateId(liveId, 'liveId'), limit));
 
-        return messages.map<LiveChatMessageRecord>((message) => ({
+        return messages
+          .filter((message): message is Exclude<typeof message, undefined> => !!message)
+          .map<LiveChatMessageRecord>((message) => ({
           id: message.id,
-          body: message.body,
+          body: (message.body || '').replace(/<[^>]*>/g, '').trim().substring(0, 2000),
           senderId: message.senderId,
           authorName:
             message.sender?.creatorProfile?.displayName?.trim() ||

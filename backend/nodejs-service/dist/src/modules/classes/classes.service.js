@@ -7,11 +7,13 @@ class ClassesService {
     accessService;
     auditService;
     pythonClient;
-    constructor(repository, accessService, auditService, pythonClient) {
+    mediaAccessService;
+    constructor(repository, accessService, auditService, pythonClient, mediaAccessService) {
         this.repository = repository;
         this.accessService = accessService;
         this.auditService = auditService;
         this.pythonClient = pythonClient;
+        this.mediaAccessService = mediaAccessService;
     }
     async create(creatorId, role, data) {
         await this.pythonClient.analyzeContent({
@@ -48,7 +50,10 @@ class ClassesService {
         if (!learningClass || learningClass.creatorId !== actor.userId) {
             throw new app_error_1.AppError("Class not found or not owned by actor.", 404);
         }
-        const lesson = await this.repository.addLesson(classId, data);
+        const lesson = await this.repository.addLesson(classId, {
+            ...data,
+            assetUrl: data.assetUrl ? this.mediaAccessService.validateSourceUrl(data.assetUrl) : undefined
+        });
         await this.auditService.record({
             actorId: actor.userId,
             actorRole: actor.role,
@@ -84,7 +89,11 @@ class ClassesService {
             allowed: true,
             lessonId: lesson.id,
             classId,
-            assetUrl: lesson.assetUrl
+            assetUrl: this.mediaAccessService.createDeliveryUrl({
+                assetUrl: lesson.assetUrl,
+                resourceType: "class_lesson",
+                resourceId: lesson.id
+            })
         };
     }
     async publish(classId, creatorId, role) {

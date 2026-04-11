@@ -12,6 +12,7 @@ import com.livegate.finance.finance.repository.PaymentTransactionRepository;
 import com.livegate.finance.finance.repository.RefundRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -67,7 +68,7 @@ public class RefundService {
                 "refund.processed",
                 "refund",
                 refund.getId(),
-                "{\"paymentTransactionId\":\"" + paymentTransaction.getId() + "\"}"
+                Map.of("paymentTransactionId", paymentTransaction.getId())
         );
         return refund;
     }

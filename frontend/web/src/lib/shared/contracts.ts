@@ -146,6 +146,7 @@ export interface PremiumContentSummary {
   creator: CreatorSummary;
   category: CategorySlug;
   price: number;
+  currency: string;
   accessGranted: boolean;
   attachmentCount: number;
 }
@@ -183,6 +184,7 @@ export interface CheckoutSummary {
   totalAmount?: number;
   sessionStatus?: 'draft' | 'ready';
   accessPolicy?: string;
+  paymentProcessingAvailable?: boolean;
 }
 
 export interface ProfileSettingsPayload {
@@ -274,6 +276,7 @@ export interface CreatorDashboardPayload {
 }
 
 export interface AdminDashboardPayload {
+  financeVisible?: boolean;
   totalUsers: number;
   totalCreators: number;
   activeLiveSessions: number;

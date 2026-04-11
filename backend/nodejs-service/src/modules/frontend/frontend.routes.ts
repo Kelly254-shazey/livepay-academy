@@ -185,6 +185,25 @@ export function createFrontendRouter(service: FrontendService) {
   );
 
   router.get(
+    "/profiles/me",
+    authenticate,
+    asyncHandler(async (req, res) => {
+      const result = await service.getProfileSettings(req.auth!);
+      res.json(result);
+    })
+  );
+
+  router.put(
+    "/profiles/me",
+    authenticate,
+    validate(profileSettingsSchema),
+    asyncHandler(async (req, res) => {
+      const result = await service.saveProfileSettings(req.auth!, req.body);
+      res.json(result);
+    })
+  );
+
+  router.get(
     "/users/settings",
     authenticate,
     asyncHandler(async (req, res) => {
@@ -330,8 +349,8 @@ export function createFrontendRouter(service: FrontendService) {
     "/admin/dashboard",
     authenticate,
     authorize("admin", "moderator"),
-    asyncHandler(async (_req, res) => {
-      const result = await service.getAdminDashboard();
+    asyncHandler(async (req, res) => {
+      const result = await service.getAdminDashboard(req.auth!);
       res.json(result);
     })
   );

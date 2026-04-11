@@ -95,23 +95,25 @@ export class AdminService {
     return resource;
   }
 
-  async overview() {
+  async overview(actor: { role: "admin" | "moderator" }) {
     const to = new Date();
     const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const fromDate = from.toISOString().slice(0, 10);
     const toDate = to.toISOString().slice(0, 10);
+    const financeVisible = actor.role === "admin";
 
     const [counts, analytics, revenueSummary, platformCommission] = await Promise.all([
       this.repository.overviewCounts(),
       this.pythonClient.getAnalyticsSummary().catch(() => null),
-      this.javaFinanceClient.getRevenueSummary(fromDate, toDate).catch(() => null),
-      this.javaFinanceClient.getPlatformCommission(fromDate, toDate).catch(() => null)
+      financeVisible ? this.javaFinanceClient.getRevenueSummary(fromDate, toDate).catch(() => null) : Promise.resolve(null),
+      financeVisible ? this.javaFinanceClient.getPlatformCommission(fromDate, toDate).catch(() => null) : Promise.resolve(null)
     ]);
 
     return {
       counts,
       analytics,
       finance: {
+        financeVisible,
         revenueSummary,
         platformCommission,
         range: { from: fromDate, to: toDate }

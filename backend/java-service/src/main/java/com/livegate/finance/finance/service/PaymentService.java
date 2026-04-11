@@ -11,6 +11,7 @@ import com.livegate.finance.finance.dto.RecordPaymentResponse;
 import com.livegate.finance.finance.repository.CommissionRecordRepository;
 import com.livegate.finance.finance.repository.PaymentTransactionRepository;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -89,7 +90,10 @@ public class PaymentService {
                 "payment.recorded",
                 "payment_transaction",
                 paymentTransaction.getId(),
-                "{\"targetType\":\"" + request.targetType() + "\",\"targetId\":\"" + request.targetId() + "\"}"
+                Map.of(
+                        "targetType", request.targetType(),
+                        "targetId", request.targetId()
+                )
         );
         return toResponse(paymentTransaction);
     }

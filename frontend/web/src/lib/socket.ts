@@ -40,7 +40,7 @@ function ensureSocket(accessToken: string) {
     throw new Error('Set VITE_API_BASE_URL or VITE_SOCKET_URL before using live realtime.');
   }
 
-  if (socket && socketToken === accessToken) {
+  if (socket && socketToken !== null && socketToken.length === accessToken.length && [...socketToken].every((c, i) => c === accessToken[i])) {
     return socket;
   }
 
@@ -127,11 +127,14 @@ export function connectLiveRoomSocket({
       return;
     }
 
+    const sanitize = (value: string) =>
+      value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+
     onMessage?.({
       id: payload.id,
-      body: payload.body,
+      body: sanitize(payload.body),
       senderId: payload.senderId,
-      authorName: payload.authorName?.trim() || 'Viewer',
+      authorName: sanitize(payload.authorName?.trim() || 'Viewer'),
       sentAt: payload.sentAt,
       status: payload.status,
     });

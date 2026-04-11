@@ -35,7 +35,9 @@ export function StaffDashboardScreen() {
               { label: 'Users', value: query.data.totalUsers },
               { label: 'Content Creators', value: query.data.totalCreators },
               { label: 'Active lives', value: query.data.activeLiveSessions },
-              { label: 'Pending payouts', value: query.data.pendingPayouts },
+              ...(query.data.financeVisible
+                ? [{ label: 'Pending payouts', value: query.data.pendingPayouts }]
+                : []),
             ].map((stat) => (
               <Surface key={stat.label} style={{ flexBasis: '47%', flexGrow: 1 }}>
                 <Text style={statLabel}>{stat.label}</Text>
@@ -51,14 +53,16 @@ export function StaffDashboardScreen() {
               Flagged content: {query.data.flaggedContent} | Suspicious payments: {query.data.suspiciousPayments} | Content creator approvals pending: {query.data.creatorApprovals}
             </Text>
           </Surface>
-          <Surface>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>
-              Revenue summary
-            </Text>
-            <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
-              Revenue: {query.data.totalRevenue} | Platform commission: {query.data.platformCommission}
-            </Text>
-          </Surface>
+          {query.data.financeVisible ? (
+            <Surface>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>
+                Revenue summary
+              </Text>
+              <Text style={{ fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary }}>
+                Revenue: {query.data.totalRevenue} | Platform commission: {query.data.platformCommission}
+              </Text>
+            </Surface>
+          ) : null}
           <Button
             onPress={async () => {
               await mobileApi.signOutCurrentSession();

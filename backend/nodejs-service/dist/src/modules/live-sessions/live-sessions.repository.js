@@ -103,9 +103,27 @@ class LiveSessionsRepository {
             if (existing) {
                 return existing;
             }
-            return tx.liveParticipant.create({
-                data: { liveSessionId, userId }
-            });
+            try {
+                return await tx.liveParticipant.create({
+                    data: { liveSessionId, userId }
+                });
+            }
+            catch (error) {
+                if (isUniqueConstraintError(error)) {
+                    const participant = await tx.liveParticipant.findFirst({
+                        where: {
+                            liveSessionId,
+                            userId,
+                            leftAt: null
+                        },
+                        orderBy: { joinedAt: "desc" }
+                    });
+                    if (participant) {
+                        return participant;
+                    }
+                }
+                throw error;
+            }
         });
     }
     async recordLeave(liveSessionId, userId, attendanceSeconds) {
@@ -176,3 +194,9 @@ class LiveSessionsRepository {
     }
 }
 exports.LiveSessionsRepository = LiveSessionsRepository;
+function isUniqueConstraintError(error) {
+    return Boolean(error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "P2002");
+}

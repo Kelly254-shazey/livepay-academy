@@ -53,6 +53,7 @@ model accessgrant {
   @@index([grantedById], map: "AccessGrant_grantedById_fkey")
   @@index([targetType, targetId, status], map: "AccessGrant_targetType_targetId_status_idx")
   @@index([userId, targetType, targetId, status], map: "AccessGrant_userId_targetType_targetId_status_idx")
+  @@index([expiresAt], map: "AccessGrant_expiresAt_idx")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -279,6 +280,7 @@ model liveparticipant {
   livesession       livesession @relation(fields: [liveSessionId], references: [id], onDelete: Cascade, map: "LiveParticipant_liveSessionId_fkey")
   user              user        @relation(fields: [userId], references: [id], onDelete: Cascade, map: "LiveParticipant_userId_fkey")
 
+  @@unique([liveSessionId, userId], map: "LiveParticipant_liveSessionId_userId_key")
   @@index([liveSessionId, userId], map: "LiveParticipant_liveSessionId_userId_idx")
   @@index([userId, joinedAt], map: "LiveParticipant_userId_joinedAt_idx")
 }

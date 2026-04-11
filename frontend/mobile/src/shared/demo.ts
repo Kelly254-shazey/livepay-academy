@@ -29,7 +29,9 @@ import type {
   ViewerDashboardPayload,
 } from './contracts';
 
-export const DEMO_PASSWORD = 'Demo@12345';
+// SECURITY NOTE: Demo credentials should NOT be hardcoded in production builds
+// Use environment variables (EXPO_PUBLIC_*) for development/testing
+export const DEMO_PASSWORD = process.env.EXPO_PUBLIC_DEMO_PASSWORD || 'DemoPass123!@';
 export const DEMO_LIVE_ACCESS_CODE = '12345';
 export const DEFAULT_VIEWER_ENTRY_LIVE_ID = 'live-nairobi-city-lights';
 
@@ -91,6 +93,7 @@ const premiumContent = (
   creator: overrides.creator ?? creator({}, category),
   category: overrides.category ?? category,
   price: overrides.price ?? 45,
+  currency: overrides.currency ?? 'USD',
   accessGranted: overrides.accessGranted ?? true,
   attachmentCount: overrides.attachmentCount ?? 3,
 });
@@ -188,28 +191,28 @@ const notifications: NotificationRecord[] = [{ id: 'notif-demo-1', type: 'system
 
 export const demoParticipants: DemoParticipant[] = [
   {
-    id: 'demo-viewer',
+    id: 'test-viewer',
     audience: 'public',
-    fullName: 'Demo Viewer',
-    email: 'viewer@demo.livegate.app',
+    fullName: 'Test Viewer',
+    email: 'testviewer@livegate.app',
     password: DEMO_PASSWORD,
-    title: 'Viewer mode',
+    title: 'Test Viewer mode',
     roleLabel: 'Viewer',
     roles: ['viewer'],
     defaultRole: 'viewer',
-    summary: 'Browse creators, buy access, and preview the audience flow.',
+    summary: 'Test account to browse creators, buy access, and preview the audience flow.',
   },
   {
-    id: 'demo-creator',
+    id: 'test-creator',
     audience: 'public',
-    fullName: 'Demo Creator',
-    email: 'creator@demo.livegate.app',
+    fullName: 'Test Creator',
+    email: 'testcreator@livegate.app',
     password: DEMO_PASSWORD,
-    title: 'Creator mode',
+    title: 'Test Creator mode',
     roleLabel: 'Creator',
     roles: ['creator'],
     defaultRole: 'creator',
-    summary: 'Preview creator dashboards, payouts, and content management.',
+    summary: 'Test account to preview creator dashboards, payouts, and content management.',
   },
 ];
 

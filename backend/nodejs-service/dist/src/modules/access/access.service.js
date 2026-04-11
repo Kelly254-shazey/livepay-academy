@@ -4,33 +4,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AccessService = void 0;
-const crypto_1 = require("crypto");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const env_1 = require("../../config/env");
 const app_error_1 = require("../../common/errors/app-error");
-const prisma_json_1 = require("../../common/db/prisma-json");
-const PAYMENT_IDENTIFIER_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._:-]{6,118}[A-Za-z0-9])?$/;
-function buildLiveJoinCode(source) {
-    const normalized = source.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-    const body = normalized.slice(0, 10).padEnd(10, "X");
-    return `LIV-${body}`;
-}
-function normalizePaymentIdentifier(value, fieldLabel) {
-    const normalized = value.trim();
-    if (!PAYMENT_IDENTIFIER_PATTERN.test(normalized)) {
-        throw new app_error_1.AppError(`${fieldLabel} format is invalid.`, 400);
-    }
-    return normalized;
-}
-function buildInternalIdempotencyKey(input) {
-    if (input.idempotencyKey?.trim()) {
-        return normalizePaymentIdentifier(input.idempotencyKey, "Idempotency key");
-    }
-    const digest = (0, crypto_1.createHash)("sha256")
-        .update(`${input.userId}:${input.targetType}:${input.targetId}:${input.providerReference}`)
-        .digest("hex");
-    return `conf-${digest.slice(0, 32)}`;
-}
 class AccessService {
     db;
     auditService;
@@ -42,157 +18,8 @@ class AccessService {
         this.javaFinanceClient = javaFinanceClient;
         this.pythonClient = pythonClient;
     }
-    async confirmPurchase(userId, role, input) {
-        const providerReference = normalizePaymentIdentifier(input.providerReference, "Provider reference");
-        const idempotencyKey = buildInternalIdempotencyKey({
-            userId,
-            targetType: input.targetType,
-            targetId: input.targetId,
-            providerReference,
-            idempotencyKey: input.idempotencyKey
-        });
-        const target = await this.resolveTarget(input.targetType, input.targetId);
-        if (!target.isPaid) {
-            throw new app_error_1.AppError("This resource does not require payment.", 409);
-        }
-        if (target.creatorId === userId) {
-            throw new app_error_1.AppError("Creators already own access to their own resources.", 409);
-        }
-        if (input.targetType === "live_session") {
-            const live = await this.db.liveSession.findUnique({
-                where: { id: input.targetId }
-            });
-            if (!live) {
-                throw new app_error_1.AppError("Live session not found.", 404);
-            }
-            await this.assertLiveVisibilityAccess(live, userId, role, false);
-        }
-        const existing = await this.db.accessGrant.findUnique({
-            where: { sourceReference: providerReference }
-        });
-        if (existing) {
-            return {
-                grant: existing,
-                idempotent: true,
-                liveJoinCode: input.targetType === "live_session" ? buildLiveJoinCode(existing.id) : undefined
-            };
-        }
-        const risk = await this.pythonClient
-            .scoreTransaction({
-            userId,
-            creatorId: target.creatorId,
-            targetType: input.targetType,
-            targetId: input.targetId,
-            amount: target.amount,
-            currency: target.currency
-        })
-            .catch(() => ({ riskScore: 0, decision: "allow" }));
-        const riskScore = Number(risk.riskScore ?? 0);
-        if (riskScore >= 85 || risk.decision === "review") {
-            await this.auditService.record({
-                actorId: userId,
-                actorRole: role,
-                action: "purchase.blocked_by_risk",
-                resource: input.targetType,
-                resourceId: input.targetId,
-                metadata: { risk }
-            });
-            throw new app_error_1.AppError("Transaction requires manual review.", 409, { risk });
-        }
-        const finance = await this.javaFinanceClient.recordSuccessfulPurchase({
-            buyerId: userId,
-            creatorId: target.creatorId,
-            targetType: input.targetType,
-            targetId: input.targetId,
-            amount: target.amount,
-            currency: target.currency,
-            providerReference,
-            idempotencyKey
-        });
-        const grant = await this.db.$transaction(async (tx) => {
-            const createdGrant = await tx.accessGrant.create({
-                data: {
-                    userId,
-                    grantedById: userId,
-                    targetType: input.targetType,
-                    targetId: input.targetId,
-                    sourceReference: providerReference,
-                    price: target.amount,
-                    currency: target.currency,
-                    riskScore,
-                    status: "active"
-                }
-            });
-            if (input.targetType === "class") {
-                await tx.enrollment.upsert({
-                    where: {
-                        classId_userId: {
-                            classId: input.targetId,
-                            userId
-                        }
-                    },
-                    update: {
-                        status: "active",
-                        accessGrantId: createdGrant.id
-                    },
-                    create: {
-                        classId: input.targetId,
-                        userId,
-                        status: "active",
-                        accessGrantId: createdGrant.id
-                    }
-                });
-            }
-            return createdGrant;
-        });
-        await this.auditService.record({
-            actorId: userId,
-            actorRole: role,
-            action: "purchase.confirmed",
-            resource: input.targetType,
-            resourceId: input.targetId,
-            metadata: {
-                providerReference,
-                idempotencyKey,
-                finance,
-                riskScore
-            }
-        });
-        await this.db.notification.createMany({
-            data: [
-                {
-                    userId,
-                    type: "purchase",
-                    title: "Purchase confirmed",
-                    body: input.targetType === "live_session"
-                        ? `Your access to ${target.title} is active. Join code: ${buildLiveJoinCode(grant.id)}.`
-                        : `Your access to ${target.title} is active.`,
-                    data: (0, prisma_json_1.toPrismaJson)({
-                        targetType: input.targetType,
-                        targetId: input.targetId,
-                        accessGrantId: grant.id,
-                        joinCode: input.targetType === "live_session" ? buildLiveJoinCode(grant.id) : undefined
-                    })
-                },
-                {
-                    userId: target.creatorId,
-                    type: "purchase",
-                    title: "New sale received",
-                    body: `A user purchased access to ${target.title}.`,
-                    data: (0, prisma_json_1.toPrismaJson)({
-                        targetType: input.targetType,
-                        targetId: input.targetId,
-                        buyerId: userId
-                    })
-                }
-            ]
-        });
-        return {
-            grant,
-            finance,
-            risk,
-            liveJoinCode: input.targetType === "live_session" ? buildLiveJoinCode(grant.id) : undefined
-        };
+    async confirmPurchase(_userId, _role, _input) {
+        throw new app_error_1.AppError("Verified payment settlement is not configured. Purchase confirmation is disabled until provider callback verification is implemented.", 503);
     }
     async getGrantStatus(userId, targetType, targetId) {
         const grant = await this.findActiveGrant(userId, targetType, targetId);
@@ -336,53 +163,6 @@ class AccessService {
                 throw new app_error_1.AppError("Private live access is required.", 403);
             }
         }
-    }
-    async resolveTarget(targetType, targetId) {
-        switch (targetType) {
-            case "live_session": {
-                const target = await this.db.liveSession.findUnique({ where: { id: targetId } });
-                if (!target) {
-                    throw new app_error_1.AppError("Live session not found.", 404);
-                }
-                return {
-                    id: target.id,
-                    creatorId: target.creatorId,
-                    title: target.title,
-                    amount: target.price.toString(),
-                    currency: target.currency,
-                    isPaid: target.isPaid
-                };
-            }
-            case "premium_content": {
-                const target = await this.db.premiumContent.findUnique({ where: { id: targetId } });
-                if (!target) {
-                    throw new app_error_1.AppError("Premium content not found.", 404);
-                }
-                return {
-                    id: target.id,
-                    creatorId: target.creatorId,
-                    title: target.title,
-                    amount: target.price.toString(),
-                    currency: target.currency,
-                    isPaid: target.isPaid
-                };
-            }
-            case "class": {
-                const target = await this.db.learningClass.findUnique({ where: { id: targetId } });
-                if (!target) {
-                    throw new app_error_1.AppError("Class not found.", 404);
-                }
-                return {
-                    id: target.id,
-                    creatorId: target.creatorId,
-                    title: target.title,
-                    amount: target.price.toString(),
-                    currency: target.currency,
-                    isPaid: target.isPaid
-                };
-            }
-        }
-        throw new app_error_1.AppError("Unsupported purchase target.", 400);
     }
 }
 exports.AccessService = AccessService;

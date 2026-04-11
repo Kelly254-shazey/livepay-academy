@@ -1,5 +1,6 @@
 import { AppError } from "../../common/errors/app-error";
 import { AuditService } from "../../common/audit/audit.service";
+import { MediaAccessService } from "../../infrastructure/media/media-access.service";
 import { PythonIntelligenceClient } from "../../infrastructure/integrations/python-intelligence.client";
 import { AccessService } from "../access/access.service";
 import { ClassesRepository } from "./classes.repository";
@@ -9,7 +10,8 @@ export class ClassesService {
     private readonly repository: ClassesRepository,
     private readonly accessService: AccessService,
     private readonly auditService: AuditService,
-    private readonly pythonClient: PythonIntelligenceClient
+    private readonly pythonClient: PythonIntelligenceClient,
+    private readonly mediaAccessService: MediaAccessService
   ) {}
 
   async create(creatorId: string, role: "creator" | "admin", data: Parameters<ClassesRepository["create"]>[1]) {
@@ -53,7 +55,10 @@ export class ClassesService {
       throw new AppError("Class not found or not owned by actor.", 404);
     }
 
-    const lesson = await this.repository.addLesson(classId, data);
+    const lesson = await this.repository.addLesson(classId, {
+      ...data,
+      assetUrl: data.assetUrl ? this.mediaAccessService.validateSourceUrl(data.assetUrl) : undefined
+    });
     await this.auditService.record({
       actorId: actor.userId,
       actorRole: actor.role,
@@ -95,7 +100,11 @@ export class ClassesService {
       allowed: true,
       lessonId: lesson.id,
       classId,
-      assetUrl: lesson.assetUrl
+      assetUrl: this.mediaAccessService.createDeliveryUrl({
+        assetUrl: lesson.assetUrl,
+        resourceType: "class_lesson",
+        resourceId: lesson.id
+      })
     };
   }
 

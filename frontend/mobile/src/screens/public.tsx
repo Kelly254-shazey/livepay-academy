@@ -126,6 +126,7 @@ function formatRoleLabel(role: UserRole) {
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD format.");
 const genderSchema = z.enum(["male", "female", "prefer_not_to_say", "custom"]);
+const countrySchema = z.string().min(2, 'Select a country').max(2);
 const passwordSchema = z
   .string()
   .min(12, 'Use at least 12 characters.')
@@ -145,12 +146,21 @@ const signUpSchema = z
     fullName: z.string().min(2),
     email: z.string().email(),
     password: passwordSchema,
+    confirmPassword: z.string(),
     username: z.string().trim().min(3).max(32),
     dateOfBirth: dateSchema,
     gender: genderSchema,
     customGender: z.string().trim().max(80).optional(),
+    country: countrySchema,
   })
   .superRefine((values, ctx) => {
+    if (values.password !== values.confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['confirmPassword'],
+        message: 'Passwords do not match.',
+      });
+    }
     if (values.gender === 'custom' && !values.customGender?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -322,6 +332,8 @@ function TextField({
   placeholder,
   error,
   secureTextEntry = false,
+  inputMode,
+  maxLength,
 }: {
   label?: string;
   value: string;
@@ -329,6 +341,8 @@ function TextField({
   placeholder?: string;
   error?: string;
   secureTextEntry?: boolean;
+  inputMode?: React.ComponentProps<typeof TextInput>['inputMode'];
+  maxLength?: number;
 }) {
   return (
     <View style={styles.publicTextFieldContainer}>
@@ -339,6 +353,8 @@ function TextField({
         placeholder={placeholder}
         placeholderTextColor={publicPalette.textMuted}
         secureTextEntry={secureTextEntry}
+        inputMode={inputMode}
+        maxLength={maxLength}
         value={value}
       />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -476,7 +492,7 @@ function SignInFormDialogContent({
           <TextField
             label="Email or username"
             onChangeText={field.onChange}
-            placeholder="you@livegate.com or yourusername"
+            placeholder="you@livegate.com or username"
             value={field.value}
             error={form.formState.errors.identifier?.message}
           />
@@ -536,10 +552,12 @@ function SignUpFormDialogContent({
       fullName: '', 
       email: '', 
       password: '',
+      confirmPassword: '',
       username: '',
       dateOfBirth: '',
       gender: 'prefer_not_to_say',
       customGender: '',
+      country: '',
     },
   });
 
@@ -609,13 +627,32 @@ function SignUpFormDialogContent({
         control={form.control}
         name="password"
         render={({ field }) => (
+          <View style={{ gap: 4 }}>
+            <TextField
+              label="Password (12+ characters)"
+              onChangeText={field.onChange}
+              placeholder="Create password"
+              secureTextEntry
+              value={field.value}
+              error={form.formState.errors.password?.message}
+            />
+            <Text style={{ fontSize: 11, color: '#666', paddingHorizontal: 12 }}>
+              • At least 12 chars • 1 uppercase • 1 lowercase • 1 number • 1 symbol
+            </Text>
+          </View>
+        )}
+      />
+      <Controller
+        control={form.control}
+        name="confirmPassword"
+        render={({ field }) => (
           <TextField
-            label="Password"
+            label="Confirm Password"
             onChangeText={field.onChange}
-            placeholder="Create password"
+            placeholder="Confirm password"
             secureTextEntry
             value={field.value}
-            error={form.formState.errors.password?.message}
+            error={form.formState.errors.confirmPassword?.message}
           />
         )}
       />
@@ -624,12 +661,30 @@ function SignUpFormDialogContent({
         name="dateOfBirth"
         render={({ field }) => (
           <TextField
-            label="Date of birth"
+            label="Date of birth (YYYY-MM-DD)"
             onChangeText={field.onChange}
-            placeholder="YYYY-MM-DD"
+            placeholder="Use calendar: 2000-01-15"
             value={field.value}
             error={form.formState.errors.dateOfBirth?.message}
+            inputMode="numeric"
           />
+        )}
+      />
+      <Controller
+        control={form.control}
+        name="country"
+        render={({ field }) => (
+          <View style={{ gap: 8 }}>
+            <Text style={styles.statusText}>Country (for currency)</Text>
+            <TextField
+              label="Country Code"
+              onChangeText={(text) => field.onChange(text.toUpperCase())}
+              placeholder="US, GB, CA, etc."
+              value={field.value}
+              error={form.formState.errors.country?.message}
+              maxLength={2}
+            />
+          </View>
         )}
       />
       <Controller
@@ -871,7 +926,7 @@ export function SignInScreen() {
             <TextField
               label="Email or username"
               onChangeText={field.onChange}
-              placeholder="you@livegate.com or yourusername"
+              placeholder="you@livegate.com or username"
               value={field.value}
               error={form.formState.errors.identifier?.message}
             />

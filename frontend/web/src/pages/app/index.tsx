@@ -999,13 +999,8 @@ export function CheckoutPage() {
           )}
           <div className="flex flex-wrap gap-3">
             <Button disabled={!hasProduct || mutation.isPending} onClick={() => mutation.mutate()}>
-              {mutation.isPending ? 'Creating checkout...' : 'Create secure checkout session'}
+              {mutation.isPending ? 'Preparing checkout quote...' : 'Prepare checkout quote'}
             </Button>
-            {hasProduct ? (
-              <Link to={`/payment/failed?productType=${productType}&productId=${productId}`}>
-                <Button variant="ghost">Preview failure state</Button>
-              </Link>
-            ) : null}
           </div>
           {mutation.isSuccess && mutation.data ? (
             <div className="space-y-4">
@@ -1042,14 +1037,15 @@ export function CheckoutPage() {
                   value={formatCurrency(mutation.data.creatorEarningsAmount ?? 0, mutation.data.currency)}
                 />
               </div>
-              <div className="flex flex-wrap gap-3">
-                <Link to={`/payment/success?productType=${productType}&productId=${productId}`}>
-                  <Button>Preview success state</Button>
-                </Link>
-                <Button onClick={() => mutation.mutate()} variant="secondary">
-                  Recreate session
-                </Button>
-              </div>
+              <InlineNotice
+                body={
+                  mutation.data.paymentProcessingAvailable
+                    ? 'Verified payment confirmation is available for this checkout session.'
+                    : 'Checkout quoting is available, but payment confirmation stays disabled until a provider webhook flow is integrated.'
+                }
+                title={mutation.data.paymentProcessingAvailable ? 'Checkout ready' : 'Provider verification pending'}
+                tone={mutation.data.paymentProcessingAvailable ? 'default' : 'danger'}
+              />
             </div>
           ) : null}
           {mutation.isError ? (

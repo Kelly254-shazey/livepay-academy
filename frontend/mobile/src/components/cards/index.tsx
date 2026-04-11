@@ -59,8 +59,8 @@ export function CreatorCard({
         <View style={{ ...badgeBase, backgroundColor: theme.colors.accentMuted }}>
           <Text style={{ color: theme.colors.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1.3 }}>CONTENT CREATOR</Text>
         </View>
-        <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>{creator.displayName}</Text>
-        <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary, marginTop: -4 }}>@{creator.handle}</Text>
+        <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold, color: theme.colors.text }}>{creator.displayName}</Text>
+        <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>@{creator.handle}</Text>
         <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>{creator.headline}</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: theme.spacing.sm }}>
           <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>{creator.followerCount} followers</Text>
@@ -86,7 +86,7 @@ export function LiveCard({
             {live.isLive ? 'LIVE NOW' : 'UPCOMING'}
           </Text>
         </View>
-        <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>{live.title}</Text>
+        <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold, color: theme.colors.text }}>{live.title}</Text>
         <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>{live.description}</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: theme.spacing.sm }}>
           <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>{live.creator.displayName}</Text>
@@ -94,7 +94,7 @@ export function LiveCard({
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>{live.viewerCount} viewers</Text>
-          <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>{live.category.replace(/-/g, ' ')}</Text>
+          <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>{(live.category as string).replace(/-/g, ' ')}</Text>
         </View>
       </Surface>
     </Pressable>
@@ -114,7 +114,7 @@ export function ContentCard({
         <View style={{ ...badgeBase, backgroundColor: theme.colors.accentMuted }}>
           <Text style={{ color: theme.colors.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1.3 }}>PREMIUM</Text>
         </View>
-        <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>{content.title}</Text>
+        <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold, color: theme.colors.text }}>{content.title}</Text>
         <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>{content.description}</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: theme.spacing.sm }}>
           <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>{content.creator.displayName}</Text>
@@ -138,7 +138,7 @@ export function ClassCard({
         <View style={{ ...badgeBase, backgroundColor: 'rgba(154,106,42,0.12)' }}>
           <Text style={{ color: theme.colors.warning, fontSize: 11, fontWeight: '700', letterSpacing: 1.3 }}>CLASS</Text>
         </View>
-        <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>{classItem.title}</Text>
+        <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold, color: theme.colors.text }}>{classItem.title}</Text>
         <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>{classItem.description}</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: theme.spacing.sm }}>
           <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>{classItem.scheduleLabel}</Text>
@@ -154,17 +154,17 @@ export function WalletCards({ wallet }: { wallet: WalletSummary }) {
     <View style={{ gap: theme.spacing.md }}>
       <Surface>
         <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>Available balance</Text>
-        <Text style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold as any, color: theme.colors.text }}>{formatCurrency(wallet.availableBalance, wallet.currency)}</Text>
+        <Text style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text }}>{formatCurrency(wallet.availableBalance, wallet.currency)}</Text>
         <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>Withdrawable now</Text>
       </Surface>
       <Surface>
         <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>Pending balance</Text>
-        <Text style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold as any, color: theme.colors.text }}>{formatCurrency(wallet.pendingBalance, wallet.currency)}</Text>
+        <Text style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text }}>{formatCurrency(wallet.pendingBalance, wallet.currency)}</Text>
         <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>Awaiting settlement</Text>
       </Surface>
       <Surface>
         <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>Lifetime earnings</Text>
-        <Text style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold as any, color: theme.colors.text }}>{formatCurrency(wallet.lifetimeEarnings, wallet.currency)}</Text>
+        <Text style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text }}>{formatCurrency(wallet.lifetimeEarnings, wallet.currency)}</Text>
         <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>Total content creator earnings recorded</Text>
       </Surface>
     </View>
@@ -180,8 +180,8 @@ export function NotificationRow({
 }) {
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => ({ opacity: pressed ? 0.97 : 1 })}>
-      <Surface style={{ borderColor: item.read ? undefined : theme.colors.accentMuted }}>
-        <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>{item.title}</Text>
+      <Surface style={item.read ? undefined : { borderColor: theme.colors.accentMuted, borderWidth: 1 }}>
+        <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold, color: theme.colors.text }}>{item.title}</Text>
         <Text style={{ fontSize: theme.typography.sizes.base, color: theme.colors.textSecondary }}>{item.body}</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={{ fontSize: theme.typography.sizes.sm, color: item.read ? theme.colors.textMuted : theme.colors.accent }}>
@@ -199,7 +199,7 @@ export function NotificationRow({
 export function TransactionRow({ item }: { item: TransactionRecord }) {
   return (
     <Surface>
-      <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold as any, color: theme.colors.text }}>{item.title}</Text>
+      <Text style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold, color: theme.colors.text }}>{item.title}</Text>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: theme.spacing.sm }}>
         <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>{item.type}</Text>
         <Text style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.textMuted }}>{formatCurrency(item.amount, item.currency)}</Text>

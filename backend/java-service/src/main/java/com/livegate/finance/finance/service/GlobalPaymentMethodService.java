@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -36,6 +37,7 @@ public class GlobalPaymentMethodService {
         if (!providerConfigRepository.findByProviderAndIsActiveTrue(request.provider()).isPresent()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Payment provider not supported");
         }
+        ensureNoActiveDuplicate(userId, request);
 
         boolean isDefault = request.isDefault() != null && request.isDefault();
         
@@ -132,22 +134,25 @@ public class GlobalPaymentMethodService {
         PaymentProviderConfig config = providerConfigRepository.findByProviderAndIsActiveTrue(provider)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Provider configuration not found"));
 
+        BigDecimal normalizedAmount = amount.setScale(2, RoundingMode.HALF_UP);
         JsonNode feesNode = config.getFees();
-        BigDecimal fixedFee = BigDecimal.ZERO;
-        BigDecimal percentageFee = BigDecimal.ZERO;
+        BigDecimal fixedFee = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal percentageFee = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
         if (feesNode.has("fixed")) {
-            fixedFee = new BigDecimal(feesNode.get("fixed").asText());
+            fixedFee = new BigDecimal(feesNode.get("fixed").asText()).setScale(2, RoundingMode.HALF_UP);
         }
         if (feesNode.has("percentage")) {
             BigDecimal percentage = new BigDecimal(feesNode.get("percentage").asText());
-            percentageFee = amount.multiply(percentage).divide(new BigDecimal(100));
+            percentageFee = normalizedAmount
+                    .multiply(percentage)
+                    .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
         }
 
-        BigDecimal totalFee = fixedFee.add(percentageFee);
-        BigDecimal total = amount.add(totalFee);
+        BigDecimal totalFee = fixedFee.add(percentageFee).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = normalizedAmount.add(totalFee).setScale(2, RoundingMode.HALF_UP);
 
-        return new FeeCalculation(amount, fixedFee, percentageFee, totalFee, total);
+        return new FeeCalculation(normalizedAmount, fixedFee, percentageFee, totalFee, total);
     }
 
     private boolean isCountrySupportedByProvider(PaymentProviderConfig config, String country) {
@@ -180,4 +185,23 @@ public class GlobalPaymentMethodService {
             BigDecimal totalFee,
             BigDecimal totalAmount
     ) {}
+
+    private void ensureNoActiveDuplicate(String userId, PaymentMethodRequest request) {
+        boolean exists = request.lastFour() == null || request.lastFour().isBlank()
+                ? paymentMethodRepository.findByUserIdAndProviderAndTypeAndLastFourIsNullAndIsActiveTrue(
+                        userId,
+                        request.provider(),
+                        request.type()
+                ).isPresent()
+                : paymentMethodRepository.findByUserIdAndProviderAndTypeAndLastFourAndIsActiveTrue(
+                        userId,
+                        request.provider(),
+                        request.type(),
+                        request.lastFour()
+                ).isPresent();
+
+        if (exists) {
+            throw new ApiException(HttpStatus.CONFLICT, "Payment method is already registered for this account.");
+        }
+    }
 }

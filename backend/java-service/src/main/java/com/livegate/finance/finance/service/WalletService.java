@@ -180,7 +180,9 @@ public class WalletService {
     }
 
     public WalletSummaryResponse getWalletSummary(String creatorId) {
-        return toSummary(getOrCreateWallet(creatorId, "USD"));
+        return creatorWalletRepository.findById(creatorId)
+                .map(this::toSummary)
+                .orElseGet(() -> toSummary(getOrCreateWallet(creatorId, "USD")));
     }
 
     public void ensureAvailableBalance(String creatorId, BigDecimal amount, String currency) {

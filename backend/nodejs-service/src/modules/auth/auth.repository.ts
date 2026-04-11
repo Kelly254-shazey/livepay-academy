@@ -62,6 +62,7 @@ export class AuthRepository {
     dateOfBirth?: Date | null;
     gender?: string | null;
     customGender?: string | null;
+    country?: string | null;
     emailVerifiedAt?: Date | null;
     profileCompletedAt?: Date | null;
     identity: {
@@ -83,6 +84,7 @@ export class AuthRepository {
           dateOfBirth: input.dateOfBirth,
           gender: input.gender,
           customGender: input.customGender,
+          country: input.country,
           emailVerifiedAt: input.emailVerifiedAt,
           profileCompletedAt: input.profileCompletedAt
         }

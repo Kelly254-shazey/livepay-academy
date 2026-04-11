@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createApp = createApp;
+const crypto_1 = require("crypto");
 const cors_1 = __importDefault(require("cors"));
 const express_1 = __importDefault(require("express"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
@@ -16,6 +17,7 @@ const cors_2 = require("./config/cors");
 const env_1 = require("./config/env");
 const swagger_1 = require("./config/swagger");
 const request_context_1 = require("./common/middleware/request-context");
+const csrf_1 = require("./common/middleware/csrf");
 const prisma_1 = require("./infrastructure/db/prisma");
 const redis_1 = require("./infrastructure/cache/redis");
 const email_service_1 = require("./infrastructure/communications/email.service");
@@ -25,6 +27,7 @@ const audit_service_1 = require("./common/audit/audit.service");
 const java_finance_client_1 = require("./infrastructure/integrations/java-finance.client");
 const python_intelligence_client_1 = require("./infrastructure/integrations/python-intelligence.client");
 const streaming_provider_client_1 = require("./infrastructure/integrations/streaming-provider.client");
+const media_access_service_1 = require("./infrastructure/media/media-access.service");
 const health_routes_1 = require("./modules/health/health.routes");
 const auth_repository_1 = require("./modules/auth/auth.repository");
 const auth_service_1 = require("./modules/auth/auth.service");
@@ -63,9 +66,13 @@ const reviews_service_1 = require("./modules/reviews/reviews.service");
 const reviews_routes_1 = require("./modules/reviews/reviews.routes");
 const reports_repository_1 = require("./modules/reports/reports.repository");
 const reports_service_1 = require("./modules/reports/reports.service");
+const profile_service_1 = require("./modules/profiles/profile.service");
+const profile_routes_1 = require("./modules/profiles/profile.routes");
 const reports_routes_1 = require("./modules/reports/reports.routes");
 const frontend_service_1 = require("./modules/frontend/frontend.service");
 const frontend_routes_1 = require("./modules/frontend/frontend.routes");
+const media_routes_1 = require("./modules/media/media.routes");
+const payment_methods_routes_1 = __importDefault(require("./modules/payments/payment-methods.routes"));
 function createApp() {
     const app = (0, express_1.default)();
     const auditService = new audit_service_1.AuditService(prisma_1.prisma);
@@ -76,18 +83,20 @@ function createApp() {
     const javaFinanceClient = new java_finance_client_1.JavaFinanceClient();
     const pythonClient = new python_intelligence_client_1.PythonIntelligenceClient();
     const streamingProviderClient = new streaming_provider_client_1.StreamingProviderClient();
+    const mediaAccessService = new media_access_service_1.MediaAccessService();
     const authService = new auth_service_1.AuthService(prisma_1.prisma, new auth_repository_1.AuthRepository(prisma_1.prisma), auditService, emailService, clerkService, googleAuthService, authSecurityService);
     const accessService = new access_service_1.AccessService(prisma_1.prisma, auditService, javaFinanceClient, pythonClient);
     const usersService = new users_service_1.UsersService(new users_repository_1.UsersRepository(prisma_1.prisma), auditService, pythonClient);
     const creatorsService = new creators_service_1.CreatorsService(new creators_repository_1.CreatorsRepository(prisma_1.prisma), auditService, pythonClient);
     const categoriesService = new categories_service_1.CategoriesService(new categories_repository_1.CategoriesRepository(prisma_1.prisma), redis_1.redis);
     const liveSessionsService = new live_sessions_service_1.LiveSessionsService(new live_sessions_repository_1.LiveSessionsRepository(prisma_1.prisma), accessService, auditService, pythonClient, streamingProviderClient);
-    const premiumContentService = new premium_content_service_1.PremiumContentService(new premium_content_repository_1.PremiumContentRepository(prisma_1.prisma), accessService, auditService, pythonClient);
-    const classesService = new classes_service_1.ClassesService(new classes_repository_1.ClassesRepository(prisma_1.prisma), accessService, auditService, pythonClient);
+    const premiumContentService = new premium_content_service_1.PremiumContentService(new premium_content_repository_1.PremiumContentRepository(prisma_1.prisma), accessService, auditService, pythonClient, mediaAccessService);
+    const classesService = new classes_service_1.ClassesService(new classes_repository_1.ClassesRepository(prisma_1.prisma), accessService, auditService, pythonClient, mediaAccessService);
     const notificationsService = new notifications_service_1.NotificationsService(new notifications_repository_1.NotificationsRepository(prisma_1.prisma), auditService);
     const walletsService = new wallets_service_1.WalletsService(javaFinanceClient, auditService);
     const reviewsService = new reviews_service_1.ReviewsService(new reviews_repository_1.ReviewsRepository(prisma_1.prisma), auditService);
     const reportsService = new reports_service_1.ReportsService(new reports_repository_1.ReportsRepository(prisma_1.prisma), auditService, pythonClient);
+    const profileService = new profile_service_1.ProfileService(prisma_1.prisma, auditService);
     const adminService = new admin_service_1.AdminService(new admin_repository_1.AdminRepository(prisma_1.prisma), auditService, pythonClient, javaFinanceClient);
     const frontendService = new frontend_service_1.FrontendService(prisma_1.prisma, authService, accessService, javaFinanceClient, walletsService, liveSessionsService);
     // Railway/Vercel sit behind a reverse proxy, and auth throttling depends on the original client IP.
@@ -106,8 +115,9 @@ function createApp() {
         legacyHeaders: false
     }));
     app.use(express_1.default.json({ limit: "1mb" }));
-    if (env_1.env.SWAGGER_ENABLED) {
-        app.use("/docs", swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup((0, swagger_1.createSwaggerDocument)()));
+    app.use(csrf_1.csrfProtection);
+    if (env_1.env.SWAGGER_ENABLED && env_1.env.SWAGGER_USERNAME && env_1.env.SWAGGER_PASSWORD) {
+        app.use("/docs", swaggerBasicAuth, swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup((0, swagger_1.createSwaggerDocument)()));
     }
     app.get("/", (_req, res) => {
         res.json({
@@ -116,6 +126,8 @@ function createApp() {
         });
     });
     app.use("/api", (0, frontend_routes_1.createFrontendRouter)(frontendService));
+    app.use("/api/media", (0, media_routes_1.createMediaRouter)(mediaAccessService));
+    app.use("/api/payment-methods", payment_methods_routes_1.default);
     app.use("/health", (0, health_routes_1.createHealthRouter)(prisma_1.prisma, redis_1.redis, {
         javaFinance: javaFinanceClient,
         pythonIntelligence: pythonClient
@@ -133,8 +145,42 @@ function createApp() {
     api.use("/wallets", (0, wallets_routes_1.createWalletsRouter)(walletsService));
     api.use("/reviews", (0, reviews_routes_1.createReviewsRouter)(reviewsService));
     api.use("/reports", (0, reports_routes_1.createReportsRouter)(reportsService));
+    api.use("/profiles", (0, profile_routes_1.createProfileRouter)(profileService));
     api.use("/admin", (0, admin_routes_1.createAdminRouter)(adminService));
     app.use(domain_1.API_PREFIX, api);
     app.use(error_handler_1.errorHandler);
     return app;
+}
+function swaggerBasicAuth(req, res, next) {
+    const authorization = req.headers.authorization;
+    if (!authorization?.startsWith("Basic ")) {
+        res.setHeader("WWW-Authenticate", 'Basic realm="LiveGate API Docs"');
+        res.status(401).send("Authentication required.");
+        return;
+    }
+    const encoded = authorization.slice("Basic ".length).trim();
+    const decoded = Buffer.from(encoded, "base64").toString("utf8");
+    const separatorIndex = decoded.indexOf(":");
+    const username = separatorIndex >= 0 ? decoded.slice(0, separatorIndex) : "";
+    const password = separatorIndex >= 0 ? decoded.slice(separatorIndex + 1) : "";
+    if (!env_1.env.SWAGGER_USERNAME || !env_1.env.SWAGGER_PASSWORD) {
+        res.status(503).send("Swagger credentials are not configured.");
+        return;
+    }
+    const validUsername = constantTimeEquals(username, env_1.env.SWAGGER_USERNAME);
+    const validPassword = constantTimeEquals(password, env_1.env.SWAGGER_PASSWORD);
+    if (!validUsername || !validPassword) {
+        res.setHeader("WWW-Authenticate", 'Basic realm="LiveGate API Docs"');
+        res.status(401).send("Invalid credentials.");
+        return;
+    }
+    next();
+}
+function constantTimeEquals(left, right) {
+    const leftBuffer = Buffer.from(left, "utf8");
+    const rightBuffer = Buffer.from(right, "utf8");
+    if (leftBuffer.length !== rightBuffer.length) {
+        return false;
+    }
+    return (0, crypto_1.timingSafeEqual)(leftBuffer, rightBuffer);
 }

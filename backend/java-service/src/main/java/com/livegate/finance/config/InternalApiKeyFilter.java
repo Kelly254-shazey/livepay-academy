@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -39,19 +40,18 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         String apiKey = request.getHeader(INTERNAL_API_KEY_HEADER);
-        String uri = request.getRequestURI();
-        boolean strictInternalRoute = uri.startsWith("/internal/");
 
+        // All routes handled by this filter require a valid internal API key.
+        // Missing or invalid key is always rejected — no pass-through.
         if (apiKey == null || apiKey.isBlank()) {
-            if (strictInternalRoute) {
-                reject(response, "Missing internal API key.");
-                return;
-            }
-            filterChain.doFilter(request, response);
+            reject(response, "Missing internal API key.");
             return;
         }
 
-        if (!financeProperties.internalApiKey().equals(apiKey)) {
+        // Constant-time comparison to prevent timing attacks
+        if (!MessageDigest.isEqual(
+                financeProperties.internalApiKey().getBytes(StandardCharsets.UTF_8),
+                apiKey.getBytes(StandardCharsets.UTF_8))) {
             reject(response, "Invalid internal API key.");
             return;
         }

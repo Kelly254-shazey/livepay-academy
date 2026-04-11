@@ -12,8 +12,8 @@ const admin_schemas_1 = require("./admin.schemas");
 function createAdminRouter(service) {
     const router = (0, express_1.Router)();
     router.use(authenticate_1.authenticate);
-    router.get("/overview", (0, authorize_1.authorize)("moderator", "admin"), (0, async_handler_1.asyncHandler)(async (_req, res) => {
-        const result = await service.overview();
+    router.get("/overview", (0, authorize_1.authorize)("moderator", "admin"), (0, async_handler_1.asyncHandler)(async (req, res) => {
+        const result = await service.overview({ role: req.auth.role });
         res.json(result);
     }));
     router.get("/users", (0, authorize_1.authorize)("moderator", "admin"), (0, async_handler_1.asyncHandler)(async (req, res) => {

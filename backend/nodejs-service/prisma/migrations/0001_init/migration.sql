@@ -113,6 +113,7 @@ CREATE TABLE `LiveParticipant` (
     `leftAt` DATETIME(3) NULL,
     `attendanceSeconds` INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT `LiveParticipant_attendanceSeconds_chk` CHECK (`attendanceSeconds` >= 0),
+    UNIQUE INDEX `LiveParticipant_liveSessionId_userId_key` (`liveSessionId`, `userId`),
     INDEX `LiveParticipant_liveSessionId_userId_idx` (`liveSessionId`, `userId`),
     INDEX `LiveParticipant_userId_joinedAt_idx` (`userId`, `joinedAt`),
     PRIMARY KEY (`id`)
@@ -234,6 +235,7 @@ CREATE TABLE `AccessGrant` (
     UNIQUE INDEX `AccessGrant_sourceReference_key` (`sourceReference`),
     INDEX `AccessGrant_userId_targetType_targetId_status_idx` (`userId`, `targetType`, `targetId`, `status`),
     INDEX `AccessGrant_targetType_targetId_status_idx` (`targetType`, `targetId`, `status`),
+    INDEX `AccessGrant_expiresAt_idx` (`expiresAt`),
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 

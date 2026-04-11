@@ -3,6 +3,7 @@ import { createHash, randomInt, randomUUID } from "crypto";
 import type { AuthProvider, UserRole } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 
+import { deriveUserRoles } from "../../common/auth/roles";
 import { env } from "../../config/env";
 import { AppError } from "../../common/errors/app-error";
 import { hashPassword, verifyPassword } from "../../common/security/password";
@@ -79,6 +80,7 @@ export class AuthService {
     dateOfBirth: string;
     gender: string;
     customGender?: string;
+    country?: string;
     ipAddress?: string;
     userAgent?: string;
   }) {
@@ -114,6 +116,7 @@ export class AuthService {
       dateOfBirth,
       gender: gender.gender,
       customGender: gender.customGender,
+      country: input.country?.trim().toUpperCase(),
       profileCompletedAt: new Date(),
       identity: {
         provider: "local",
@@ -825,13 +828,18 @@ export class AuthService {
   }
 
   private toSessionUser(user: AuthUser) {
+    const roles = deriveUserRoles({
+      role: user.role,
+      hasCreatorProfile: Boolean(user.creatorProfile)
+    });
+
     return {
       id: user.id,
       fullName: `${user.firstName} ${user.lastName}`.trim(),
       email: user.email,
       username: user.username,
       role: user.role,
-      roles: [user.role],
+      roles,
       avatarUrl: user.avatarUrl,
       emailVerified: Boolean(user.emailVerifiedAt),
       profileCompleted: Boolean(user.profileCompletedAt),

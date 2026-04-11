@@ -42,10 +42,10 @@ public class PayoutRequest {
     @Column(nullable = false)
     private Instant requestedAt;
 
+    private Instant holdUntil;
     private Instant approvedAt;
     private Instant rejectedAt;
     private Instant processedAt;
 
     private String rejectionReason;
 }
-

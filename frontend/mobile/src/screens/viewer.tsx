@@ -4,7 +4,7 @@ import { categories, formatCurrency, getSessionRoles } from '../shared';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { mobileApi } from '@/api/client';
 import { MobileAlert } from '@/components/MobileAlert';
@@ -119,14 +119,6 @@ function mapProductTypeToAccessTarget(productType: ViewerCheckoutProductType): A
   if (productType === 'live') return 'live_session';
   if (productType === 'content') return 'premium_content';
   return 'class';
-}
-
-function createPurchaseAttempt(productType: ViewerCheckoutProductType, productId: string) {
-  const nonce = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  return {
-    providerReference: `mobile-${productType}-${productId}-${nonce}`,
-    idempotencyKey: `mobile-confirm-${productType}-${productId}-${nonce}`,
-  };
 }
 
 function getUnlockedRoute(
@@ -1596,22 +1588,27 @@ export function CheckoutScreen() {
       }),
     enabled: Boolean(productId && productType),
   });
-  const purchaseAttempt = useMemo(
-    () => (productId && productType ? createPurchaseAttempt(productType, productId) : null),
-    [productId, productType],
-  );
+  const canConfirmPurchase =
+    checkoutQuery.data?.paymentProcessingAvailable === true &&
+    checkoutQuery.data.sessionStatus === 'ready';
   const confirmMutation = useMutation({
     mutationFn: async () => {
-      if (!productId || !productType || !purchaseAttempt) {
-        throw new Error('Select a live, premium content item, or class before confirming payment.');
+      if (!productId || !productType) {
+        throw new Error('Select a live, premium content item, or class before continuing.');
+      }
+
+      if (!canConfirmPurchase) {
+        throw new Error(
+          'Payment processing is unavailable until a verified provider callback flow is connected.',
+        );
       }
 
       const targetType = mapProductTypeToAccessTarget(productType);
       const result = await mobileApi.confirmPurchase({
         targetType,
         targetId: productId,
-        providerReference: purchaseAttempt.providerReference,
-        idempotencyKey: purchaseAttempt.idempotencyKey,
+        providerReference: `disabled-${targetType}-${productId}`,
+        idempotencyKey: `disabled-confirm-${targetType}-${productId}`,
       });
 
       const accessState = await mobileApi.getAccessGrantStatus(targetType, productId);
@@ -1705,9 +1702,15 @@ export function CheckoutScreen() {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
               <Button
                 onPress={() => confirmMutation.mutate()}
-                title={confirmMutation.isPending ? 'Confirming payment...' : 'Confirm payment'}
+                title={
+                  canConfirmPurchase
+                    ? confirmMutation.isPending
+                      ? 'Confirming payment...'
+                      : 'Confirm payment'
+                    : 'Payment processing unavailable'
+                }
                 loading={confirmMutation.isPending}
-                disabled={confirmMutation.isPending || confirmed}
+                disabled={confirmMutation.isPending || confirmed || !canConfirmPurchase}
               />
               <Button onPress={() => router.replace('/(viewer)/(tabs)/library')} title="Return to library" variant="secondary" />
               <Button onPress={() => router.back()} title="Back" variant="ghost" />
@@ -1918,6 +1921,46 @@ export function SettingsScreen() {
                 />
               ))}
             </View>
+          </Surface>
+          <Surface>
+            <SectionLead
+              body="Add a bio, profile photo, cover photo, and social media links to make your profile complete and engaging."
+              eyebrow="Branding"
+              title="Profile format"
+            />
+            <TextField
+              label="Bio"
+              maxLength={500}
+              multiline
+              numberOfLines={4}
+              onChangeText={(value) => setSettings((current) => (current ? { ...current, bio: value } : current))}
+              placeholder="Tell visitors about yourself (max 500 chars)"
+              value={settings.bio || ''}
+            />
+            <TextField
+              label="Profile photo URL"
+              onChangeText={(value) => setSettings((current) => (current ? { ...current, profilePhotoUrl: value } : current))}
+              placeholder="https://example.com/profile.jpg"
+              value={settings.profilePhotoUrl || ''}
+            />
+            <TextField
+              label="Cover photo URL"
+              onChangeText={(value) => setSettings((current) => (current ? { ...current, coverPhotoUrl: value } : current))}
+              placeholder="https://example.com/cover.jpg"
+              value={settings.coverPhotoUrl || ''}
+            />
+            <TextField
+              label="Website"
+              onChangeText={(value) => setSettings((current) => (current ? { ...current, website: value } : current))}
+              placeholder="https://yourwebsite.com"
+              value={settings.website || ''}
+            />
+            <TextField
+              label="Location"
+              onChangeText={(value) => setSettings((current) => (current ? { ...current, location: value } : current))}
+              placeholder="City, Country"
+              value={settings.location || ''}
+            />
           </Surface>
           <Surface>
             <SectionLead

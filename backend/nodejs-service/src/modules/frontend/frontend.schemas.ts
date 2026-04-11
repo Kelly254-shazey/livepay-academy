@@ -29,10 +29,12 @@ export const frontendSignUpSchema = z.object({
     username: usernameSchema,
     email: z.string().email(),
     password: passwordSchema,
+    confirmPassword: z.string().optional(),
     role: z.enum(["viewer", "creator"]).default("viewer"),
     dateOfBirth: dateSchema,
     gender: genderSchema,
-    customGender: z.string().trim().max(80).optional()
+    customGender: z.string().trim().max(80).optional(),
+    country: z.string().min(2).max(2).optional()
   }),
   params: z.object({}).default({}),
   query: z.object({}).default({})

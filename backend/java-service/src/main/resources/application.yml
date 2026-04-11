@@ -25,10 +25,13 @@ management:
           - info
   endpoint:
     health:
-      show-details: always
+      # Never expose DB/pool details publicly — use 'when-authorized' for internal monitoring
+      show-details: when-authorized
+      show-components: when-authorized
 
 livegate:
-  internal-api-key: ${INTERNAL_API_KEY:livegate-internal-key}
+  # INTERNAL_API_KEY must be set via environment variable — no default allowed in production
+  internal-api-key: ${INTERNAL_API_KEY}
   platform-commission-rate: ${PLATFORM_COMMISSION_RATE:0.20}
   creator-share-rate: ${CREATOR_SHARE_RATE:0.80}
   payout-hold-days: ${PAYOUT_HOLD_DAYS:7}

@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FrontendService = void 0;
+const roles_1 = require("../../common/auth/roles");
 const env_1 = require("../../config/env");
 const app_error_1 = require("../../common/errors/app-error");
 const CANONICAL_CATEGORIES = [
@@ -123,8 +124,11 @@ function formatScheduleLabel(startsAt, endsAt) {
     }
     return "Schedule to be announced";
 }
-function getAllowedSettingsRoles(role) {
-    return [role];
+function getAllowedSettingsRoles(role, hasCreatorProfile) {
+    return (0, roles_1.deriveUserRoles)({
+        role,
+        hasCreatorProfile
+    });
 }
 class FrontendService {
     db;
@@ -208,7 +212,7 @@ class FrontendService {
         if (!user) {
             throw new app_error_1.AppError("Account is unavailable.", 403);
         }
-        const allowedRoles = getAllowedSettingsRoles(user.role);
+        const allowedRoles = getAllowedSettingsRoles(user.role, Boolean(user.creatorProfile));
         const settings = isRecord(user.settings) ? user.settings : {};
         const appearance = isRecord(settings.appearancePreferences) ? settings.appearancePreferences : {};
         const privacy = isRecord(settings.privacyPreferences) ? settings.privacyPreferences : {};
@@ -270,7 +274,7 @@ class FrontendService {
         if (normalizedEmail !== user.email) {
             throw new app_error_1.AppError("Email changes require a dedicated verification flow.", 400);
         }
-        const allowedRoles = getAllowedSettingsRoles(user.role);
+        const allowedRoles = getAllowedSettingsRoles(user.role, Boolean(user.creatorProfile));
         if (input.roles.length !== allowedRoles.length ||
             input.roles.some((role) => !allowedRoles.includes(role))) {
             throw new app_error_1.AppError("Account roles cannot be changed from profile settings.", 403);
@@ -814,19 +818,24 @@ class FrontendService {
             managedContent
         };
     }
-    async getAdminDashboard() {
+    async getAdminDashboard(actor) {
         const to = new Date();
         const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         const fromDate = from.toISOString().slice(0, 10);
         const toDate = to.toISOString().slice(0, 10);
+        const financeVisible = actor.role === "admin";
         const [totalUsers, totalCreators, activeLiveSessions, revenue, commission, creatorApprovals, flaggedContent, suspiciousPayments, managedContent] = await Promise.all([
             this.db.user.count(),
             this.db.creatorProfile.count(),
             this.db.liveSession.count({
                 where: { status: "live" }
             }),
-            this.javaFinanceClient.getRevenueSummary(fromDate, toDate).catch(() => ({ grossRevenue: 0 })),
-            this.javaFinanceClient.getPlatformCommission(fromDate, toDate).catch(() => ({ platformCommission: 0 })),
+            financeVisible
+                ? this.javaFinanceClient.getRevenueSummary(fromDate, toDate).catch(() => ({ grossRevenue: 0 }))
+                : Promise.resolve({ grossRevenue: 0 }),
+            financeVisible
+                ? this.javaFinanceClient.getPlatformCommission(fromDate, toDate).catch(() => ({ platformCommission: 0 }))
+                : Promise.resolve({ platformCommission: 0 }),
             this.db.creatorProfile.count({
                 where: { verificationStatus: "pending" }
             }),
@@ -844,6 +853,7 @@ class FrontendService {
             this.getManagedContent()
         ]);
         return {
+            financeVisible,
             totalUsers,
             totalCreators,
             activeLiveSessions,
@@ -903,7 +913,7 @@ class FrontendService {
                 createdAt: String(entry.createdAt ?? new Date().toISOString())
             })));
         }
-        return listResponse([]);
+        return this.getViewerTransactions(actor.userId);
     }
     async search(input) {
         const categorySlug = input.category ? normalizeCategorySlug(input.category) : undefined;
@@ -1023,6 +1033,7 @@ class FrontendService {
         };
     }
     async createCheckout(actor, input) {
+        const paymentAccessPolicy = "Checkout totals are prepared by the backend, but payment confirmation is disabled until a verified provider callback flow is integrated.";
         const commissionBreakdown = async (amount) => {
             const finance = await this.javaFinanceClient.calculateCommission({ amount: amount.toFixed(2) });
             return {
@@ -1055,9 +1066,10 @@ class FrontendService {
                     productType: "live",
                     category: normalizeCategorySlug(live.category?.slug ?? live.category?.name),
                     creatorName: live.creator.creatorProfile?.displayName ?? `${live.creator.firstName} ${live.creator.lastName}`.trim(),
-                    sessionStatus: "ready",
-                    accessPolicy: "Payment is confirmed by the backend before live access is granted.",
-                    paymentMethods: [...SUPPORTED_PAYMENT_METHODS],
+                    sessionStatus: "draft",
+                    accessPolicy: paymentAccessPolicy,
+                    paymentMethods: [],
+                    paymentProcessingAvailable: false,
                     ...breakdown
                 };
             }
@@ -1084,9 +1096,10 @@ class FrontendService {
                     productType: "content",
                     category: normalizeCategorySlug(content.category?.slug ?? content.category?.name),
                     creatorName: content.creator.creatorProfile?.displayName ?? content.creator.id,
-                    sessionStatus: "ready",
-                    accessPolicy: "Payment is confirmed by the backend before premium access is granted.",
-                    paymentMethods: [...SUPPORTED_PAYMENT_METHODS],
+                    sessionStatus: "draft",
+                    accessPolicy: paymentAccessPolicy,
+                    paymentMethods: [],
+                    paymentProcessingAvailable: false,
                     ...breakdown
                 };
             }
@@ -1113,9 +1126,10 @@ class FrontendService {
                     productType: "class",
                     category: normalizeCategorySlug(learningClass.category?.slug ?? learningClass.category?.name),
                     creatorName: learningClass.creator.creatorProfile?.displayName ?? learningClass.creator.id,
-                    sessionStatus: "ready",
-                    accessPolicy: "Payment is confirmed by the backend before class enrollment is activated.",
-                    paymentMethods: [...SUPPORTED_PAYMENT_METHODS],
+                    sessionStatus: "draft",
+                    accessPolicy: paymentAccessPolicy,
+                    paymentMethods: [],
+                    paymentProcessingAvailable: false,
                     ...breakdown
                 };
             }
@@ -1135,13 +1149,19 @@ class FrontendService {
                 throw new app_error_1.AppError("Creator verification must be approved before requesting payouts.", 403);
             }
         }
-        await this.walletsService.requestPayout({ userId: actor.userId, role: actor.role }, input.amount, env_1.env.DEFAULT_CURRENCY);
+        const walletSummary = await this.walletsService
+            .getMyWalletSummary(actor.userId)
+            .catch(() => null);
+        const payoutCurrency = typeof walletSummary?.currency === "string" && walletSummary.currency.trim()
+            ? walletSummary.currency
+            : env_1.env.DEFAULT_CURRENCY;
+        await this.walletsService.requestPayout({ userId: actor.userId, role: actor.role }, input.amount, payoutCurrency);
         await this.db.notification.create({
             data: {
                 userId: actor.userId,
                 type: "system_alert",
                 title: "Payout request submitted",
-                body: `Your ${input.method} payout request for ${input.amount.toFixed(2)} ${env_1.env.DEFAULT_CURRENCY} is now under review.`
+                body: `Your ${input.method} payout request for ${input.amount.toFixed(2)} ${payoutCurrency} is now under review.`
             }
         });
         return {
@@ -1425,6 +1445,7 @@ class FrontendService {
             }),
             category: normalizeCategorySlug(content.category?.slug ?? content.category?.name),
             price: toNumber(content.price),
+            currency: content.currency,
             accessGranted: content.creatorId === actorUserId || !content.isPaid || Boolean(grant),
             attachmentCount: content.contentAsset ? 1 : 0
         };
@@ -1498,13 +1519,17 @@ class FrontendService {
         };
     }
     toUserAccount(user) {
+        const roles = (0, roles_1.deriveUserRoles)({
+            role: user.role,
+            hasCreatorProfile: Boolean(user.creatorProfile)
+        });
         return {
             id: user.id,
             fullName: `${user.firstName} ${user.lastName}`.trim(),
             email: user.email,
             username: user.username,
             role: user.role,
-            roles: [user.role],
+            roles,
             avatarUrl: user.avatarUrl ?? null,
             emailVerified: Boolean(user.emailVerifiedAt),
             profileCompleted: Boolean(user.profileCompletedAt),
